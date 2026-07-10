@@ -1,6 +1,6 @@
 WEB_DIR := web
 
-.PHONY: bootstrap web-install web-install-browser web-dev web-build web-check web-test api-generate api-check docs-check fmt test vet build check
+.PHONY: bootstrap web-install web-install-browser web-dev web-build web-check web-test api-generate api-check docs-check fmt test vet build check check-ci
 
 bootstrap:
 	go mod download
@@ -52,12 +52,15 @@ build:
 	mkdir -p bin
 	go build -o bin/conflow ./cmd/conflow
 
-check:
+check-ci:
 	$(MAKE) api-check
 	$(MAKE) web-check
 	$(MAKE) docs-check
-	$(MAKE) web-test
 	test -z "$$(gofmt -l $$(find . -name '*.go' -not -path './web/*'))"
 	$(MAKE) test
 	$(MAKE) vet
 	$(MAKE) build
+
+check:
+	$(MAKE) check-ci
+	$(MAKE) web-test
