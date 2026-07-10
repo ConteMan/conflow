@@ -23,6 +23,8 @@ conflow validate / plan / publish
 
 React 只负责展示、输入和调用本地 API；业务校验、模板构建和发布安全检查都在 Go 中执行。Node 只参与开发期前端构建，发布二进制通过 `go:embed` 携带前端资源。
 
+前后端通过版本化的同源 HTTP API 交互，契约见 [http-api.md](http-api.md) 和仓库根的 [`api/openapi.yaml`](../../api/openapi.yaml)。CLI 不通过 HTTP 回环调用，而是与 HTTP Handler 复用相同的 Go 应用服务。
+
 ## 四层模型
 
 ```text

@@ -21,6 +21,14 @@ go run ./cmd/conflow serve --workspace ./examples/photo-editor
 
 The frontend uses React, TypeScript, Tailwind, and shadcn/ui with Base UI primitives. Node is used only to build the frontend; release artifacts are single Go binaries.
 
+## Documentation
+
+- [Architecture](docs/design/architecture.md)
+- [Configuration model](docs/design/config-model.md)
+- [Frontend/backend HTTP API contract](docs/design/http-api.md)
+- [UI design direction and prototyping workflow](DESIGN.md)
+- [Roadmap and Specs](docs/roadmap.md)
+
 ## License
 
 [MIT](LICENSE)

@@ -1,0 +1,85 @@
+openapi: 3.1.0
+info:
+  title: Conflow Local API
+  version: 0.1.0
+  description: |
+    Versioned same-origin API between the embedded React GUI and the local Go service.
+    Only endpoints implemented in the repository are listed here. Planned endpoint families are
+    documented in docs/design/http-api.md and enter this file with their implementation Spec.
+servers:
+  - url: /api/v1
+    description: Same-origin local Conflow service
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check service health and the loaded project
+      responses:
+        "200":
+          description: Service is ready
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Must be no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, project_id]
+      properties:
+        status:
+          type: string
+          const: ok
+        project_id:
+          type: string
+    ResponseMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id]
+      properties:
+        request_id:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        next_cursor:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        path:
+          type: string
+        code:
+          type: string
+        message:
+          type: string

@@ -18,6 +18,7 @@ func New(manifest project.Manifest) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(writer).Encode(map[string]string{
 			"status":     "ok",
 			"project_id": manifest.Project.ID,

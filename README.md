@@ -46,6 +46,8 @@ make check
 
 - [架构总览](docs/design/architecture.md)
 - [配置模型](docs/design/config-model.md)
+- [前后端 HTTP API 规范](docs/design/http-api.md)
+- [UI 设计方向与原型流程](DESIGN.md)
 - [架构决策记录](docs/decisions/README.md)
 - [路线图](docs/roadmap.md)
 - [贡献指南](CONTRIBUTING.md)
