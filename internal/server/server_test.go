@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ConteMan/conflow/internal/app"
+	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 )
 
@@ -252,6 +253,79 @@ func TestHealthReportsUnavailableProject(t *testing.T) {
 	}
 }
 
+func TestPackEndpointsReturnDeclarativeMetadataAndSchema(t *testing.T) {
+	handler, _ := newTestHandlerWithPacks(t, packs.MustNewRegistry(testPackDefinition()))
+
+	listed := executeRequest(t, handler, http.MethodGet, "/api/v1/packs", "", nil)
+	if listed.Code != http.StatusOK || listed.Header().Get("Cache-Control") != "no-store" || listed.Header().Get("ETag") != `"1"` {
+		t.Fatalf("list status = %d, headers = %#v, body = %s", listed.Code, listed.Header(), listed.Body.String())
+	}
+	var listResponse struct {
+		Data []packSummaryDTO `json:"data"`
+		Meta responseMeta     `json:"meta"`
+	}
+	decodeResponse(t, listed, &listResponse)
+	if len(listResponse.Data) != 1 || listResponse.Data[0].Ref != "test-pack/v1" || listResponse.Data[0].Name != "test-pack" || listResponse.Meta.RequestID == "" {
+		t.Fatalf("list response = %#v", listResponse)
+	}
+
+	metadata := executeRequest(t, handler, http.MethodGet, "/api/v1/packs/test-pack/versions/v1", "", nil)
+	if metadata.Code != http.StatusOK || metadata.Header().Get("ETag") != `"1"` {
+		t.Fatalf("metadata status = %d, body = %s", metadata.Code, metadata.Body.String())
+	}
+	var metadataResponse struct {
+		Data packMetadataDTO `json:"data"`
+		Meta responseMeta    `json:"meta"`
+	}
+	decodeResponse(t, metadata, &metadataResponse)
+	if metadataResponse.Meta.Revision != 1 || metadataResponse.Data.Ref != "test-pack/v1" || metadataResponse.Data.SchemaVersion != 1 || metadataResponse.Data.EntityTypes[0].DeletionPolicy != "restrict" || metadataResponse.Data.EntityTypes[0].EnvironmentOverrideFields[0] != "enabled" {
+		t.Fatalf("metadata = %#v", metadataResponse.Data)
+	}
+
+	schema := executeRequest(t, handler, http.MethodGet, "/api/v1/packs/test-pack/versions/v1/schema", "", nil)
+	if schema.Code != http.StatusOK || schema.Header().Get("ETag") != `"1"` {
+		t.Fatalf("schema status = %d, body = %s", schema.Code, schema.Body.String())
+	}
+	var schemaResponse struct {
+		Data packSchemaDTO `json:"data"`
+		Meta responseMeta  `json:"meta"`
+	}
+	decodeResponse(t, schema, &schemaResponse)
+	field := schemaResponse.Data.Entities[0].Fields[0]
+	if schemaResponse.Meta.Revision != 1 || string(field.Default) != "false" || field.UI.Control != "switch" || field.Sensitivity != "public" {
+		t.Fatalf("field = %#v", field)
+	}
+}
+
+func TestPackEndpointsMapLookupAndSchemaErrors(t *testing.T) {
+	handler, _ := newTestHandlerWithPacks(t, packs.MustNewRegistry(testPackDefinition()))
+	tests := []struct {
+		path       string
+		wantStatus int
+		wantCode   string
+	}{
+		{path: "/api/v1/packs/missing-pack/versions/v1", wantStatus: http.StatusNotFound, wantCode: "pack_not_found"},
+		{path: "/api/v1/packs/test-pack/versions/v2", wantStatus: http.StatusNotFound, wantCode: "pack_version_not_found"},
+		{path: "/api/v1/packs/test-pack/versions/v1/schema?schema_version=2", wantStatus: http.StatusUnprocessableEntity, wantCode: "schema_incompatible"},
+		{path: "/api/v1/packs/test-pack/versions/v1/schema?schema_version=invalid", wantStatus: http.StatusBadRequest, wantCode: "invalid_request"},
+		{path: "/api/v1/packs/test-pack/versions/v1/schema?schema_version=", wantStatus: http.StatusBadRequest, wantCode: "invalid_request"},
+		{path: "/api/v1/packs/test-pack/versions/v1/schema?schema_version=1&schema_version=1", wantStatus: http.StatusBadRequest, wantCode: "invalid_request"},
+	}
+	for _, test := range tests {
+		t.Run(test.wantCode, func(t *testing.T) {
+			recorder := executeRequest(t, handler, http.MethodGet, test.path, "", nil)
+			if recorder.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d, body = %s", recorder.Code, test.wantStatus, recorder.Body.String())
+			}
+			var response errorEnvelope
+			decodeResponse(t, recorder, &response)
+			if response.Error.Code != test.wantCode || response.Error.RequestID == "" {
+				t.Fatalf("error = %#v", response.Error)
+			}
+		})
+	}
+}
+
 func TestExternalManifestChangeInvalidatesRevision(t *testing.T) {
 	handler, workspace := newTestHandler(t)
 	path := project.ManifestPath(workspace)
@@ -271,16 +345,55 @@ func TestExternalManifestChangeInvalidatesRevision(t *testing.T) {
 }
 
 func newTestHandler(t *testing.T) (http.Handler, string) {
+	return newTestHandlerWithPacks(t, packs.BuiltinRegistry())
+}
+
+func newTestHandlerWithPacks(t *testing.T, registry *packs.Registry) (http.Handler, string) {
 	t.Helper()
 	workspace := t.TempDir()
 	if _, err := project.CreateExample(workspace); err != nil {
 		t.Fatal(err)
 	}
-	service, err := app.Open(workspace)
+	service, err := app.OpenWithPacks(workspace, registry)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return New(service), workspace
+}
+
+func testPackDefinition() packs.Definition {
+	return packs.Definition{
+		Metadata: packs.Metadata{
+			Name:         "test-pack",
+			Version:      "v1",
+			Description:  "A declarative HTTP test Pack.",
+			Capabilities: []string{"environment_overrides"},
+			EntityTypes: []packs.EntityMetadata{{
+				Name:                      "setting",
+				Label:                     "Setting",
+				Description:               "A test setting.",
+				IDRule:                    packs.IDRule{Pattern: "^[a-z][a-z0-9-]{0,62}$", MinLength: 1, MaxLength: 63},
+				DeletionPolicy:            packs.DeletionPolicyRestrict,
+				EnvironmentOverrideFields: []string{"enabled"},
+			}},
+		},
+		Schema: packs.Schema{
+			Version: 1,
+			Entities: []packs.EntitySchema{{
+				Name: "setting",
+				Fields: []packs.FieldSchema{{
+					Name:        "enabled",
+					Type:        packs.FieldTypeBoolean,
+					Required:    true,
+					Default:     json.RawMessage("false"),
+					Sensitivity: packs.SensitivityPublic,
+					UI:          packs.FieldUI{Label: "Enabled", Description: "Whether the setting is enabled.", Control: "switch", Group: "General", Order: 0},
+					Validation:  packs.FieldValidation{Enum: []json.RawMessage{}},
+				}},
+			}},
+			Migrations: []packs.SchemaMigration{},
+		},
+	}
 }
 
 func executeRequest(t *testing.T, handler http.Handler, method, path, ifMatch string, body []byte) *httptest.ResponseRecorder {

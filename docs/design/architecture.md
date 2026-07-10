@@ -51,7 +51,7 @@ Provider Adapter
 | `cmd/embedui` | 将 Vite 产物同步为可嵌入资源 |
 | `internal/cli` | `init`、`serve`、`validate` 等 Cobra 命令 |
 | `internal/project` | 项目清单、环境、基础校验 |
-| `internal/packs` | 配置包元数据与注册表 |
+| `internal/packs` | 版本化、纯声明式的配置包契约、内置注册表与未来编译 / 校验 / 语义 diff 边界 |
 | `internal/source` | 源适配器接口与实现 |
 | `internal/provider` | 发布适配器接口与实现 |
 | `internal/server` | 本地 HTTP API 与静态 UI 托管 |

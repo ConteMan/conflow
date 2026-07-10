@@ -8,7 +8,7 @@ Conflow is a single Go binary with both a CLI and a local web GUI. It lets produ
 
 ## Status
 
-Conflow is in the M2 configuration-core stage: the foundation and project/environment API are implemented. The first configuration pack is `mobile-ad-monetization/v1`, and the first publishing provider is Firebase Remote Config. See the [roadmap](docs/roadmap.md) for scope.
+Conflow is in the M2 configuration-core stage: the foundation, project/environment API, and versioned Config Pack contract are implemented. The first configuration pack is `mobile-ad-monetization/v1`, and the first publishing provider is Firebase Remote Config. See the [roadmap](docs/roadmap.md) for scope.
 
 ## Development
 

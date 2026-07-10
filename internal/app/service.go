@@ -5,13 +5,18 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 )
 
-var ErrLastEnvironment = errors.New("cannot delete the last environment")
+var (
+	ErrLastEnvironment         = errors.New("cannot delete the last environment")
+	ErrPackRegistryUnavailable = errors.New("pack registry is unavailable")
+)
 
 type Service struct {
-	projects *project.Store
+	projects     *project.Store
+	packRegistry *packs.Registry
 }
 
 func Initialize(workspace string) (string, error) {
@@ -19,11 +24,18 @@ func Initialize(workspace string) (string, error) {
 }
 
 func Open(workspace string) (*Service, error) {
+	return OpenWithPacks(workspace, packs.BuiltinRegistry())
+}
+
+func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error) {
+	if registry == nil {
+		return nil, ErrPackRegistryUnavailable
+	}
 	store, err := project.Open(workspace)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{projects: store}, nil
+	return &Service{projects: store, packRegistry: registry}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -90,4 +102,16 @@ func (s *Service) DeleteEnvironment(_ context.Context, expectedRevision uint64, 
 		}
 		return project.ErrNotFound
 	})
+}
+
+func (s *Service) ListPacks(_ context.Context) packs.Snapshot {
+	return s.packRegistry.List()
+}
+
+func (s *Service) GetPack(_ context.Context, name, version string) (packs.Definition, uint64, error) {
+	return s.packRegistry.Get(name, version)
+}
+
+func (s *Service) GetPackSchema(_ context.Context, name, version string, requestedVersion *uint64) (packs.Schema, uint64, error) {
+	return s.packRegistry.Schema(name, version, requestedVersion)
 }

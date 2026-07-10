@@ -60,6 +60,7 @@ API 变更顺序固定为：
 - `data` 是资源或资源集合。
 - `meta.request_id` 用于日志与问题定位。
 - 可修改资源返回 `meta.revision`，同时响应头带 `ETag: "12"`。
+- Pack 查询返回只读的 registry revision 与对应 ETag；它和项目 manifest revision 属于不同 revision 域，不得用于项目写请求的 `If-Match`。
 - 集合分页时，`meta` 增加 `next_cursor`；没有下一页时省略，不返回空字符串。
 
 健康检查保留最小响应：
@@ -93,11 +94,11 @@ API 变更顺序固定为：
 |---|---|---|
 | `400` | `invalid_request`、`malformed_json` | 请求结构无法解析 |
 | `403` | `invalid_origin` | 浏览器来源不允许 |
-| `404` | `project_not_found`、`entity_not_found` | 资源不存在 |
+| `404` | `project_not_found`、`entity_not_found`、`pack_not_found`、`pack_version_not_found` | 资源不存在 |
 | `409` | `state_conflict`、`operation_in_progress` | 当前状态不允许操作 |
 | `412` | `revision_mismatch`、`remote_etag_mismatch` | `If-Match` 或远端 ETag 已变化 |
 | `415` | `unsupported_media_type` | 修改请求未使用 JSON Content-Type |
-| `422` | `validation_failed`、`rule_violation` | 请求结构有效，但业务规则不通过 |
+| `422` | `validation_failed`、`rule_violation`、`schema_incompatible` | 请求结构有效，但业务规则不通过或客户端不能消费所请求 schema |
 | `428` | `precondition_required` | 修改请求缺少 `If-Match` |
 | `502` | `provider_error`、`provider_unauthorized` | 上游 Provider 调用失败 |
 | `503` | `provider_unavailable` | 上游暂时不可用 |
@@ -178,7 +179,7 @@ Firebase 的 ETag 是远端并发令牌，必须单独保存为 `remote_etag`。
 |---|---|---|
 | `/health`、`/bootstrap` | 运行状态、GUI 启动上下文、能力发现 | 001、002 |
 | `/project`、`/environments` | 项目和环境 CRUD | 002 |
-| `/packs` | Pack 元数据、实体类型和表单 schema | 003 |
+| `/packs` | Pack 列表、版本 metadata 与声明式表单 schema；schema 查询可带客户端支持的 `schema_version` | 003 |
 | `/drafts/{environment_id}` | 草稿、实体 CRUD、环境覆盖 | 004、005、006 |
 | `/drafts/{environment_id}:validate` | 完整校验 | 007 |
 | `/drafts/{environment_id}:plan` | 构建、语义 diff、风险和影响范围 | 008 |

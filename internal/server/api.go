@@ -3,8 +3,10 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/ConteMan/conflow/internal/app"
+	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 )
 
@@ -27,9 +29,15 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/environments/{environment_id}", a.getEnvironment)
 	mux.HandleFunc("PUT /api/v1/environments/{environment_id}", a.updateEnvironment)
 	mux.HandleFunc("DELETE /api/v1/environments/{environment_id}", a.deleteEnvironment)
+	mux.HandleFunc("GET /api/v1/packs", a.listPacks)
+	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}", a.getPack)
+	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}/schema", a.getPackSchema)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments/{environment_id}", methodNotAllowed)
+	mux.HandleFunc("/api/v1/packs", methodNotAllowed)
+	mux.HandleFunc("/api/v1/packs/{pack_name}/versions/{pack_version}", methodNotAllowed)
+	mux.HandleFunc("/api/v1/packs/{pack_name}/versions/{pack_version}/schema", methodNotAllowed)
 	mux.HandleFunc("/api/", routeNotFound)
 	return apiMiddleware(mux)
 }
@@ -176,6 +184,50 @@ func (a *api) deleteEnvironment(writer http.ResponseWriter, request *http.Reques
 	writeSuccess(writer, request, http.StatusOK, deleteEnvironmentData{DeletedID: environmentID}, snapshot.Revision)
 }
 
+func (a *api) listPacks(writer http.ResponseWriter, request *http.Request) {
+	snapshot := a.service.ListPacks(request.Context())
+	writeSuccess(writer, request, http.StatusOK, packSummariesDTOFrom(snapshot.Definitions), snapshot.Revision)
+}
+
+func (a *api) getPack(writer http.ResponseWriter, request *http.Request) {
+	definition, revision, err := a.service.GetPack(request.Context(), request.PathValue("pack_name"), request.PathValue("pack_version"))
+	if err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, packMetadataDTOFrom(definition), revision)
+}
+
+func (a *api) getPackSchema(writer http.ResponseWriter, request *http.Request) {
+	requestedVersion, err := schemaVersionFrom(request)
+	if err != nil {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "schema_version 必须是正整数", 0)
+		return
+	}
+	schema, revision, err := a.service.GetPackSchema(request.Context(), request.PathValue("pack_name"), request.PathValue("pack_version"), requestedVersion)
+	if err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, packSchemaDTOFrom(schema), revision)
+}
+
+func schemaVersionFrom(request *http.Request) (*uint64, error) {
+	values, exists := request.URL.Query()["schema_version"]
+	if !exists {
+		return nil, nil
+	}
+	if len(values) != 1 || values[0] == "" {
+		return nil, errors.New("invalid schema version")
+	}
+	raw := values[0]
+	version, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil || version == 0 {
+		return nil, errors.New("invalid schema version")
+	}
+	return &version, nil
+}
+
 func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err error) {
 	var mismatch *project.RevisionMismatchError
 	switch {
@@ -187,6 +239,12 @@ func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err 
 		writeAPIError(writer, request, http.StatusConflict, "environment_already_exists", "环境 ID 已存在", 0)
 	case errors.Is(err, app.ErrLastEnvironment):
 		writeAPIError(writer, request, http.StatusConflict, "last_environment", "项目必须至少保留一个环境", 0)
+	case errors.Is(err, packs.ErrUnknownPack):
+		writeAPIError(writer, request, http.StatusNotFound, "pack_not_found", "配置包不存在", 0)
+	case errors.Is(err, packs.ErrUnknownVersion):
+		writeAPIError(writer, request, http.StatusNotFound, "pack_version_not_found", "配置包版本不存在", 0)
+	case errors.Is(err, packs.ErrSchemaIncompatible):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "schema_incompatible", "配置包 schema 版本不兼容", 0)
 	case errors.Is(err, project.ErrInvalidManifest):
 		writeAPIError(writer, request, http.StatusUnprocessableEntity, "validation_failed", "项目配置不合法", 0)
 	default:
