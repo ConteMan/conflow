@@ -38,16 +38,24 @@ source:
   type: managed-file
 environments:
   - id: development
+    name: Development
+    kind: development
     provider:
       type: firebase-remote-config
       project_id: photo-editor-dev
   - id: production
+    name: Production
+    kind: production
     provider:
       type: firebase-remote-config
       project_id: photo-editor-prod
     publish:
       requires_confirmation: true
 ```
+
+环境 `id` 是稳定、不透明的技术标识；`name` 是 PM 可见名称；`kind` 固定为 `development`、`staging`、`production` 或 `custom`。客户端只根据服务端返回的 `kind` 判断 Production 风险状态，不从 `id`、`name`、Provider project ID 或确认开关推断。`id` 与 `kind` 创建后不可变，`name` 可编辑；同一项目允许存在多个同类环境。
+
+Conflow 尚未冻结稳定 manifest 格式，本约束直接纳入 manifest version 1。此前的实验性 manifest 必须显式补齐 `name` 与 `kind`；服务端不得静默猜测环境类别。
 
 项目可选 `git-json` 源适配器，以读取并写回既有仓库中 `config/remote-config/` 一类结构。适配器映射是项目配置，不承担广告业务规则。
 

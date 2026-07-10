@@ -20,6 +20,15 @@
 
 `UI-API-001`、`UI-API-002` 是 Spec 013 的硬阻塞。`UI-API-003` 可以通过“只实现状态槽”降级；`UI-API-004` 可以延后到 015，但 013 不得先创造临时字段。
 
+处理状态（2026-07-10）：
+
+- `UI-API-001`：合同已定义。`Environment.name/kind` 进入 OpenAPI；只有 `kind=production` 驱动 Production UI。
+- `UI-API-002`：合同已定义。manifest 写冲突返回原子 `current_state`、`current_revision` 与匹配 ETag。
+- `UI-API-003`：已降级，不阻塞 013。013 只实现状态槽，真实 dirty 由 004 接入。
+- `UI-API-004`：已延后，不阻塞 013。项目级确认策略由 010/015 收口，013 不创建临时字段。
+
+“合同已定义”表示前后端可以基于已合并 OpenAPI 并行实现；对应运行时代码和 E2E 仍须在实现 PR 中完成，不能把 mock 视为验收通过。
+
 ## Spec 014 开工门槛
 
 | ID | UI 假设与证据 | 当前缺口 | 最小合同建议 | 归属 |
