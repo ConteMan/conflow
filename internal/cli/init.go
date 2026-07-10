@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +13,7 @@ func newInitCommand() *cobra.Command {
 		Use:   "init",
 		Short: "Create a Conflow project manifest",
 		RunE: func(command *cobra.Command, args []string) error {
-			path, err := project.CreateExample(directory)
+			path, err := app.Initialize(directory)
 			if err != nil {
 				return err
 			}

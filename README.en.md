@@ -8,7 +8,7 @@ Conflow is a single Go binary with both a CLI and a local web GUI. It lets produ
 
 ## Status
 
-Conflow is at the M1 foundation stage. The first configuration pack is `mobile-ad-monetization/v1`, and the first publishing provider is Firebase Remote Config. See the [roadmap](docs/roadmap.md) for scope.
+Conflow is in the M2 configuration-core stage: the foundation and project/environment API are implemented. The first configuration pack is `mobile-ad-monetization/v1`, and the first publishing provider is Firebase Remote Config. See the [roadmap](docs/roadmap.md) for scope.
 
 ## Development
 
@@ -20,6 +20,14 @@ go run ./cmd/conflow serve --workspace ./examples/photo-editor
 ```
 
 The frontend uses React, TypeScript, Tailwind, and shadcn/ui with Base UI primitives. Node is used only to build the frontend; release artifacts are single Go binaries.
+
+## Documentation
+
+- [Architecture](docs/design/architecture.md)
+- [Configuration model](docs/design/config-model.md)
+- [Frontend/backend HTTP API contract](docs/design/http-api.md)
+- [UI design direction and prototyping workflow](DESIGN.md)
+- [Roadmap and Specs](docs/roadmap.md)
 
 ## License
 

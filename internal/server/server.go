@@ -1,35 +1,32 @@
 package server
 
 import (
-	"encoding/json"
 	"io/fs"
 	"net/http"
 	"path"
 
-	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/webui"
 )
 
-func New(manifest project.Manifest) http.Handler {
+func New(service *app.Service) http.Handler {
 	assets, err := webui.Files()
 	if err != nil {
 		panic(err)
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(writer).Encode(map[string]string{
-			"status":     "ok",
-			"project_id": manifest.Project.ID,
-		})
-	})
-	mux.Handle("GET /", frontend(assets))
-	return mux
+	root := http.NewServeMux()
+	root.Handle("/api/", newAPI(service).handler())
+	root.Handle("/", frontend(assets))
+	return root
 }
 
 func frontend(assets fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(assets))
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet && request.Method != http.MethodHead {
+			writer.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		if request.URL.Path == "/" {
 			request.URL.Path = "/index.html"
 		}

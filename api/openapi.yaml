@@ -1,0 +1,534 @@
+openapi: 3.1.0
+info:
+  title: Conflow Local API
+  version: 0.2.0
+  description: |
+    Versioned same-origin API between the embedded React GUI and the local Go service.
+servers:
+  - url: /api/v1
+    description: Same-origin local Conflow service
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check service health and the loaded project
+      responses:
+        "200":
+          description: Service is ready
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: The project manifest is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /bootstrap:
+    get:
+      operationId: getBootstrap
+      summary: Load the GUI bootstrap context
+      responses:
+        "200":
+          description: Bootstrap context
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapResponse"
+  /project:
+    get:
+      operationId: getProject
+      summary: Get the loaded project
+      responses:
+        "200":
+          description: Project
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+    put:
+      operationId: updateProject
+      summary: Replace editable project metadata
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectInput"
+      responses:
+        "200":
+          description: Updated project
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "412":
+          $ref: "#/components/responses/RevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /environments:
+    get:
+      operationId: listEnvironments
+      summary: List project environments
+      responses:
+        "200":
+          description: Environments
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentsResponse"
+    post:
+      operationId: createEnvironment
+      summary: Create an environment
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnvironmentInput"
+      responses:
+        "201":
+          description: Created environment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+        "412":
+          $ref: "#/components/responses/RevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /environments/{environment_id}:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    get:
+      operationId: getEnvironment
+      summary: Get an environment
+      responses:
+        "200":
+          description: Environment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateEnvironment
+      summary: Replace an environment without changing its ID
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEnvironmentInput"
+      responses:
+        "200":
+          description: Updated environment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/RevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteEnvironment
+      summary: Delete an environment
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Deleted environment ID
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/ETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteEnvironmentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "412":
+          $ref: "#/components/responses/RevisionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+components:
+  parameters:
+    EnvironmentID:
+      name: environment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9-]{1,62}$"
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Quoted local manifest revision returned by ETag.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+  headers:
+    CacheControl:
+      schema:
+        type: string
+        const: no-store
+    ETag:
+      description: Quoted local manifest revision.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+    RequestID:
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Malformed JSON, unknown fields, or invalid request headers.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Browser origin is not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    StateConflict:
+      description: Resource already exists or the current state forbids the operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RevisionMismatch:
+      description: The manifest revision changed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationFailed:
+      description: Request is structurally valid but violates project rules.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnsupportedMediaType:
+      description: Mutation body is not application/json.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PreconditionRequired:
+      description: If-Match is required for this mutation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, project_id]
+      properties:
+        status:
+          type: string
+          const: ok
+        project_id:
+          type: string
+    BootstrapResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/BootstrapData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    BootstrapData:
+      type: object
+      additionalProperties: false
+      required: [project, environments, capabilities]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        environments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Environment"
+        capabilities:
+          $ref: "#/components/schemas/Capabilities"
+    ProjectResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Project"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    EnvironmentsResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Environment"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    EnvironmentResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Environment"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    DeleteEnvironmentResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [deleted_id]
+          properties:
+            deleted_id:
+              type: string
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    ResponseMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, revision]
+      properties:
+        request_id:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+    Project:
+      type: object
+      additionalProperties: false
+      required: [id, name, pack_ref, source_type]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{1,62}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        pack_ref:
+          type: string
+        source_type:
+          type: string
+          enum: [managed-file, git-json]
+    UpdateProjectInput:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{1,62}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+    Environment:
+      type: object
+      additionalProperties: false
+      required: [id, provider, publish]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{1,62}$"
+        provider:
+          $ref: "#/components/schemas/ProviderConfig"
+        publish:
+          $ref: "#/components/schemas/PublishConfig"
+    CreateEnvironmentInput:
+      allOf:
+        - $ref: "#/components/schemas/Environment"
+    UpdateEnvironmentInput:
+      type: object
+      additionalProperties: false
+      required: [provider, publish]
+      properties:
+        provider:
+          $ref: "#/components/schemas/ProviderConfig"
+        publish:
+          $ref: "#/components/schemas/PublishConfig"
+    ProviderConfig:
+      type: object
+      additionalProperties: false
+      required: [type, project_id]
+      properties:
+        type:
+          type: string
+          const: firebase-remote-config
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+    PublishConfig:
+      type: object
+      additionalProperties: false
+      required: [requires_confirmation]
+      properties:
+        requires_confirmation:
+          type: boolean
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [project_edit, environment_manage]
+      properties:
+        project_edit:
+          type: boolean
+          const: true
+        environment_manage:
+          type: boolean
+          const: true
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+        current_revision:
+          type: integer
+          minimum: 1
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        path:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
