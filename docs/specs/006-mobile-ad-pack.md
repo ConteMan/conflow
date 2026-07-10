@@ -22,6 +22,7 @@
 - 基线与环境字段边界：unit binding 必须按环境；稳定 ID 与 placement 不允许环境覆盖。
 - 删除策略和引用查询入口。
 - Provider-neutral 编译中间模型；Firebase 参数编译留给 Spec 008/009。
+- 建立版本化、机器可读的 PDF Launcher 等价 contract fixture；Go golden tests、API tests 与 UI E2E 直接复用，`docs/design/ui/prototypes/fixtures.md` 作为人类可读说明。
 
 ## API
 
@@ -34,7 +35,7 @@
 
 ## 验收
 
-- 使用 PDF Launcher 等价 fixture 可表达 20+ 广告位、共享频控和多环境 unit binding。
+- 共享 contract fixture 可表达 20+ 广告位、共享频控和多环境 unit binding，并由 Pack golden test 与后续 UI E2E 读取同一份数据。
 - UI schema 不要求 PM 直接填写长 JSON。
 - 删除被引用频控策略前能返回引用者清单。
 - Pack schema、默认值和序列化有 golden tests。

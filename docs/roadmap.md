@@ -32,12 +32,12 @@ M5 的设计探索不等待 M4 完成：Spec 012 在 Spec 006 领域合同稳定
 
 ## 近期执行顺序
 
-1. Spec 002 与 003 可并行：先稳定项目/API 与 Pack 合同。
-2. Spec 004 汇合两者，随后完成 Spec 005。
-3. Spec 006、007、008形成首个可用领域与 Plan。
-4. Spec 012 在 Spec 006 后启动两轮原型探索，结论回写 `DESIGN.md`。
-5. Spec 009–011 与 Spec 013–014按依赖并行推进。
-6. Spec 015 合并完整 PM 发布体验；Spec 016–018补既有仓与自动化。
+1. Spec 002、003 与 Spec 012 的首轮 UI 结构基线已完成；Spec 006 合并后按真实领域合同回校原型，不重新开启无边界视觉探索。
+2. 先关闭 [`UI-API-001`](design/ui/contract-gaps.md#spec-013-开工门槛) 与 `UI-API-002`，再实现 Spec 013 的 Production 状态和冲突交互；应用壳的路由与布局可先并行。
+3. 先合并 Spec 004 contract-only PR，再实现草稿分层；随后 Spec 005、006 可并行。
+4. Spec 006/007 的合同与共享 fixture 合并后实现领域校验，并关闭 Spec 014 的合同门槛。
+5. Spec 008–011 与对应 contract-only PR 形成 Plan、Firebase、发布和回滚闭环；Spec 014 可按依赖并行。
+6. Spec 015 合并完整 PM 发布体验；Spec 016–018 补既有仓与自动化。
 7. Spec 019 在 v1 功能冻结后完成正式分发。
 
 ## v1 In

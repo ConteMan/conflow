@@ -32,6 +32,8 @@ API 变更顺序固定为：
 
 不得先让前端猜测 JSON，再倒推 Go 实现。
 
+UI flows 或原型依赖服务端行为时，必须先登记并关闭 [`ui/contract-gaps.md`](ui/contract-gaps.md) 中的对应缺口。UI Spec 开工前使用 contract-only PR 合并路径、DTO、错误恢复、状态机和 fixture；该 PR 不混入 Handler 或 React 实现。后端尚未实现时，前端只能基于已合并 OpenAPI 与同源 contract fixture mock，不得另建一套手写响应。
+
 ## 3. 基础约定
 
 - 基础路径：`/api/v1`。

@@ -1,6 +1,6 @@
 # Spec 012 UI 原型真实规模 Fixture
 
-> 场景：类 PDF Launcher 的移动应用广告配置包 `mobile-ad-monetization/v1`。本数据仅用于原型、评审和后续实现的共享参考；它刻意保留禁用项、长 key、未引用策略与不完整绑定，以覆盖真实操作场景。
+> 场景：类 PDF Launcher 的移动应用广告配置包 `mobile-ad-monetization/v1`。本数据用于原型、评审和后续实现的共享参考；它刻意保留禁用项、长 key、未引用策略与不完整绑定，以覆盖真实操作场景。本文是人类可读视图；Spec 006 将建立结构化 contract fixture 作为 Go golden tests、API tests 和 UI E2E 的共同可执行事实源。
 
 ## 1. placement（24 条）
 
@@ -40,7 +40,7 @@
 | <a id="frequency-policy"></a>策略 key | cooldown | interval | max count | shift count | positions | 引用 placement 数 | 原型用途 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <a id="frequency-policy-inter_global_cap"></a>`inter_global_cap` | 30 秒 | 300 秒 | 3 次 | 1 次 | `open_document, export_pdf, complete_action` | 10 | 共享频控编辑抽屉与受影响实体清单 |
-| <a id="frequency-policy-app_open_session_gate"></a>`app_open_session_gate` | 120 秒 | 1,800 秒 | 2 次 | 0 次 | `cold_start, warm_resume, return_from_settings` | 7 | 启动/恢复展示节流 |
+| <a id="frequency-policy-app_open_session_gate"></a>`app_open_session_gate` | 30 秒 | 1,800 秒 | 2 次 | 0 次 | `cold_start, warm_resume, return_from_settings` | 7 | PM 主路径将其冷却时间从 30 秒提高到 120 秒 |
 | <a id="frequency-policy-native_scroll_gap"></a>`native_scroll_gap` | 0 秒 | 90 秒 | 4 次 | 2 次 | `feed_top, list_inline, search_inline` | 6 | 信息流滚动间隔 |
 | <a id="frequency-policy-legacy_campaign_cap"></a>`legacy_campaign_cap` | 600 秒 | 3,600 秒 | 1 次 | 0 次 | `compress_complete` | 0 | 未引用提示与安全删除场景 |
 | <a id="frequency-policy-high_intent_tool_cap"></a>`high_intent_tool_cap` | 180 秒 | 900 秒 | 2 次 | 1 次 | `document_tools_panel` | 1 | 工具面板的低频展示节流 |
@@ -105,7 +105,7 @@
 | 警告 | 未引用 | [frequency policy `legacy_campaign_cap`](#frequency-policy-legacy_campaign_cap) | 此频控策略当前未被任何广告位引用；删除前请确认不需要为旧活动回滚保留它。 |
 | 阻断 | 发布就绪度 | [Production 绑定矩阵](#4-unit_binding3-个环境--ios--android) | Production 发布被阻断：2 个启用的广告位缺少平台绑定。补齐绑定或将对应广告位停用后，才能生成可发布 Plan。 |
 
-## 6. 大 diff 场景（14 处业务变更）
+## 6. 大 diff 场景（5 项直接修改 / 10 个受影响实体）
 
 场景：运营将共享频控 `inter_global_cap` 的 cooldown 从 **30 秒**提高到 **120 秒**；此修改会波及其引用的 10 个 interstitial 广告位。同时翻转 3 个功能开关，并为 staging 新增 1 个环境覆盖。
 
@@ -116,4 +116,4 @@
 | 功能开关（3 处） | `use_amazon_bidding`：`false` → `true`；`enable_native_preload`：`true` → `false`；`show_subscription_offer`：`true` → `false` | 同时展示高、中、中风险标签与对应回滚说明。 |
 | 环境覆盖（1 处） | 新增 staging 覆盖：`use_amazon_bidding = false` | 仅影响 staging；基线启用竞价，staging 保持 waterfall，用于三值 caption 与环境覆盖新增态。 |
 
-远端参数数量级：约 **12 个 Firebase 参数**。原型将 14 处业务变更与远端参数分层展示：共享频控产生的 10 个引用影响在编译后按有效广告位聚合为约 8 个 placement 参数，3 个功能开关与 1 个 staging 覆盖各形成 1 个参数变更。该数量是 UI 评审用的编译结果 fixture，不构成 Firebase 参数命名或编译契约。
+直接修改共 5 项：1 个共享频控、3 个功能开关和 1 个 staging 环境覆盖；共享频控另外产生 10 个受影响广告位。远端参数数量级约 **12 个 Firebase 参数**：10 个引用影响在编译后按有效广告位聚合为约 8 个 placement 参数，3 个功能开关与 1 个 staging 覆盖各形成 1 个参数变更。该数量是 UI 评审用的编译结果 fixture，不构成 Firebase 参数命名或编译契约。

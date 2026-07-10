@@ -65,6 +65,9 @@ flowchart LR
 ## 执行规则
 
 - 一份 Spec 一个聚焦 PR；接口契约变化先改 `api/openapi.yaml`。
+- UI Spec 消费新端点前，先合并 contract-only PR：对应后端 Spec、跨域 HTTP 语义、OpenAPI、示例、生成类型与 contract fixture 同步更新，不混入 Handler 或 React 实现。一个公开行为确实跨越多个 Spec 时可在同一合同 PR 收口，但实现仍按 Spec 分开交付。
+- UI flows 中的服务端行为假设必须映射到已合并合同或 [`UI 假设与后端合同缺口`](../design/ui/contract-gaps.md)；未记录的假设先补合同再实现。
+- 跨 Go golden tests、API tests 与 UI E2E 的业务场景使用同一份结构化 contract fixture；Markdown 和截图只作为人类可读说明。
 - Worker 只拥有被分配 Spec 的文件范围；跨 Spec 变更先回到主控确认。
 - review-only 任务只报告问题，不直接修改其他 Spec。
 - Spec 与 ADR 冲突时停止实现，新增 ADR 或由维护者决策。
