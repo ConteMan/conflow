@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Conflow Local API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Versioned same-origin API between the embedded React GUI and the local Go service.
 servers:
@@ -94,7 +94,7 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "412":
-          $ref: "#/components/responses/RevisionMismatch"
+          $ref: "#/components/responses/ManifestRevisionMismatch"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "422":
@@ -151,7 +151,7 @@ paths:
         "409":
           $ref: "#/components/responses/StateConflict"
         "412":
-          $ref: "#/components/responses/RevisionMismatch"
+          $ref: "#/components/responses/ManifestRevisionMismatch"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "422":
@@ -212,7 +212,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "412":
-          $ref: "#/components/responses/RevisionMismatch"
+          $ref: "#/components/responses/ManifestRevisionMismatch"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "422":
@@ -245,7 +245,7 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "412":
-          $ref: "#/components/responses/RevisionMismatch"
+          $ref: "#/components/responses/ManifestRevisionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
   /packs:
@@ -399,12 +399,40 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-    RevisionMismatch:
-      description: The manifest revision changed.
+    ManifestRevisionMismatch:
+      description: The manifest revision changed; the response contains the authoritative current manifest state from the same snapshot as the returned ETag.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        ETag:
+          $ref: "#/components/headers/ETag"
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: "#/components/schemas/ManifestRevisionMismatchResponse"
+          example:
+            error:
+              code: revision_mismatch
+              message: The project manifest changed. Review the current state before saving again.
+              request_id: req_01JEXAMPLE
+              current_revision: 2
+              current_state:
+                project:
+                  id: photo-editor
+                  name: Photo Editor from Git
+                  pack_ref: mobile-ad-monetization/v1
+                  source_type: managed-file
+                environments:
+                  - id: development
+                    name: Development
+                    kind: development
+                    provider:
+                      type: firebase-remote-config
+                      project_id: photo-editor-dev
+                    publish:
+                      requires_confirmation: false
     ValidationFailed:
       description: Request is structurally valid but violates project rules.
       content:
@@ -462,6 +490,17 @@ components:
             $ref: "#/components/schemas/Environment"
         capabilities:
           $ref: "#/components/schemas/Capabilities"
+    ManifestState:
+      type: object
+      additionalProperties: false
+      required: [project, environments]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        environments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Environment"
     ProjectResponse:
       type: object
       additionalProperties: false
@@ -576,27 +615,67 @@ components:
     Environment:
       type: object
       additionalProperties: false
-      required: [id, provider, publish]
+      required: [id, name, kind, provider, publish]
       properties:
         id:
           type: string
           pattern: "^[a-z][a-z0-9-]{1,62}$"
+          description: Stable opaque environment identifier. It cannot be changed after creation and carries no environment semantics.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Human-readable environment name shown in the UI.
+        kind:
+          $ref: "#/components/schemas/EnvironmentKind"
         provider:
           $ref: "#/components/schemas/ProviderConfig"
         publish:
           $ref: "#/components/schemas/PublishConfig"
+      example:
+        id: production
+        name: Production
+        kind: production
+        provider:
+          type: firebase-remote-config
+          project_id: photo-editor-prod
+        publish:
+          requires_confirmation: true
     CreateEnvironmentInput:
-      allOf:
-        - $ref: "#/components/schemas/Environment"
+      type: object
+      additionalProperties: false
+      required: [id, name, kind, provider, publish]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{1,62}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        kind:
+          $ref: "#/components/schemas/EnvironmentKind"
+        provider:
+          $ref: "#/components/schemas/ProviderConfig"
+        publish:
+          $ref: "#/components/schemas/PublishConfig"
     UpdateEnvironmentInput:
       type: object
       additionalProperties: false
-      required: [provider, publish]
+      required: [name, provider, publish]
       properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
         provider:
           $ref: "#/components/schemas/ProviderConfig"
         publish:
           $ref: "#/components/schemas/PublishConfig"
+    EnvironmentKind:
+      type: string
+      enum: [development, staging, production, custom]
+      description: Server-authoritative environment category. Only production activates the persistent Production UI state. It cannot be changed after creation.
     ProviderConfig:
       type: object
       additionalProperties: false
@@ -802,6 +881,31 @@ components:
       properties:
         error:
           $ref: "#/components/schemas/Error"
+    ManifestRevisionMismatchResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ManifestRevisionMismatchError"
+    ManifestRevisionMismatchError:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, current_revision, current_state]
+      properties:
+        code:
+          type: string
+          const: revision_mismatch
+        message:
+          type: string
+        request_id:
+          type: string
+        current_revision:
+          type: integer
+          minimum: 1
+          description: Revision of current_state and the ETag response header.
+        current_state:
+          $ref: "#/components/schemas/ManifestState"
     Error:
       type: object
       additionalProperties: false

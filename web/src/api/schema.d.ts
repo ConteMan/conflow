@@ -173,6 +173,10 @@ export interface components {
             environments: components["schemas"]["Environment"][];
             capabilities: components["schemas"]["Capabilities"];
         };
+        ManifestState: {
+            project: components["schemas"]["Project"];
+            environments: components["schemas"]["Environment"][];
+        };
         ProjectResponse: {
             data: components["schemas"]["Project"];
             meta: components["schemas"]["ResponseMeta"];
@@ -218,16 +222,46 @@ export interface components {
             id: string;
             name: string;
         };
+        /**
+         * @example {
+         *       "id": "production",
+         *       "name": "Production",
+         *       "kind": "production",
+         *       "provider": {
+         *         "type": "firebase-remote-config",
+         *         "project_id": "photo-editor-prod"
+         *       },
+         *       "publish": {
+         *         "requires_confirmation": true
+         *       }
+         *     }
+         */
         Environment: {
+            /** @description Stable opaque environment identifier. It cannot be changed after creation and carries no environment semantics. */
             id: string;
+            /** @description Human-readable environment name shown in the UI. */
+            name: string;
+            kind: components["schemas"]["EnvironmentKind"];
             provider: components["schemas"]["ProviderConfig"];
             publish: components["schemas"]["PublishConfig"];
         };
-        CreateEnvironmentInput: components["schemas"]["Environment"];
+        CreateEnvironmentInput: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["EnvironmentKind"];
+            provider: components["schemas"]["ProviderConfig"];
+            publish: components["schemas"]["PublishConfig"];
+        };
         UpdateEnvironmentInput: {
+            name: string;
             provider: components["schemas"]["ProviderConfig"];
             publish: components["schemas"]["PublishConfig"];
         };
+        /**
+         * @description Server-authoritative environment category. Only production activates the persistent Production UI state. It cannot be changed after creation.
+         * @enum {string}
+         */
+        EnvironmentKind: "development" | "staging" | "production" | "custom";
         ProviderConfig: {
             /** @constant */
             type: "firebase-remote-config";
@@ -314,6 +348,18 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["Error"];
         };
+        ManifestRevisionMismatchResponse: {
+            error: components["schemas"]["ManifestRevisionMismatchError"];
+        };
+        ManifestRevisionMismatchError: {
+            /** @constant */
+            code: "revision_mismatch";
+            message: string;
+            request_id: string;
+            /** @description Revision of current_state and the ETag response header. */
+            current_revision: number;
+            current_state: components["schemas"]["ManifestState"];
+        };
         Error: {
             code: string;
             message: string;
@@ -364,13 +410,48 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The manifest revision changed. */
-        RevisionMismatch: {
+        /** @description The manifest revision changed; the response contains the authoritative current manifest state from the same snapshot as the returned ETag. */
+        ManifestRevisionMismatch: {
             headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["ETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["ErrorResponse"];
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "revision_mismatch",
+                 *         "message": "The project manifest changed. Review the current state before saving again.",
+                 *         "request_id": "req_01JEXAMPLE",
+                 *         "current_revision": 2,
+                 *         "current_state": {
+                 *           "project": {
+                 *             "id": "photo-editor",
+                 *             "name": "Photo Editor from Git",
+                 *             "pack_ref": "mobile-ad-monetization/v1",
+                 *             "source_type": "managed-file"
+                 *           },
+                 *           "environments": [
+                 *             {
+                 *               "id": "development",
+                 *               "name": "Development",
+                 *               "kind": "development",
+                 *               "provider": {
+                 *                 "type": "firebase-remote-config",
+                 *                 "project_id": "photo-editor-dev"
+                 *               },
+                 *               "publish": {
+                 *                 "requires_confirmation": false
+                 *               }
+                 *             }
+                 *           ]
+                 *         }
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ManifestRevisionMismatchResponse"];
             };
         };
         /** @description Request is structurally valid but violates project rules. */
@@ -538,7 +619,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
-            412: components["responses"]["RevisionMismatch"];
+            412: components["responses"]["ManifestRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationFailed"];
             428: components["responses"]["PreconditionRequired"];
@@ -598,7 +679,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["StateConflict"];
-            412: components["responses"]["RevisionMismatch"];
+            412: components["responses"]["ManifestRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationFailed"];
             428: components["responses"]["PreconditionRequired"];
@@ -663,7 +744,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            412: components["responses"]["RevisionMismatch"];
+            412: components["responses"]["ManifestRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationFailed"];
             428: components["responses"]["PreconditionRequired"];
@@ -698,7 +779,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["StateConflict"];
-            412: components["responses"]["RevisionMismatch"];
+            412: components["responses"]["ManifestRevisionMismatch"];
             428: components["responses"]["PreconditionRequired"];
         };
     };

@@ -16,7 +16,7 @@
 
 ## 合同前置
 
-- 开工前关闭 [`UI-API-001`](../design/ui/contract-gaps.md#spec-013-开工门槛) 与 `UI-API-002`，避免前端猜测 Production 身份或 `412` 恢复语义。
+- [`UI-API-001`](../design/ui/contract-gaps.md#spec-013-开工门槛) 与 `UI-API-002` 的合同已定义：消费 `Environment.name/kind` 与 `ManifestRevisionMismatchResponse`，不猜测 Production 身份或 `412` 恢复语义。
 - `UI-API-003` 在本 Spec 只实现 draft 状态槽，不展示伪造的 dirty 数据；真实状态由 Spec 004 合同接入。
 - `UI-API-004` 的项目级确认策略可以延后至 Spec 015，但本 Spec 不创建临时字段或本地存储。
 
