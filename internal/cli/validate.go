@@ -1,9 +1,10 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -13,14 +14,15 @@ func newValidateCommand() *cobra.Command {
 		Use:   "validate",
 		Short: "Validate a Conflow project manifest",
 		RunE: func(command *cobra.Command, args []string) error {
-			manifest, err := project.Load(workspace)
+			service, err := app.Open(workspace)
 			if err != nil {
 				return err
 			}
-			if err := project.Validate(manifest); err != nil {
+			snapshot, err := service.Snapshot(context.Background())
+			if err != nil {
 				return err
 			}
-			fmt.Fprintf(command.OutOrStdout(), "validated %s with %d environments\n", manifest.Project.ID, len(manifest.Environments))
+			fmt.Fprintf(command.OutOrStdout(), "validated %s with %d environments\n", snapshot.Manifest.Project.ID, len(snapshot.Manifest.Environments))
 			return nil
 		},
 	}

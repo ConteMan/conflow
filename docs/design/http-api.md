@@ -92,10 +92,13 @@ API 变更顺序固定为：
 | HTTP | 稳定错误码示例 | 用途 |
 |---|---|---|
 | `400` | `invalid_request`、`malformed_json` | 请求结构无法解析 |
+| `403` | `invalid_origin` | 浏览器来源不允许 |
 | `404` | `project_not_found`、`entity_not_found` | 资源不存在 |
 | `409` | `state_conflict`、`operation_in_progress` | 当前状态不允许操作 |
 | `412` | `revision_mismatch`、`remote_etag_mismatch` | `If-Match` 或远端 ETag 已变化 |
+| `415` | `unsupported_media_type` | 修改请求未使用 JSON Content-Type |
 | `422` | `validation_failed`、`rule_violation` | 请求结构有效，但业务规则不通过 |
+| `428` | `precondition_required` | 修改请求缺少 `If-Match` |
 | `502` | `provider_error`、`provider_unauthorized` | 上游 Provider 调用失败 |
 | `503` | `provider_unavailable` | 上游暂时不可用 |
 
@@ -185,7 +188,7 @@ Firebase 的 ETag 是远端并发令牌，必须单独保存为 `remote_etag`。
 
 ## 11. 本地服务安全
 
-- 默认只监听 `127.0.0.1`；显式改为非 loopback 时必须显示安全警告并要求确认。
+- v1 只允许监听 loopback；如未来支持非 loopback，必须先新增认证与安全 ADR，不能只增加命令行开关。
 - 不启用通配 CORS；GUI 与 API 同源。
 - 服务端校验 `Host`；写请求校验 `Origin` 和 JSON `Content-Type`。
 - 浏览器提交不了的 API 仍必须在服务端鉴权 Provider 凭据和校验发布权限。

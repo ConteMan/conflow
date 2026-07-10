@@ -7,7 +7,7 @@
 | 编号 | 标题 | 依赖 | 状态 |
 |---|---|---|---|
 | [001](001-foundation.md) | Go CLI、本地服务与嵌入式 React 基础 | — | 已实现 |
-| [002](002-project-environments-api.md) | 项目、环境与 API 基础 | 001 | 待实现 |
+| [002](002-project-environments-api.md) | 项目、环境与 API 基础 | 001 | 已实现 |
 | [003](003-config-pack-contract.md) | Config Pack 契约与注册表 | 001 | 待实现 |
 | [004](004-draft-layering.md) | 草稿与分层配置模型 | 002、003 | 待实现 |
 | [005](005-managed-file-source.md) | Managed File 源适配器 | 004 | 待实现 |
