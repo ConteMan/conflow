@@ -14,6 +14,12 @@
 - 窄屏（<1280px）导航折叠；窄屏定位为查看与轻量修改，不承载发布流程。
 - 结构依据：DESIGN.md §3 与 docs/design/ui/reviews/2026-07-10-structure-directions.md。
 
+## 合同前置
+
+- 开工前关闭 [`UI-API-001`](../design/ui/contract-gaps.md#spec-013-开工门槛) 与 `UI-API-002`，避免前端猜测 Production 身份或 `412` 恢复语义。
+- `UI-API-003` 在本 Spec 只实现 draft 状态槽，不展示伪造的 dirty 数据；真实状态由 Spec 004 合同接入。
+- `UI-API-004` 的项目级确认策略可以延后至 Spec 015，但本 Spec 不创建临时字段或本地存储。
+
 ## 范围
 
 - 路由、全局布局、项目/环境常驻选择和 Production 风险标识。

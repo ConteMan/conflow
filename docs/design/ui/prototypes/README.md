@@ -9,7 +9,7 @@
 | `explorations.pen` | Pencil 原型源文件：方向 A（A1/A2）、方向 B（B1/B2/B2b）、窄屏（N1/N2）共 7 屏 |
 | [fixtures.md](fixtures.md) | 真实规模参考数据（24 广告位 / 5 频控 / 6 开关 / 3 环境 / 诊断样例 / 大 diff 场景） |
 
-**命名基准**：`fixtures.md` 是实体 key 的事实源。`explorations.pen` 的首轮帧早于 fixtures 定稿，锚点实体（`app_open_cold_start`、`inter_global_cap`、`native_scroll_gap`、`compress_complete_interstitial_legacy_campaign`、`use_amazon_bidding`、`ads_enabled_legacy`）与 fixtures 一致，其余广告位命名存在差异；后续补帧和 React 实现一律以 fixtures.md 为准，首轮帧不返工。
+**命名基准**：当前由 `fixtures.md` 维护实体 key；Spec 006 建立结构化 contract fixture 后，以其为可执行事实源。`explorations.pen` 的首轮帧早于 fixtures 定稿，锚点实体（`app_open_cold_start`、`inter_global_cap`、`native_scroll_gap`、`compress_complete_interstitial_legacy_campaign`、`use_amazon_bidding`、`ads_enabled_legacy`）与 fixtures 一致，其余命名和“14 处修改”等统计属于历史探索数据；后续补帧和 React 实现一律以共享 contract fixture 为准，首轮帧不返工。
 
 ## 画布结构
 
