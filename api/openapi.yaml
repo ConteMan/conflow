@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Conflow Local API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Versioned same-origin API between the embedded React GUI and the local Go service.
 servers:
@@ -317,6 +317,114 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "422":
           $ref: "#/components/responses/SchemaIncompatible"
+  /drafts/{environment_id}:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    get:
+      operationId: getDraft
+      summary: Get the targeted draft view for an environment
+      responses:
+        "200":
+          description: Draft layers, effective configuration, and field origins for the selected environment.
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/DraftETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: replaceDraftScope
+      summary: Replace one targeted draft scope
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceDraftScopeInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/DraftMutationSucceeded"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/DraftRevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/DraftValidationFailed"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /drafts/{environment_id}:reset:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: resetDraftScope
+      summary: Install an explicit empty object replacement in one draft scope
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftScopeMutationInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/DraftMutationSucceeded"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/DraftRevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /drafts/{environment_id}:discard:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: discardDraftScope
+      summary: Remove one draft replacement and resolve the current source layer
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftScopeMutationInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/DraftMutationSucceeded"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/DraftRevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
 components:
   parameters:
     EnvironmentID:
@@ -330,7 +438,7 @@ components:
       name: If-Match
       in: header
       required: true
-      description: Quoted local manifest revision returned by ETag.
+      description: Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains.
       schema:
         type: string
         pattern: '^"[1-9][0-9]*"$'
@@ -363,6 +471,11 @@ components:
         const: no-store
     ETag:
       description: Quoted local manifest revision.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+    DraftETag:
+      description: Quoted project-level draft revision shared by baseline and every environment override.
       schema:
         type: string
         pattern: '^"[1-9][0-9]*"$'
@@ -433,6 +546,43 @@ components:
                       project_id: photo-editor-dev
                     publish:
                       requires_confirmation: false
+    DraftMutationSucceeded:
+      description: The targeted mutation was accepted, consumed the previous ETag, and the response contains the committed draft snapshot. Accepted no-op writes also advance the project-level draft revision.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        ETag:
+          $ref: "#/components/headers/DraftETag"
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DraftResponse"
+    DraftRevisionMismatch:
+      description: The project-level draft revision or source revision changed. The ETag and complete current state come from the same atomic snapshot.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        ETag:
+          $ref: "#/components/headers/DraftETag"
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DraftRevisionMismatchResponse"
+    DraftValidationFailed:
+      description: The replacement violates the Pack structural schema, nullability, or environment override permissions.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DraftValidationErrorResponse"
     ValidationFailed:
       description: Request is structurally valid but violates project rules.
       content:
@@ -808,7 +958,7 @@ components:
     FieldSchema:
       type: object
       additionalProperties: false
-      required: [name, type, required, default, sensitivity, ui, validation]
+      required: [name, type, required, nullable, default, sensitivity, ui, validation]
       properties:
         name:
           type: string
@@ -817,6 +967,9 @@ components:
           enum: [string, boolean, integer, number, object, array, reference]
         required:
           type: boolean
+        nullable:
+          type: boolean
+          description: Whether an explicit JSON null is a valid configured value. This is independent of required.
         default: {}
         sensitivity:
           type: string
@@ -873,6 +1026,311 @@ components:
           type: integer
           minimum: 1
         description:
+          type: string
+    DraftResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/DraftView"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    DraftView:
+      type: object
+      additionalProperties: false
+      required:
+        - environment_id
+        - pack_ref
+        - source_revision
+        - dirty
+        - dirty_scopes
+        - baseline
+        - environment_override
+        - effective
+        - field_states
+        - affected_environments
+      properties:
+        environment_id:
+          type: string
+          description: Environment view used to resolve environment_override. It does not make baseline environment-private.
+        pack_ref:
+          type: string
+        source_revision:
+          type: string
+          minLength: 1
+          description: Opaque Source Adapter snapshot revision; never used as an HTTP ETag.
+        dirty:
+          type: boolean
+          description: Whether the shared baseline or this environment view has an installed replacement. Other environments are excluded.
+        dirty_scopes:
+          type: array
+          description: Non-null scopes installed in this view (shared baseline and this environment only), sorted baseline before environment_override. Other environment overrides are excluded.
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/DraftWriteScope"
+        baseline:
+          $ref: "#/components/schemas/DraftLayerState"
+        environment_override:
+          $ref: "#/components/schemas/DraftLayerState"
+        effective:
+          $ref: "#/components/schemas/Configuration"
+        field_states:
+          type: array
+          description: Non-null field states sorted by RFC 6901 path.
+          items:
+            $ref: "#/components/schemas/FieldState"
+        affected_environments:
+          type: array
+          description: Non-null environments actually changed by the shared baseline and current-environment replacements represented in this view, holding other environment drafts constant, in project manifest order.
+          items:
+            $ref: "#/components/schemas/AffectedEnvironment"
+    Configuration:
+      type: object
+      description: A complete configuration object for one targeted layer.
+      additionalProperties: true
+    ConfigurationPresence:
+      oneOf:
+        - $ref: "#/components/schemas/MissingConfiguration"
+        - $ref: "#/components/schemas/PresentConfiguration"
+    MissingConfiguration:
+      type: object
+      additionalProperties: false
+      required: [present]
+      properties:
+        present:
+          type: boolean
+          const: false
+    PresentConfiguration:
+      type: object
+      additionalProperties: false
+      required: [present, value]
+      properties:
+        present:
+          type: boolean
+          const: true
+        value:
+          $ref: "#/components/schemas/Configuration"
+    DraftLayerState:
+      type: object
+      additionalProperties: false
+      required: [source, draft, resolved, dirty]
+      properties:
+        source:
+          $ref: "#/components/schemas/ConfigurationPresence"
+        draft:
+          $ref: "#/components/schemas/ConfigurationPresence"
+        resolved:
+          $ref: "#/components/schemas/ConfigurationPresence"
+        dirty:
+          type: boolean
+          description: Whether a replacement is installed for this targeted layer.
+    FieldValuePresence:
+      oneOf:
+        - $ref: "#/components/schemas/MissingFieldValue"
+        - $ref: "#/components/schemas/PresentFieldValue"
+    MissingFieldValue:
+      type: object
+      additionalProperties: false
+      required: [present]
+      properties:
+        present:
+          type: boolean
+          const: false
+    PresentFieldValue:
+      type: object
+      additionalProperties: false
+      required: [present, value]
+      properties:
+        present:
+          type: boolean
+          const: true
+        value:
+          description: Any JSON value, including null when the Pack field declares nullable true.
+    FieldState:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - pack_default
+        - baseline
+        - draft_baseline
+        - environment_override
+        - draft_environment_override
+        - effective
+        - origin
+        - environment_override_allowed
+        - is_environment_overridden
+        - source_revision
+        - nullable
+      properties:
+        path:
+          type: string
+          description: RFC 6901 JSON Pointer. Tilde and slash tokens are escaped as ~0 and ~1.
+        pack_default:
+          $ref: "#/components/schemas/FieldValuePresence"
+        baseline:
+          $ref: "#/components/schemas/FieldValuePresence"
+        draft_baseline:
+          $ref: "#/components/schemas/FieldValuePresence"
+        environment_override:
+          $ref: "#/components/schemas/FieldValuePresence"
+        draft_environment_override:
+          $ref: "#/components/schemas/FieldValuePresence"
+        effective:
+          $ref: "#/components/schemas/FieldValuePresence"
+        origin:
+          $ref: "#/components/schemas/FieldOrigin"
+        environment_override_allowed:
+          type: boolean
+        is_environment_overridden:
+          type: boolean
+          description: Whether the effective value comes from the source or draft environment override.
+        source_revision:
+          type: string
+          minLength: 1
+          description: Source snapshot used to produce every value in this field state.
+        nullable:
+          type: boolean
+    FieldOrigin:
+      type: string
+      description: Effective value origin. Draft origins are distinct from source origins.
+      enum: [pack_default, baseline, draft_baseline, environment_override, draft_environment_override]
+    AffectedEnvironment:
+      type: object
+      additionalProperties: false
+      required: [environment_id, name, kind]
+      properties:
+        environment_id:
+          type: string
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/EnvironmentKind"
+    DraftWriteScope:
+      type: string
+      enum: [baseline, environment_override]
+    ReplaceDraftScopeInput:
+      type: object
+      additionalProperties: false
+      required: [expected_source_revision, write_scope, configuration]
+      properties:
+        expected_source_revision:
+          type: string
+          minLength: 1
+        write_scope:
+          $ref: "#/components/schemas/DraftWriteScope"
+        configuration:
+          $ref: "#/components/schemas/Configuration"
+    DraftScopeMutationInput:
+      type: object
+      additionalProperties: false
+      required: [expected_source_revision, write_scope]
+      properties:
+        expected_source_revision:
+          type: string
+          minLength: 1
+        write_scope:
+          $ref: "#/components/schemas/DraftWriteScope"
+    DraftRevisionMismatchResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          oneOf:
+            - $ref: "#/components/schemas/DraftRevisionMismatchError"
+            - $ref: "#/components/schemas/SourceRevisionMismatchError"
+          discriminator:
+            propertyName: code
+            mapping:
+              revision_mismatch: "#/components/schemas/DraftRevisionMismatchError"
+              source_revision_mismatch: "#/components/schemas/SourceRevisionMismatchError"
+    DraftRevisionMismatchError:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, current_revision, current_source_revision, conflict_scope, current_state]
+      properties:
+        code:
+          type: string
+          const: revision_mismatch
+        message:
+          type: string
+        request_id:
+          type: string
+        current_revision:
+          type: integer
+          minimum: 1
+        current_source_revision:
+          type: string
+          minLength: 1
+        conflict_scope:
+          $ref: "#/components/schemas/DraftWriteScope"
+          description: Scope the failed request attempted to write; it does not identify the concurrent writer's changed scope.
+        current_state:
+          $ref: "#/components/schemas/DraftView"
+    SourceRevisionMismatchError:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, current_revision, current_source_revision, conflict_scope, current_state]
+      properties:
+        code:
+          type: string
+          const: source_revision_mismatch
+        message:
+          type: string
+        request_id:
+          type: string
+        current_revision:
+          type: integer
+          minimum: 1
+        current_source_revision:
+          type: string
+          minLength: 1
+        conflict_scope:
+          $ref: "#/components/schemas/DraftWriteScope"
+          description: Scope the failed request attempted to write; it does not identify the source change location.
+        current_state:
+          $ref: "#/components/schemas/DraftView"
+    DraftValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/DraftValidationError"
+    DraftValidationError:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, details]
+      properties:
+        code:
+          type: string
+          const: validation_failed
+        message:
+          type: string
+        request_id:
+          type: string
+        details:
+          type: array
+          minItems: 1
+          description: Sorted by scope, RFC 6901 path, then code.
+          items:
+            $ref: "#/components/schemas/DraftStructuralErrorDetail"
+    DraftStructuralErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, path, scope, message]
+      properties:
+        code:
+          type: string
+          enum: [invalid_config_shape, field_type_mismatch, required_field_missing, value_not_allowed, explicit_null_forbidden, environment_override_forbidden]
+        path:
+          type: string
+          description: RFC 6901 JSON Pointer to the invalid configuration field.
+        scope:
+          $ref: "#/components/schemas/DraftWriteScope"
+        message:
           type: string
     ErrorResponse:
       type: object

@@ -7,7 +7,7 @@
 - UI Spec 开工前，必须关闭它所依赖的阻塞项，或在 Spec 中明确降级范围。
 - 每个缺口通过独立的 contract-only PR 收口：只修改 Spec、跨域 HTTP 语义、OpenAPI、示例、生成类型和 contract fixture，不混入 Handler 或 React 实现。
 - flows / 状态矩阵新增后端行为假设时，必须引用已合并合同或本清单 ID；不能只把行为画进原型。
-- `fixtures.md` 保留给人阅读。可执行事实源在 Spec 006 建立为仓库级结构化 contract fixture，Go golden tests、API tests 和 UI E2E 读取同一份数据，不解析 Markdown。
+- `fixtures.md` 保留给人阅读。Spec 004 建立 Pack-neutral 草稿分层 contract fixture，Spec 006 再建立领域实体 fixture；后续 Go golden tests、API tests 和 UI E2E 读取各自对应的仓库级结构化事实源，不解析 Markdown。
 
 ## Spec 013 开工门槛
 
@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | `UI-API-005` | PM 可以选择修改“通用值”或“只改当前环境”，并在保存前看到影响环境（`pm-main-path.md:41`；`flows/02-placement-editing.md:23`）。 | 004 只列出按环境的整份 draft PUT，没有定义基线与环境覆盖分别写到哪里，也没有影响环境 read model。 | Draft DTO 明确 `baseline`、`environment_override`、`effective` 和写入 scope；服务端返回影响环境集合，前端不自行模拟四层合并。 | 004 |
 | `UI-API-006` | 每个字段显示通用值、当前环境专属值、effective value、是否可覆盖和来源 caption（`DESIGN.md:34,87`；Spec 014:14,21）。 | 004 只描述“每个字段携带 origin”，没有可序列化结构、JSON Pointer 约定或 null/缺失表达。 | 定义 field-state read model：稳定 path、各层值、effective value、origin、overrideability、source revision；固定 object/array/null 语义。 | 004 |
-| `UI-API-007` | C3 保存冲突要对照“我的输入”和“服务端当前值”（`flows/02-placement-editing.md:17`；Spec 014:24）。 | `412` 只有 revision；整份 draft 可能过大，且没有实体级 reload / comparison 合同。 | 004 contract PR 必须选择 typed current snapshot 或原子 reload 协议；冲突响应至少携带当前 draft revision 和发生冲突的 scope。UI 只做展示，不做自动合并。 | 004 / 014 |
+| `UI-API-007` | C3 保存冲突要对照“我的输入”和“服务端当前值”（`flows/02-placement-editing.md:17`；Spec 014:24）。 | `412` 只有 revision；整份 draft 可能过大，且没有实体级 reload / comparison 合同。 | 004 contract PR 必须选择 typed current snapshot 或原子 reload 协议；冲突响应至少携带当前 draft revision 和本次请求试图写入的 scope。UI 只做展示，不做自动合并。 | 004 / 014 |
 | `UI-API-008` | UI 按实体 CRUD、查询引用者，并在删除被引用策略时展示引用清单（`flows/02-placement-editing.md:18,24`）。 | 004 仅有整份 draft API；006 说复用通用 API，但没有实体路径、引用查询或受限删除响应。 | 定义 Pack-neutral entity resources、稳定实体引用和 `referenced_by[]`；删除冲突返回 typed references，不靠解析 message。 | 004 / 006 |
 | `UI-API-009` | 字段 caption 还要表达“线上当前值”（评审记录 `2026-07-10-structure-directions.md:47`；Spec 014:14）。 | 009 保护完整 Firebase 快照，不返回普通 API；尚无 provider-neutral 的受管理字段远端投影。 | 明确是 014 提供只读 remote projection，还是把线上对照严格延后到 Plan。若保留字段 caption，009/008 必须返回脱敏、可映射到字段 path 的远端值摘要。 | 008 / 009 / 014 |
 | `UI-API-010` | 保存时字段错误行内展示；完整校验返回可跳转诊断（`flows/02-placement-editing.md:15`；`flows/03-validation.md:14,24`）。 | 004 写入校验与 007 完整校验的边界不清；OpenAPI 尚无诊断 DTO。 | 固定写入时 structural errors 与显式 validate diagnostics 的分工；二者共享稳定 `code/path/entity_ref`，但 readiness 只由 007 产生。 | 004 / 007 |
@@ -43,7 +43,14 @@
 | `UI-API-012` | UI 使用“阻断 / 警告 / 建议”，并认为只有阻断影响 readiness（`flows/03-validation.md:23`）。 | 007 使用 `info/warning/error/blocking`，CLI 又规定 `error/blocking` 非零；“error 是否阻止 Plan”存在语义分歧。 | 在 007 中固定 severity、CLI exit 和 publish readiness 的映射；UI 文案只做稳定枚举的本地化。 | 007 / 014 / 015 |
 | `UI-API-013` | UI 列表、诊断、大 diff 与后端 golden tests 必须使用同一组实体 key 和场景。 | 当前 `fixtures.md` 是人工文档，不能直接作为 Go / E2E 测试输入；原型与主路径已出现命名、计数漂移。 | Spec 006 建立版本化结构化 fixture；场景 overlay 分别覆盖 validation、Plan、412 和 ETag 冲突；Go 与 E2E 读取同一文件并断言稳定业务结果。 | 006 / 007 / 008 / 014 |
 
-以上条目全部关闭后再启动 014。特别是 `UI-API-005` 到 `UI-API-008`，它们决定编辑器的数据边界，不能由 React 先发明 DTO。
+`UI-API-005`、`UI-API-006`、`UI-API-007` 的草稿合同已定义；`UI-API-010` 的 structural error 部分已定义。以上只是合同完成，Spec 004 Handler 与 UI 尚未实现。`UI-API-008`、`UI-API-010` 的完整校验部分以及 `UI-API-011` 到 `UI-API-013` 仍未关闭，因此 Spec 014 仍不能开工。
+
+处理状态（2026-07-11）：
+
+- `UI-API-005`：合同已定义。`write_scope`、targeted replacement 与服务端计算的 `affected_environments` 已进入 OpenAPI。
+- `UI-API-006`：合同已定义。DraftView、layer/field presence、RFC 6901 path、origin 与 overrideability 已固定。
+- `UI-API-007`：合同已定义。两类 typed `412` 都携带原子 current state、revision 与 conflict scope。
+- `UI-API-010`：部分合同已定义。004 structural errors 已固定；007 diagnostics、实体引用与 readiness 尚待后续合同。
 
 ## Spec 015 开工门槛
 
@@ -72,8 +79,9 @@
 
 1. **013 前置合同：项目、环境与冲突 read model（已完成）**
    `UI-API-001`、`UI-API-002` 已关闭；`UI-API-003`、`UI-API-004` 已明确降级或延后。API `0.4.0`、HTTP 语义、Spec 002/013、生成类型和响应示例已经对齐。
-2. **004 草稿合同**  
-   关闭 `UI-API-005` 到 `UI-API-007`、`UI-API-010` 的草稿部分。先合并合同，再实现 004。
+2. **004 草稿合同（已定义，待实现）**
+
+   `UI-API-005` 到 `UI-API-007`、`UI-API-010` 的草稿部分已收口。OpenAPI、HTTP 语义、Spec 004、ADR-005、生成类型和共享草稿 fixture 已对齐；运行时实现不属于合同 PR。
 3. **006/007 领域与校验合同**  
    关闭 `UI-API-008`、`UI-API-010` 到 `UI-API-013`。同时提交可执行 fixture 第一版。
 4. **008–010 Plan / 风险 / 发布合同**  
@@ -84,5 +92,5 @@
 ## 审计结论
 
 - Spec 013 的合同前置已满足，可以开始应用壳、Production 状态和 revision 冲突交互；最终 E2E 前仍须完成 API `0.4.0` 的 Go 运行时对齐。
-- Spec 014 必须等待 004、006、007 的 contract-only PR 全部合并。
+- Spec 014 仍必须等待 004、006、007 的 contract-only PR 全部合并；004 合同完成不代表 006/007 或 React 编辑器已实现。
 - Spec 015 必须消费服务端权威的 readiness、Plan lifecycle、risk items、confirmation requirements 和 Operation state，不能在前端复制规则。
