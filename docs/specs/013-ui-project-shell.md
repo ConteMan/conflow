@@ -43,7 +43,7 @@
 - 状态管理使用 React 内置 state / hook；本阶段只有单一 manifest revision 域，不引入服务端状态缓存库。
 - `lucide-react` 作为直接运行时依赖，统一提供按钮和状态图标，避免维护手绘 SVG。
 - `@playwright/test` 作为直接开发依赖，在浏览器中运行完整 React 应用并拦截 HTTP 合同，覆盖 bootstrap、Production、环境写入、typed `412` 和断线恢复；不以组件快照替代交互验收。
-- E2E 使用 Playwright 管理的 Chromium；`make bootstrap` 安装浏览器，CI 显式安装浏览器及系统依赖，不要求贡献者预装 Google Chrome。
+- E2E 使用 Playwright 管理的 Chromium，`make bootstrap` 安装本地浏览器。为控制公共 GitHub Actions 的安装时间与资源消耗，CI 运行不含浏览器的 `make check-ci`；涉及 UI、API client 或交互状态的变更必须在本地运行完整 `make check` 并记录结果。
 
 ## 验收
 

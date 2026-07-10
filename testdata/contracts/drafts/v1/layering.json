@@ -1,0 +1,370 @@
+{
+  "contract_version": 1,
+  "description": "Pack-neutral golden scenarios for Spec 004 targeted draft layering.",
+  "pack": {
+    "ref": "fixture-config/v1",
+    "defaults": {
+      "settings": {
+        "enabled": false,
+        "label": "default",
+        "limits": {"daily": 1, "session": 1},
+        "tags": ["default"],
+        "note": "fallback",
+        "baseline_only": "safe"
+      }
+    },
+    "fields": [
+      {"path": "/settings/baseline_only", "nullable": false, "environment_override_allowed": false},
+      {"path": "/settings/enabled", "nullable": false, "environment_override_allowed": true},
+      {"path": "/settings/label", "nullable": false, "environment_override_allowed": true, "min_length": 1},
+      {"path": "/settings/limits/daily", "nullable": false, "environment_override_allowed": true},
+      {"path": "/settings/limits/session", "nullable": false, "environment_override_allowed": true},
+      {"path": "/settings/note", "nullable": true, "environment_override_allowed": true},
+      {"path": "/settings/tags", "nullable": false, "environment_override_allowed": true}
+    ]
+  },
+  "environments": [
+    {"environment_id": "development", "name": "Development", "kind": "development"},
+    {"environment_id": "production", "name": "Production", "kind": "production"}
+  ],
+  "source": {
+    "revision": "src-1",
+    "baseline": {
+      "settings": {
+        "enabled": true,
+        "label": "source",
+        "limits": {"daily": 5, "session": 2},
+        "tags": ["source-a", "source-b"],
+        "note": "source-note",
+        "baseline_only": "source-only"
+      }
+    },
+    "environment_overrides": {
+      "development": {"settings": {"label": "development", "limits": {"session": 3}}},
+      "production": {"settings": {"limits": {"session": 4}}}
+    }
+  },
+  "scenarios": [
+    {
+      "id": "targeted-baseline-complete-replacement",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"enabled": false}}}
+      },
+      "expected": {
+        "status": 200,
+        "draft_revision": 2,
+        "dirty_scopes": ["baseline"],
+        "baseline_layer_draft": {"present": true, "value": {"settings": {"enabled": false}}},
+        "development_effective": {"settings": {"enabled": false, "label": "development", "limits": {"daily": 1, "session": 3}, "tags": ["default"], "note": "fallback", "baseline_only": "safe"}},
+        "affected_environment_ids": ["development", "production"],
+        "field_states": {
+          "/settings/enabled": {"origin": "draft_baseline", "is_environment_overridden": false, "source_revision": "src-1"},
+          "/settings/label": {"origin": "environment_override", "is_environment_overridden": true, "source_revision": "src-1"}
+        }
+      }
+    },
+    {
+      "id": "targeted-environment-complete-replacement",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "environment_override", "configuration": {"settings": {"enabled": false}}}
+      },
+      "expected": {
+        "status": 200,
+        "draft_revision": 2,
+        "dirty_scopes": ["environment_override"],
+        "development_effective": {"settings": {"enabled": false, "label": "source", "limits": {"daily": 5, "session": 2}, "tags": ["source-a", "source-b"], "note": "source-note", "baseline_only": "source-only"}},
+        "affected_environment_ids": ["development"],
+        "field_states": {
+          "/settings/enabled": {"origin": "draft_environment_override", "is_environment_overridden": true, "source_revision": "src-1"},
+          "/settings/label": {"origin": "baseline", "is_environment_overridden": false, "source_revision": "src-1"}
+        }
+      }
+    },
+    {
+      "id": "objects-merge-recursively-across-resolved-layers",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"limits": {"daily": 9}}}}
+      },
+      "expected": {
+        "status": 200,
+        "development_effective_subset": {"settings": {"limits": {"daily": 9, "session": 3}}},
+        "origins": {"/settings/limits/daily": "draft_baseline", "/settings/limits/session": "environment_override"}
+      }
+    },
+    {
+      "id": "scalar-replaces-lower-value",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "environment_override", "configuration": {"settings": {"enabled": false}}}
+      },
+      "expected": {"status": 200, "field": {"path": "/settings/enabled", "effective": {"present": true, "value": false}, "origin": "draft_environment_override"}}
+    },
+    {
+      "id": "array-replaces-as-a-whole",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"tags": []}}}
+      },
+      "expected": {"status": 200, "field": {"path": "/settings/tags", "effective": {"present": true, "value": []}, "origin": "draft_baseline"}}
+    },
+    {
+      "id": "missing-field-falls-back-to-lower-layer-not-replaced-source",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"label": "draft"}}}
+      },
+      "expected": {
+        "status": 200,
+        "field_states": {
+          "/settings/enabled": {"draft_baseline": {"present": false}, "effective": {"present": true, "value": false}, "origin": "pack_default"},
+          "/settings/label": {"effective": {"present": true, "value": "draft"}, "origin": "draft_baseline"}
+        }
+      }
+    },
+    {
+      "id": "nullable-field-allows-explicit-null",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"note": null}}}
+      },
+      "expected": {"status": 200, "field": {"path": "/settings/note", "effective": {"present": true, "value": null}, "origin": "draft_baseline"}}
+    },
+    {
+      "id": "non-nullable-field-rejects-null",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"enabled": null}}}
+      },
+      "expected": {"status": 422, "error_code": "validation_failed", "detail_subset": [{"code": "explicit_null_forbidden", "path": "/settings/enabled", "scope": "baseline"}], "detail_messages_required": true}
+    },
+    {
+      "id": "reset-installs-present-empty-object",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "POST",
+        "action": "reset",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline"}
+      },
+      "expected": {
+        "status": 200,
+        "baseline_layer_draft": {"present": true, "value": {}},
+        "baseline_layer_resolved": {"present": true, "value": {}},
+        "dirty": true,
+        "affected_environment_ids": ["development", "production"]
+      }
+    },
+    {
+      "id": "discard-removes-replacement",
+      "given": {"draft_revision": 7, "drafts": {"baseline": {"settings": {"label": "draft"}}}},
+      "operation": {
+        "method": "POST",
+        "action": "discard",
+        "environment_id": "development",
+        "if_match": "\"7\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline"}
+      },
+      "expected": {"status": 200, "draft_revision": 8, "baseline_layer_draft": {"present": false}, "baseline_resolved_source": true, "dirty": false, "dirty_scopes": [], "affected_environment_ids": []}
+    },
+    {
+      "id": "environment-override-forbidden",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "environment_override", "configuration": {"settings": {"baseline_only": "unsafe"}}}
+      },
+      "expected": {"status": 422, "error_code": "validation_failed", "detail_subset": [{"code": "environment_override_forbidden", "path": "/settings/baseline_only", "scope": "environment_override"}], "detail_messages_required": true}
+    },
+    {
+      "id": "project-draft-revision-conflict-precedes-source-and-structure",
+      "given": {"draft_revision": 9, "source_revision": "src-2", "drafts": {"environment_overrides": {"production": {"settings": {"enabled": false}}}}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"8\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"enabled": null}}}
+      },
+      "expected": {
+        "status": 412,
+        "error_code": "revision_mismatch",
+        "etag": "\"9\"",
+        "current_revision": 9,
+        "current_source_revision": "src-2",
+        "conflict_scope": "baseline",
+        "conflict_scope_semantics": "requested_write_scope",
+        "current_state_subset": {"environment_id": "development", "source_revision": "src-2", "dirty": false, "dirty_scopes": [], "affected_environment_ids": []}
+      }
+    },
+    {
+      "id": "source-revision-conflict-precedes-structure",
+      "given": {"draft_revision": 9, "source_revision": "src-2", "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"9\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"enabled": null}}}
+      },
+      "expected": {
+        "status": 412,
+        "error_code": "source_revision_mismatch",
+        "etag": "\"9\"",
+        "current_revision": 9,
+        "current_source_revision": "src-2",
+        "conflict_scope": "baseline",
+        "conflict_scope_semantics": "requested_write_scope",
+        "current_state_subset": {"environment_id": "development", "source_revision": "src-2", "dirty": false, "dirty_scopes": [], "affected_environment_ids": []}
+      }
+    },
+    {
+      "id": "affected-environments-compare-actual-effective-values",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"label": "development", "enabled": true, "limits": {"daily": 5, "session": 2}, "tags": ["source-a", "source-b"], "note": "source-note", "baseline_only": "source-only"}}}
+      },
+      "expected": {
+        "status": 200,
+        "dirty": true,
+        "affected_environment_ids": ["production"],
+        "explanation": "Development remains unchanged because its source environment override already resolves label to development; Production changes from source to development."
+      }
+    },
+    {
+      "id": "field-type-mismatch-uses-stable-rfc6901-path",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"tags": "not-an-array"}}}
+      },
+      "expected": {"status": 422, "error_code": "validation_failed", "detail_subset": [{"code": "field_type_mismatch", "path": "/settings/tags", "scope": "baseline"}], "detail_messages_required": true}
+    },
+    {
+      "id": "disallowed-values-have-stable-code",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"label": ""}}}
+      },
+      "expected": {"status": 422, "error_code": "validation_failed", "detail_subset": [{"code": "value_not_allowed", "path": "/settings/label", "scope": "baseline"}], "detail_messages_required": true}
+    },
+    {
+      "id": "unknown-field-is-an-invalid-config-shape",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"unexpected": true}}
+      },
+      "expected": {"status": 422, "error_code": "validation_failed", "detail_subset": [{"code": "invalid_config_shape", "path": "/unexpected", "scope": "baseline"}], "detail_messages_required": true}
+    },
+    {
+      "id": "if-match-is-validated-before-body-decode",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "content_type": "application/json",
+        "raw_body": "{"
+      },
+      "expected": {"status": 428, "error_code": "precondition_required", "body_decode_attempted": false}
+    },
+    {
+      "id": "other-environment-draft-is-not-dirty-in-current-view",
+      "given": {"draft_revision": 9, "drafts": {"environment_overrides": {"production": {"settings": {"enabled": false}}}}},
+      "operation": {"method": "GET", "environment_id": "development"},
+      "expected": {"status": 200, "etag": "\"9\"", "dirty": false, "dirty_scopes": [], "affected_environment_ids": []}
+    },
+    {
+      "id": "same-put-still-advances-project-draft-revision",
+      "given": {"draft_revision": 4, "drafts": {"baseline": {"settings": {"label": "same"}}}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "development",
+        "if_match": "\"4\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"label": "same"}}}
+      },
+      "expected": {"status": 200, "etag": "\"5\"", "draft_revision": 5, "dirty": true, "dirty_scopes": ["baseline"]}
+    },
+    {
+      "id": "repeated-reset-still-advances-project-draft-revision",
+      "given": {"draft_revision": 4, "drafts": {"baseline": {}}},
+      "operation": {
+        "method": "POST",
+        "action": "reset",
+        "environment_id": "development",
+        "if_match": "\"4\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline"}
+      },
+      "expected": {"status": 200, "etag": "\"5\"", "draft_revision": 5, "baseline_layer_draft": {"present": true, "value": {}}, "dirty": true}
+    },
+    {
+      "id": "discard-missing-still-advances-project-draft-revision",
+      "given": {"draft_revision": 4, "drafts": {}},
+      "operation": {
+        "method": "POST",
+        "action": "discard",
+        "environment_id": "development",
+        "if_match": "\"4\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "environment_override"}
+      },
+      "expected": {"status": 200, "etag": "\"5\"", "draft_revision": 5, "dirty": false, "dirty_scopes": []}
+    },
+    {
+      "id": "structural-errors-have-stable-order",
+      "given": {"draft_revision": 1, "drafts": {}},
+      "operation": {
+        "method": "PUT",
+        "environment_id": "production",
+        "if_match": "\"1\"",
+        "body": {"expected_source_revision": "src-1", "write_scope": "baseline", "configuration": {"settings": {"tags": "not-an-array", "label": "", "enabled": null}}}
+      },
+      "expected": {
+        "status": 422,
+        "error_code": "validation_failed",
+        "detail_order": [
+          {"code": "explicit_null_forbidden", "path": "/settings/enabled", "scope": "baseline"},
+          {"code": "value_not_allowed", "path": "/settings/label", "scope": "baseline"},
+          {"code": "field_type_mismatch", "path": "/settings/tags", "scope": "baseline"}
+        ],
+        "detail_messages_required": true
+      }
+    }
+  ]
+}

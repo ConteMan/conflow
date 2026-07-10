@@ -11,7 +11,7 @@
 
 - Pack 引用解析：保持清单中的 `pack.id: <name>/<version>` 为不透明 ref。
 - Pack metadata：名称、版本、说明、能力、实体类型、支持的环境覆盖字段。
-- Entity definition：字段 schema、UI 元数据、ID 规则、默认值、敏感级别和删除策略。
+- Entity definition：字段 schema、UI 元数据、ID 规则、默认值、`nullable`、敏感级别和删除策略。
 - Pack compiler / validator / semantic differ 接口边界；具体广告逻辑留给 Spec 006–008。
 - 内置 Pack 注册表和未知/不兼容版本错误。
 - Pack schema 自身的版本与迁移入口，不支持运行用户代码。
@@ -63,11 +63,12 @@ Host: 127.0.0.1:9010
 
 ## 实现说明
 
-- `internal/packs` 将 Pack 分为纯声明式 `Definition`（metadata、schema、字段默认值与 UI metadata）和未来运行期的 compiler / validator / semantic differ / migrator 接口。字段类型限制为 GUI 可稳定消费的 `string`、`boolean`、`integer`、`number`、`object`、`array` 与 `reference`。注册表只接受编译进二进制的声明，不加载脚本、插件或用户代码，也不依赖 Source 或 Provider 包。
+- `internal/packs` 将 Pack 分为纯声明式 `Definition`（metadata、schema、字段默认值与 UI metadata）和未来运行期的 compiler / validator / semantic differ / migrator 接口。字段类型限制为 GUI 可稳定消费的 `string`、`boolean`、`integer`、`number`、`object`、`array` 与 `reference`。每个字段必须显式声明 `nullable`；只有 `nullable=true` 才允许配置值为 JSON `null`，该属性独立于字段是否 `required`。注册表只接受编译进二进制的声明，不加载脚本、插件或用户代码，也不依赖 Source 或 Provider 包。
 - 项目清单继续原样保存 `pack.id`；只有需要查询 Pack 时才由注册表解析 `<name>/<version>`。Pack API 直接返回可写入清单的 `ref`，调用方不自行拼接。未知 Pack、未知版本和客户端声明的 schema 版本不兼容分别使用 `pack_not_found`、`pack_version_not_found` 和 `schema_incompatible`。
 - Pack API 的 `meta.revision` 与 ETag 表示进程内 registry revision，独立于项目 manifest revision；Pack 查询令牌不得用于项目写请求的 `If-Match`。
 - `mobile-ad-monetization/v1` 作为可解析的内置契约占位。具体广告实体、校验、编译与差异语义仍由 Spec 006–008 定义，避免在本 Spec 固化领域规则。
 - `GET /api/v1/packs/{pack_name}/versions/{pack_version}/schema` 的可选 `schema_version` 表示客户端精确支持的 schema 版本；省略时返回当前版本。schema 中的 migration 仅为声明入口，实际迁移执行由后续草稿服务编排。
+- Spec 004 的 contract-only PR 将 `FieldSchema.nullable` 固定为 required boolean；在 Spec 004 标记“已实现”前，必须同步 `internal/packs` 声明与现有 Pack schema 响应。合同先行阶段不把尚未修改的 Go DTO 误认为已经完成 nullable 运行时对齐。
 
 ## 验收
 

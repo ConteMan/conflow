@@ -11,3 +11,4 @@ All notable changes are documented here. This project follows Keep a Changelog a
 - Project and environment application service, optimistic revision control, CRUD API, and generated React API types.
 - Versioned, declarative Config Pack contracts with a concurrency-safe built-in registry, Pack discovery API, schema compatibility errors, and generated React API types.
 - PM-oriented React project shell with environment management, persistent Production context, typed revision conflict recovery, read-only states, and Playwright E2E coverage.
+- Targeted draft-layer contract with scoped replacements, field presence/origin states, typed concurrency errors, and shared golden fixtures.

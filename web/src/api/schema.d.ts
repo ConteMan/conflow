@@ -155,6 +155,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drafts/{environment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** Get the targeted draft view for an environment */
+        get: operations["getDraft"];
+        /** Replace one targeted draft scope */
+        put: operations["replaceDraftScope"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}:reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install an explicit empty object replacement in one draft scope */
+        post: operations["resetDraftScope"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}:discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove one draft replacement and resolve the current source layer */
+        post: operations["discardDraftScope"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -319,6 +377,8 @@ export interface components {
             /** @enum {string} */
             type: "string" | "boolean" | "integer" | "number" | "object" | "array" | "reference";
             required: boolean;
+            /** @description Whether an explicit JSON null is a valid configured value. This is independent of required. */
+            nullable: boolean;
             default: unknown;
             /** @enum {string} */
             sensitivity: "public" | "sensitive";
@@ -344,6 +404,148 @@ export interface components {
             from_version: number;
             to_version: number;
             description: string;
+        };
+        DraftResponse: {
+            data: components["schemas"]["DraftView"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        DraftView: {
+            /** @description Environment view used to resolve environment_override. It does not make baseline environment-private. */
+            environment_id: string;
+            pack_ref: string;
+            /** @description Opaque Source Adapter snapshot revision; never used as an HTTP ETag. */
+            source_revision: string;
+            /** @description Whether the shared baseline or this environment view has an installed replacement. Other environments are excluded. */
+            dirty: boolean;
+            /** @description Non-null scopes installed in this view (shared baseline and this environment only), sorted baseline before environment_override. Other environment overrides are excluded. */
+            dirty_scopes: components["schemas"]["DraftWriteScope"][];
+            baseline: components["schemas"]["DraftLayerState"];
+            environment_override: components["schemas"]["DraftLayerState"];
+            effective: components["schemas"]["Configuration"];
+            /** @description Non-null field states sorted by RFC 6901 path. */
+            field_states: components["schemas"]["FieldState"][];
+            /** @description Non-null environments actually changed by the shared baseline and current-environment replacements represented in this view, holding other environment drafts constant, in project manifest order. */
+            affected_environments: components["schemas"]["AffectedEnvironment"][];
+        };
+        /** @description A complete configuration object for one targeted layer. */
+        Configuration: {
+            [key: string]: unknown;
+        };
+        ConfigurationPresence: components["schemas"]["MissingConfiguration"] | components["schemas"]["PresentConfiguration"];
+        MissingConfiguration: {
+            /** @constant */
+            present: false;
+        };
+        PresentConfiguration: {
+            /** @constant */
+            present: true;
+            value: components["schemas"]["Configuration"];
+        };
+        DraftLayerState: {
+            source: components["schemas"]["ConfigurationPresence"];
+            draft: components["schemas"]["ConfigurationPresence"];
+            resolved: components["schemas"]["ConfigurationPresence"];
+            /** @description Whether a replacement is installed for this targeted layer. */
+            dirty: boolean;
+        };
+        FieldValuePresence: components["schemas"]["MissingFieldValue"] | components["schemas"]["PresentFieldValue"];
+        MissingFieldValue: {
+            /** @constant */
+            present: false;
+        };
+        PresentFieldValue: {
+            /** @constant */
+            present: true;
+            /** @description Any JSON value, including null when the Pack field declares nullable true. */
+            value: unknown;
+        };
+        FieldState: {
+            /** @description RFC 6901 JSON Pointer. Tilde and slash tokens are escaped as ~0 and ~1. */
+            path: string;
+            pack_default: components["schemas"]["FieldValuePresence"];
+            baseline: components["schemas"]["FieldValuePresence"];
+            draft_baseline: components["schemas"]["FieldValuePresence"];
+            environment_override: components["schemas"]["FieldValuePresence"];
+            draft_environment_override: components["schemas"]["FieldValuePresence"];
+            effective: components["schemas"]["FieldValuePresence"];
+            origin: components["schemas"]["FieldOrigin"];
+            environment_override_allowed: boolean;
+            /** @description Whether the effective value comes from the source or draft environment override. */
+            is_environment_overridden: boolean;
+            /** @description Source snapshot used to produce every value in this field state. */
+            source_revision: string;
+            nullable: boolean;
+        };
+        /**
+         * @description Effective value origin. Draft origins are distinct from source origins.
+         * @enum {string}
+         */
+        FieldOrigin: "pack_default" | "baseline" | "draft_baseline" | "environment_override" | "draft_environment_override";
+        AffectedEnvironment: {
+            environment_id: string;
+            name: string;
+            kind: components["schemas"]["EnvironmentKind"];
+        };
+        /** @enum {string} */
+        DraftWriteScope: "baseline" | "environment_override";
+        ReplaceDraftScopeInput: {
+            expected_source_revision: string;
+            write_scope: components["schemas"]["DraftWriteScope"];
+            configuration: components["schemas"]["Configuration"];
+        };
+        DraftScopeMutationInput: {
+            expected_source_revision: string;
+            write_scope: components["schemas"]["DraftWriteScope"];
+        };
+        DraftRevisionMismatchResponse: {
+            error: components["schemas"]["DraftRevisionMismatchError"] | components["schemas"]["SourceRevisionMismatchError"];
+        };
+        DraftRevisionMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "revision_mismatch";
+            message: string;
+            request_id: string;
+            current_revision: number;
+            current_source_revision: string;
+            /** @description Scope the failed request attempted to write; it does not identify the concurrent writer's changed scope. */
+            conflict_scope: components["schemas"]["DraftWriteScope"];
+            current_state: components["schemas"]["DraftView"];
+        };
+        SourceRevisionMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "source_revision_mismatch";
+            message: string;
+            request_id: string;
+            current_revision: number;
+            current_source_revision: string;
+            /** @description Scope the failed request attempted to write; it does not identify the source change location. */
+            conflict_scope: components["schemas"]["DraftWriteScope"];
+            current_state: components["schemas"]["DraftView"];
+        };
+        DraftValidationErrorResponse: {
+            error: components["schemas"]["DraftValidationError"];
+        };
+        DraftValidationError: {
+            /** @constant */
+            code: "validation_failed";
+            message: string;
+            request_id: string;
+            /** @description Sorted by scope, RFC 6901 path, then code. */
+            details: components["schemas"]["DraftStructuralErrorDetail"][];
+        };
+        DraftStructuralErrorDetail: {
+            /** @enum {string} */
+            code: "invalid_config_shape" | "field_type_mismatch" | "required_field_missing" | "value_not_allowed" | "explicit_null_forbidden" | "environment_override_forbidden";
+            /** @description RFC 6901 JSON Pointer to the invalid configuration field. */
+            path: string;
+            scope: components["schemas"]["DraftWriteScope"];
+            message: string;
         };
         ErrorResponse: {
             error: components["schemas"]["Error"];
@@ -454,6 +656,41 @@ export interface components {
                 "application/json": components["schemas"]["ManifestRevisionMismatchResponse"];
             };
         };
+        /** @description The targeted mutation was accepted, consumed the previous ETag, and the response contains the committed draft snapshot. Accepted no-op writes also advance the project-level draft revision. */
+        DraftMutationSucceeded: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["DraftResponse"];
+            };
+        };
+        /** @description The project-level draft revision or source revision changed. The ETag and complete current state come from the same atomic snapshot. */
+        DraftRevisionMismatch: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["DraftRevisionMismatchResponse"];
+            };
+        };
+        /** @description The replacement violates the Pack structural schema, nullability, or environment override permissions. */
+        DraftValidationFailed: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["DraftValidationErrorResponse"];
+            };
+        };
         /** @description Request is structurally valid but violates project rules. */
         ValidationFailed: {
             headers: {
@@ -493,7 +730,7 @@ export interface components {
     };
     parameters: {
         EnvironmentID: string;
-        /** @description Quoted local manifest revision returned by ETag. */
+        /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
         IfMatch: string;
         PackName: string;
         PackVersion: string;
@@ -505,6 +742,8 @@ export interface components {
         CacheControl: "no-store";
         /** @description Quoted local manifest revision. */
         ETag: string;
+        /** @description Quoted project-level draft revision shared by baseline and every environment override. */
+        DraftETag: string;
         /** @description Quoted in-process Pack registry revision; this is independent of the project manifest revision. */
         PackETag: string;
         RequestID: string;
@@ -593,7 +832,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Quoted local manifest revision returned by ETag. */
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
                 "If-Match": components["parameters"]["IfMatch"];
             };
             path?: never;
@@ -652,7 +891,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Quoted local manifest revision returned by ETag. */
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
                 "If-Match": components["parameters"]["IfMatch"];
             };
             path?: never;
@@ -715,7 +954,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Quoted local manifest revision returned by ETag. */
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
                 "If-Match": components["parameters"]["IfMatch"];
             };
             path: {
@@ -754,7 +993,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Quoted local manifest revision returned by ETag. */
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
                 "If-Match": components["parameters"]["IfMatch"];
             };
             path: {
@@ -863,6 +1102,114 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["SchemaIncompatible"];
+        };
+    };
+    getDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft layers, effective configuration, and field origins for the selected environment. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceDraftScope: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceDraftScopeInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DraftMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["DraftValidationFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    resetDraftScope: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftScopeMutationInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DraftMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    discardDraftScope: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftScopeMutationInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DraftMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
 }

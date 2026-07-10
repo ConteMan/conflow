@@ -12,16 +12,27 @@
 | 源适配器（Source Adapter） | 配置保存和读取方式，例如 Git JSON |
 | 发布适配器（Provider Adapter） | 发布目标交互方式，例如 Firebase Remote Config |
 
-## 优先级
+## 分层与定向草稿
+
+草稿不是叠加在所有配置之上的第五层，而是对一个目标层的完整替换。每个项目只有一份共享的项目基线草稿；每个环境可有一份环境覆盖草稿。读取某个环境时，先分别解析两个目标层，再计算 effective value：
 
 ```text
-Pack 安全默认值
-  < 项目基线配置
-  < 环境覆盖
-  < 当前草稿
+resolved baseline = draft.baseline ?? source.baseline
+resolved environment override =
+  draft.environment_override[environment_id]
+  ?? source.environment_override[environment_id]
+
+effective =
+  Pack 安全默认值
+  < resolved baseline
+  < resolved environment override
 ```
 
-Firebase 当前值不参与上述优先级；它用于生成发布计划、检测并发变化与发布后验证。
+这里的 `??` 表示草稿 replacement 是否存在，不是 JSON 的 null 合并运算。显式安装的空对象 `{}` 仍然是“存在的 replacement”，与没有草稿不同。baseline replacement 在项目内共享，因此从任一环境视角修改 baseline 都会影响同一份项目草稿；`environment_id` 只决定读取视角和 environment override 的目标。
+
+层间合并固定为：对象递归合并，标量替换，数组整体替换；上层字段缺失时回退到低层。空对象不会清空低层对象；显式 `null` 只有在 Pack 字段声明 `nullable=true` 时才是合法值。Firebase 当前值不参与上述优先级；它用于生成发布计划、检测并发变化与发布后验证。
+
+详细的草稿 presence、字段来源和并发合同见 [Spec 004](../specs/004-draft-layering.md) 与 [ADR-005](../decisions/ADR-005-targeted-draft-layer.md)。
 
 ## 项目清单
 

@@ -9,7 +9,9 @@ make check
 git diff --check
 ```
 
-`make check` 会构建 React UI、同步 Go 嵌入资源、确认嵌入资源已提交，并运行 `gofmt`、Go tests、`go vet` 和二进制构建。
+`make check` 会构建 React UI、同步 Go 嵌入资源、确认嵌入资源已提交，运行 `gofmt`、Go tests、`go vet`、二进制构建和本地 Playwright E2E。
+
+GitHub Actions 运行 `make check-ci`：覆盖除 Playwright 以外的同一组门禁，不安装 Chromium 或系统浏览器依赖。涉及 UI、API client 或交互状态的 PR 必须在本地运行完整 `make check`，并在 PR 中记录 E2E 结果。
 
 ## 版本与变更记录
 
