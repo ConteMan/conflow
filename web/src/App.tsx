@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConflowAPIError,
   ConflowNetworkError,
@@ -36,6 +36,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState<{ code: string; requestId?: string } | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
+  const environmentSelectRef = useRef<HTMLSelectElement>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -118,11 +119,11 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
+      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
       {requestError ? <div className="error-container"><RequestError {...requestError} onDismiss={() => setRequestError(null)} /></div> : null}
-      {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} environments={data.environments} pack={pack} onManageEnvironments={(environmentId) => { if (environmentId) setSelectedEnvironmentId(environmentId); selectPage("environments"); }} /> : null}
+      {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} environments={data.environments} pack={pack} onManageEnvironments={(environmentId) => { if (environmentId) setSelectedEnvironmentId(environmentId); selectPage("environments"); }} onManageProject={() => selectPage("project")} onSwitchEnvironment={() => environmentSelectRef.current?.focus()} /> : null}
       {page === "environments" ? <EnvironmentManager environments={data.environments} selectedEnvironmentId={selectedEnvironment.id} busy={busy} readOnly={!data.capabilities.environment_manage} onSelect={setSelectedEnvironmentId} onSubmit={saveEnvironment} onDelete={removeEnvironment} /> : null}
-      {page === "project" ? <ProjectSettings project={data.project} busy={busy} readOnly={!data.capabilities.project_edit} onSave={saveProject} /> : null}
+      {page === "project" ? <ProjectSettings project={data.project} busy={busy} readOnly={!data.capabilities.project_edit} onManageEnvironments={() => selectPage("environments")} onSave={saveProject} /> : null}
       <ConflictDialog open={conflict !== null} state={conflict?.state} revision={conflict?.revision} local={conflict?.local ?? null} onClose={() => setConflict(null)} onReload={() => { if (conflict?.state && conflict.revision) { setData((current) => current ? { ...current, ...conflict.state } : current); setRevision(conflict.revision); } setConflict(null); }} />
     </div>
   );
