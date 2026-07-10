@@ -17,7 +17,7 @@
 | [009](009-firebase-read-validate.md) | Firebase 认证、拉取与预校验 | 002、005、008 | 待实现 |
 | [010](010-firebase-publish.md) | Firebase 发布与并发保护 | 008、009 | 待实现 |
 | [011](011-release-audit-rollback.md) | 发布审计、默认值下载与回滚 | 010 | 待实现 |
-| [012](012-ui-design-prototype.md) | UI 设计探索与设计基线 | 002、003、006 | 待实现 |
+| [012](012-ui-design-prototype.md) | UI 设计探索与设计基线 | 002、003、006 | 已实现 |
 | [013](013-ui-project-shell.md) | Web 应用壳、项目与环境管理 UI | 002、003、012 | 待实现 |
 | [014](014-ui-domain-editor.md) | 业务配置编辑器 | 004、006、007、012、013 | 待实现 |
 | [015](015-ui-plan-release.md) | 校验、Plan、发布与回滚 UI | 008–012、014 | 待实现 |
