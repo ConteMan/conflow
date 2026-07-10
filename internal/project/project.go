@@ -38,6 +38,8 @@ type Source struct {
 
 type Environment struct {
 	ID       string   `yaml:"id"`
+	Name     string   `yaml:"name"`
+	Kind     string   `yaml:"kind"`
 	Provider Provider `yaml:"provider"`
 	Publish  Publish  `yaml:"publish"`
 }
@@ -101,6 +103,17 @@ func Validate(manifest Manifest) error {
 			validationErrors = append(validationErrors, fmt.Errorf("environment.id %q is duplicated", environment.ID))
 		}
 		environmentIDs[environment.ID] = struct{}{}
+		environmentName := strings.TrimSpace(environment.Name)
+		if environmentName == "" {
+			validationErrors = append(validationErrors, fmt.Errorf("environment %q name is required", environment.ID))
+		} else if len([]rune(environmentName)) > 120 {
+			validationErrors = append(validationErrors, fmt.Errorf("environment %q name must be at most 120 characters", environment.ID))
+		}
+		switch environment.Kind {
+		case "development", "staging", "production", "custom":
+		default:
+			validationErrors = append(validationErrors, fmt.Errorf("environment %q kind must be development, staging, production, or custom", environment.ID))
+		}
 		if environment.Provider.Type != "firebase-remote-config" {
 			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.type must be firebase-remote-config", environment.ID))
 		}
@@ -130,8 +143,8 @@ func CreateExample(workspace string) (string, error) {
 		Pack:    PackReference{ID: "mobile-ad-monetization/v1"},
 		Source:  Source{Type: "managed-file"},
 		Environments: []Environment{
-			{ID: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
-			{ID: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
+			{ID: "development", Name: "Development", Kind: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
+			{ID: "production", Name: "Production", Kind: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
 		},
 	}
 	content, err := yaml.Marshal(manifest)

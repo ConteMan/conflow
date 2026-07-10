@@ -271,10 +271,10 @@ export interface components {
             requires_confirmation: boolean;
         };
         Capabilities: {
-            /** @constant */
-            project_edit: true;
-            /** @constant */
-            environment_manage: true;
+            /** @description Whether the current project source can be edited. Clients must render project forms as read-only when false. */
+            project_edit: boolean;
+            /** @description Whether environments can be created, updated, or deleted. Clients must render environment management as read-only when false. */
+            environment_manage: boolean;
         };
         PackSummary: {
             ref: string;

@@ -702,10 +702,10 @@ components:
       properties:
         project_edit:
           type: boolean
-          const: true
+          description: Whether the current project source can be edited. Clients must render project forms as read-only when false.
         environment_manage:
           type: boolean
-          const: true
+          description: Whether environments can be created, updated, or deleted. Clients must render environment management as read-only when false.
     PackSummary:
       type: object
       additionalProperties: false

@@ -1,6 +1,6 @@
 # Spec 013：Web 应用壳、项目与环境管理 UI
 
-> 状态：待实现  
+> 状态：已实现（2026-07-10）
 > 依赖：Spec 002、003、012
 
 ## 目标
@@ -37,6 +37,13 @@
 
 - 广告位编辑、语义 diff 和发布。
 - 独立设计系统包、主题市场和插件 UI。
+
+## 实现选型
+
+- 状态管理使用 React 内置 state / hook；本阶段只有单一 manifest revision 域，不引入服务端状态缓存库。
+- `lucide-react` 作为直接运行时依赖，统一提供按钮和状态图标，避免维护手绘 SVG。
+- `@playwright/test` 作为直接开发依赖，在浏览器中运行完整 React 应用并拦截 HTTP 合同，覆盖 bootstrap、Production、环境写入、typed `412` 和断线恢复；不以组件快照替代交互验收。
+- E2E 使用 Playwright 管理的 Chromium；`make bootstrap` 安装浏览器，CI 显式安装浏览器及系统依赖，不要求贡献者预装 Google Chrome。
 
 ## 验收
 

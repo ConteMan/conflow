@@ -159,6 +159,7 @@ func (a *api) updateEnvironment(writer http.ResponseWriter, request *http.Reques
 	environmentID := request.PathValue("environment_id")
 	replacement := project.Environment{
 		ID:       environmentID,
+		Name:     input.Name,
 		Provider: input.Provider.toProject(),
 		Publish:  publish,
 	}
@@ -232,7 +233,7 @@ func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err 
 	var mismatch *project.RevisionMismatchError
 	switch {
 	case errors.As(err, &mismatch):
-		writeAPIError(writer, request, http.StatusPreconditionFailed, "revision_mismatch", "项目已被其他操作修改，请重新加载", mismatch.Current)
+		writeManifestRevisionMismatch(writer, request, mismatch.Snapshot)
 	case errors.Is(err, project.ErrNotFound):
 		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
 	case errors.Is(err, project.ErrAlreadyExists):

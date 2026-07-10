@@ -20,6 +20,8 @@ func TestEnvironmentLifecycle(t *testing.T) {
 
 	createdSnapshot, created, err := service.CreateEnvironment(ctx, initial.Revision, project.Environment{
 		ID:       "staging",
+		Name:     "Staging",
+		Kind:     "staging",
 		Provider: project.Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-staging"},
 		Publish:  project.Publish{RequiresConfirmation: true},
 	})
@@ -31,12 +33,14 @@ func TestEnvironmentLifecycle(t *testing.T) {
 	}
 
 	updatedSnapshot, updated, err := service.UpdateEnvironment(ctx, createdSnapshot.Revision, "staging", project.Environment{
+		Name:     "QA Staging",
+		Kind:     "production",
 		Provider: project.Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-staging-2"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.ID != "staging" || updated.Provider.ProjectID != "photo-editor-staging-2" {
+	if updated.ID != "staging" || updated.Name != "QA Staging" || updated.Kind != "staging" || updated.Provider.ProjectID != "photo-editor-staging-2" {
 		t.Fatalf("updated environment = %#v", updated)
 	}
 
@@ -92,12 +96,16 @@ source:
   type: managed-file
 environments:
   - id: development
+    name: Development
+    kind: development
     provider:
       type: firebase-remote-config
       project_id: photo-editor-dev
     publish:
       requires_confirmation: false
   - id: production
+    name: Production
+    kind: production
     provider:
       type: firebase-remote-config
       project_id: photo-editor-prod
