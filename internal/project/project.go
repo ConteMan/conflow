@@ -76,8 +76,11 @@ func Validate(manifest Manifest) error {
 	if !projectIDPattern.MatchString(manifest.Project.ID) {
 		validationErrors = append(validationErrors, errors.New("project.id must be kebab-case and 2-63 characters"))
 	}
-	if strings.TrimSpace(manifest.Project.Name) == "" {
+	projectName := strings.TrimSpace(manifest.Project.Name)
+	if projectName == "" {
 		validationErrors = append(validationErrors, errors.New("project.name is required"))
+	} else if len([]rune(projectName)) > 120 {
+		validationErrors = append(validationErrors, errors.New("project.name must be at most 120 characters"))
 	}
 	if manifest.Pack.ID == "" {
 		validationErrors = append(validationErrors, errors.New("pack.id is required"))
@@ -101,8 +104,11 @@ func Validate(manifest Manifest) error {
 		if environment.Provider.Type != "firebase-remote-config" {
 			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.type must be firebase-remote-config", environment.ID))
 		}
-		if strings.TrimSpace(environment.Provider.ProjectID) == "" {
+		providerProjectID := strings.TrimSpace(environment.Provider.ProjectID)
+		if providerProjectID == "" {
 			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.project_id is required", environment.ID))
+		} else if len([]rune(providerProjectID)) > 128 {
+			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.project_id must be at most 128 characters", environment.ID))
 		}
 	}
 	return errors.Join(validationErrors...)

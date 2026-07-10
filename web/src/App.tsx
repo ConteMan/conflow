@@ -1,22 +1,20 @@
 import { useEffect, useState } from "react";
 
-type Health = {
-  status: string;
-  project_id: string;
-};
+import { getBootstrap, type BootstrapResponse } from "./api/client";
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void fetch("/api/v1/health")
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return (await response.json()) as Health;
-      })
-      .then(setHealth)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unknown error"));
+    const controller = new AbortController();
+    void getBootstrap(controller.signal)
+      .then(setBootstrap)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError(reason instanceof Error ? reason.message : "Unknown error");
+      });
+    return () => controller.abort();
   }, []);
 
   return (
@@ -29,9 +27,9 @@ export default function App() {
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Status title="本地服务" value={health?.status === "ok" ? "正常" : "连接中"} />
-          <Status title="当前项目" value={health?.project_id ?? "—"} />
-          <Status title="首个配置包" value="移动广告配置" />
+          <Status title="本地服务" value={bootstrap ? "正常" : "连接中"} />
+          <Status title="当前项目" value={bootstrap?.data.project.name ?? "—"} />
+          <Status title="环境数量" value={bootstrap ? String(bootstrap.data.environments.length) : "—"} />
         </div>
 
         {error ? <p className="mt-6 rounded-lg bg-red-50 p-4 text-red-700 dark:bg-red-950 dark:text-red-200">API 连接失败：{error}</p> : null}
