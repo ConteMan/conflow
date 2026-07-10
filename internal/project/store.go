@@ -21,6 +21,7 @@ var (
 type RevisionMismatchError struct {
 	Expected uint64
 	Current  uint64
+	Snapshot Snapshot
 }
 
 func (e *RevisionMismatchError) Error() string {
@@ -80,7 +81,8 @@ func (s *Store) Update(expectedRevision uint64, mutate func(*Manifest) error) (S
 		return Snapshot{}, err
 	}
 	if expectedRevision != s.revision {
-		return Snapshot{}, &RevisionMismatchError{Expected: expectedRevision, Current: s.revision}
+		current := s.snapshotLocked()
+		return Snapshot{}, &RevisionMismatchError{Expected: expectedRevision, Current: current.Revision, Snapshot: current}
 	}
 
 	next := cloneManifest(s.manifest)

@@ -76,17 +76,21 @@ func (s *Service) GetEnvironment(ctx context.Context, environmentID string) (pro
 }
 
 func (s *Service) UpdateEnvironment(_ context.Context, expectedRevision uint64, environmentID string, replacement project.Environment) (project.Snapshot, project.Environment, error) {
-	replacement.ID = environmentID
 	snapshot, err := s.projects.Update(expectedRevision, func(manifest *project.Manifest) error {
 		for index := range manifest.Environments {
 			if manifest.Environments[index].ID == environmentID {
+				replacement.ID = environmentID
+				replacement.Kind = manifest.Environments[index].Kind
 				manifest.Environments[index] = replacement
 				return nil
 			}
 		}
 		return project.ErrNotFound
 	})
-	return snapshot, replacement, err
+	if err != nil {
+		return snapshot, project.Environment{}, err
+	}
+	return snapshot, replacement, nil
 }
 
 func (s *Service) DeleteEnvironment(_ context.Context, expectedRevision uint64, environmentID string) (project.Snapshot, error) {

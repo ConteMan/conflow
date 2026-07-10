@@ -75,6 +75,9 @@ func TestStoreRejectsStaleRevision(t *testing.T) {
 	if !errors.As(err, &mismatch) || mismatch.Current != snapshot.Revision+1 {
 		t.Fatalf("mismatch = %#v", mismatch)
 	}
+	if mismatch.Snapshot.Revision != mismatch.Current || mismatch.Snapshot.Manifest.Project.Name != "First update" {
+		t.Fatalf("mismatch snapshot = %#v", mismatch.Snapshot)
+	}
 }
 
 func TestStoreWritesValidManifest(t *testing.T) {
@@ -223,8 +226,8 @@ func validTestManifest() Manifest {
 		Pack:    PackReference{ID: "mobile-ad-monetization/v1"},
 		Source:  Source{Type: "managed-file"},
 		Environments: []Environment{
-			{ID: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
-			{ID: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
+			{ID: "development", Name: "Development", Kind: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
+			{ID: "production", Name: "Production", Kind: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
 		},
 	}
 }

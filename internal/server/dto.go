@@ -26,6 +26,23 @@ type errorEnvelope struct {
 	Error errorDTO `json:"error"`
 }
 
+type manifestRevisionMismatchEnvelope struct {
+	Error manifestRevisionMismatchDTO `json:"error"`
+}
+
+type manifestRevisionMismatchDTO struct {
+	Code            string           `json:"code"`
+	Message         string           `json:"message"`
+	RequestID       string           `json:"request_id"`
+	CurrentRevision uint64           `json:"current_revision"`
+	CurrentState    manifestStateDTO `json:"current_state"`
+}
+
+type manifestStateDTO struct {
+	Project      projectDTO       `json:"project"`
+	Environments []environmentDTO `json:"environments"`
+}
+
 type errorDTO struct {
 	Code            string `json:"code"`
 	Message         string `json:"message"`
@@ -58,17 +75,22 @@ type updateProjectInput struct {
 
 type environmentDTO struct {
 	ID       string      `json:"id"`
+	Name     string      `json:"name"`
+	Kind     string      `json:"kind"`
 	Provider providerDTO `json:"provider"`
 	Publish  publishDTO  `json:"publish"`
 }
 
 type createEnvironmentInput struct {
 	ID       string       `json:"id"`
+	Name     string       `json:"name"`
+	Kind     string       `json:"kind"`
 	Provider providerDTO  `json:"provider"`
 	Publish  publishInput `json:"publish"`
 }
 
 type updateEnvironmentInput struct {
+	Name     string       `json:"name"`
 	Provider providerDTO  `json:"provider"`
 	Publish  publishInput `json:"publish"`
 }
@@ -187,7 +209,9 @@ func environmentsDTOFrom(environments []project.Environment) []environmentDTO {
 
 func environmentDTOFrom(environment project.Environment) environmentDTO {
 	return environmentDTO{
-		ID: environment.ID,
+		ID:   environment.ID,
+		Name: environment.Name,
+		Kind: environment.Kind,
 		Provider: providerDTO{
 			Type:      environment.Provider.Type,
 			ProjectID: environment.Provider.ProjectID,
@@ -280,6 +304,8 @@ func (environment createEnvironmentInput) toProject() (project.Environment, bool
 	}
 	return project.Environment{
 		ID:       environment.ID,
+		Name:     environment.Name,
+		Kind:     environment.Kind,
 		Provider: environment.Provider.toProject(),
 		Publish:  publish,
 	}, true

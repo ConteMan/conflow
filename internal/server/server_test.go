@@ -29,6 +29,24 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestFrontendServesIndexWithoutRedirect(t *testing.T) {
+	handler, _ := newTestHandler(t)
+	for _, requestPath := range []string{"/", "/environments"} {
+		t.Run(requestPath, func(t *testing.T) {
+			recorder := executeRequest(t, handler, http.MethodGet, requestPath, "", nil)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
+			}
+			if got := recorder.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/html") {
+				t.Fatalf("content type = %q, want text/html", got)
+			}
+			if !strings.Contains(recorder.Body.String(), `<div id="root"></div>`) {
+				t.Fatalf("response does not contain React root: %s", recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestBootstrapReturnsRevisionAndRequestID(t *testing.T) {
 	handler, _ := newTestHandler(t)
 	recorder := executeRequest(t, handler, http.MethodGet, "/api/v1/bootstrap", "", nil)
@@ -49,6 +67,9 @@ func TestBootstrapReturnsRevisionAndRequestID(t *testing.T) {
 	decodeResponse(t, recorder, &response)
 	if response.Data.Project.ID != "photo-editor" || len(response.Data.Environments) != 2 {
 		t.Fatalf("bootstrap = %#v", response.Data)
+	}
+	if response.Data.Environments[1].Name != "Production" || response.Data.Environments[1].Kind != "production" {
+		t.Fatalf("production environment = %#v", response.Data.Environments[1])
 	}
 	if response.Meta.RequestID == "" || response.Meta.Revision != 1 {
 		t.Fatalf("meta = %#v", response.Meta)
@@ -73,16 +94,19 @@ func TestProjectUpdateAndRevisionConflict(t *testing.T) {
 	if stale.Code != http.StatusPreconditionFailed {
 		t.Fatalf("status = %d, body = %s", stale.Code, stale.Body.String())
 	}
-	var response errorEnvelope
+	var response manifestRevisionMismatchEnvelope
 	decodeResponse(t, stale, &response)
 	if response.Error.Code != "revision_mismatch" || response.Error.CurrentRevision != 2 {
 		t.Fatalf("error = %#v", response.Error)
+	}
+	if stale.Header().Get("ETag") != `"2"` || response.Error.CurrentState.Project.Name != "Updated Photo Editor" || len(response.Error.CurrentState.Environments) != 2 {
+		t.Fatalf("conflict state = %#v, etag = %q", response.Error.CurrentState, stale.Header().Get("ETag"))
 	}
 }
 
 func TestEnvironmentLifecycle(t *testing.T) {
 	handler, _ := newTestHandler(t)
-	createBody := `{"id":"staging","provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging"},"publish":{"requires_confirmation":true}}`
+	createBody := `{"id":"staging","name":"Staging","kind":"staging","provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging"},"publish":{"requires_confirmation":true}}`
 	created := executeRequest(t, handler, http.MethodPost, "/api/v1/environments", `"1"`, []byte(createBody))
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create status = %d, body = %s", created.Code, created.Body.String())
@@ -93,10 +117,17 @@ func TestEnvironmentLifecycle(t *testing.T) {
 		t.Fatalf("get status = %d, body = %s", got.Code, got.Body.String())
 	}
 
-	updateBody := `{"provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging-2"},"publish":{"requires_confirmation":false}}`
+	updateBody := `{"name":"QA Staging","provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging-2"},"publish":{"requires_confirmation":false}}`
 	updated := executeRequest(t, handler, http.MethodPut, "/api/v1/environments/staging", `"2"`, []byte(updateBody))
 	if updated.Code != http.StatusOK || updated.Header().Get("ETag") != `"3"` {
 		t.Fatalf("update status = %d, etag = %q, body = %s", updated.Code, updated.Header().Get("ETag"), updated.Body.String())
+	}
+	var updatedResponse struct {
+		Data environmentDTO `json:"data"`
+	}
+	decodeResponse(t, updated, &updatedResponse)
+	if updatedResponse.Data.Name != "QA Staging" || updatedResponse.Data.Kind != "staging" {
+		t.Fatalf("updated environment = %#v", updatedResponse.Data)
 	}
 
 	deleted := executeRequest(t, handler, http.MethodDelete, "/api/v1/environments/staging", `"3"`, nil)
@@ -172,7 +203,7 @@ func TestUnknownJSONFieldIsRejected(t *testing.T) {
 
 func TestDuplicateEnvironmentReturnsConflict(t *testing.T) {
 	handler, _ := newTestHandler(t)
-	body := `{"id":"development","provider":{"type":"firebase-remote-config","project_id":"duplicate"},"publish":{"requires_confirmation":false}}`
+	body := `{"id":"development","name":"Development copy","kind":"development","provider":{"type":"firebase-remote-config","project_id":"duplicate"},"publish":{"requires_confirmation":false}}`
 	recorder := executeRequest(t, handler, http.MethodPost, "/api/v1/environments", `"1"`, []byte(body))
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
@@ -199,7 +230,7 @@ func TestInvalidProjectReturnsValidationError(t *testing.T) {
 
 func TestEnvironmentRequiresExplicitPublishConfirmation(t *testing.T) {
 	handler, _ := newTestHandler(t)
-	body := `{"id":"staging","provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging"},"publish":{}}`
+	body := `{"id":"staging","name":"Staging","kind":"staging","provider":{"type":"firebase-remote-config","project_id":"photo-editor-staging"},"publish":{}}`
 	recorder := executeRequest(t, handler, http.MethodPost, "/api/v1/environments", `"1"`, []byte(body))
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())

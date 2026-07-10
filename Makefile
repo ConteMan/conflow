@@ -1,14 +1,18 @@
 WEB_DIR := web
 
-.PHONY: bootstrap web-install web-dev web-build web-check api-generate api-check docs-check fmt test vet build check
+.PHONY: bootstrap web-install web-install-browser web-dev web-build web-check web-test api-generate api-check docs-check fmt test vet build check
 
 bootstrap:
 	go mod download
 	npm --prefix $(WEB_DIR) install
+	$(MAKE) web-install-browser
 	$(MAKE) web-build
 
 web-install:
 	npm --prefix $(WEB_DIR) ci
+
+web-install-browser:
+	npm --prefix $(WEB_DIR) exec -- playwright install chromium
 
 web-dev:
 	npm --prefix $(WEB_DIR) run dev
@@ -21,6 +25,9 @@ web-check:
 	npm --prefix $(WEB_DIR) run build
 	go run ./cmd/embedui
 	git diff --exit-code -- internal/webui/assets
+
+web-test:
+	npm --prefix $(WEB_DIR) run test:e2e
 
 api-generate:
 	npm --prefix $(WEB_DIR) run api:generate
@@ -49,6 +56,7 @@ check:
 	$(MAKE) api-check
 	$(MAKE) web-check
 	$(MAKE) docs-check
+	$(MAKE) web-test
 	test -z "$$(gofmt -l $$(find . -name '*.go' -not -path './web/*'))"
 	$(MAKE) test
 	$(MAKE) vet

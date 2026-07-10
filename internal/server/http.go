@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ConteMan/conflow/internal/project"
 )
 
 type contextKey string
@@ -146,6 +148,20 @@ func writeAPIError(writer http.ResponseWriter, request *http.Request, status int
 		Message:         message,
 		RequestID:       requestID(request),
 		CurrentRevision: currentRevision,
+	}})
+}
+
+func writeManifestRevisionMismatch(writer http.ResponseWriter, request *http.Request, snapshot project.Snapshot) {
+	writer.Header().Set("ETag", strconv.Quote(strconv.FormatUint(snapshot.Revision, 10)))
+	writeJSON(writer, http.StatusPreconditionFailed, manifestRevisionMismatchEnvelope{Error: manifestRevisionMismatchDTO{
+		Code:            "revision_mismatch",
+		Message:         "项目已被其他操作修改，请重新加载",
+		RequestID:       requestID(request),
+		CurrentRevision: snapshot.Revision,
+		CurrentState: manifestStateDTO{
+			Project:      projectDTOFrom(snapshot.Manifest),
+			Environments: environmentsDTOFrom(snapshot.Manifest.Environments),
+		},
 	}})
 }
 

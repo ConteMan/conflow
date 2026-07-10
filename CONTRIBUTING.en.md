@@ -4,7 +4,7 @@
 
 Conflow is documentation-first. Read [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/README.md), before changing code.
 
-Requirements: Go 1.25+, Node.js 24+, and npm.
+Requirements: Go 1.25+, Node.js 24+, npm, and Playwright Chromium. `make bootstrap` installs the browser used by frontend E2E tests.
 
 ```sh
 make bootstrap
