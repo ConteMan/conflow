@@ -1,0 +1,17 @@
+# Go
+/bin/
+/conflow
+/coverage.out
+
+# React / Vite
+/web/node_modules/
+/web/dist/
+
+# Local runtime state and generated release artefacts
+/.conflow/
+/dist/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
