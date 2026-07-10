@@ -18,7 +18,7 @@
 | `UI-API-003` | 顶栏有全局“未发布修改”位置，切换环境后仍要恢复认知（`DESIGN.md:31`；`pm-main-path.md:42,49`）。 | Bootstrap 和环境响应没有 draft summary；013 又不依赖 004。 | 013 只建立状态槽，不伪造 dirty；004 定义按环境的 draft summary 后再接入。若 013 验收要求真实状态，则先将 004 加为合同依赖。 | 004 / 013 |
 | `UI-API-004` | 确认强度是项目级设置，项目可放宽低风险 Production Plan 的确认（评审记录 `2026-07-10-structure-directions.md:9,57`）。 | `Project` 没有发布策略，`Environment.publish` 只有 `requires_confirmation: boolean`，无法表达已收口的策略。 | 由 Spec 010 定义策略语义与默认值，再回写 Spec 002/OpenAPI 的项目模型；013 只在合同合并后展示设置。 | 002 / 010 / 013 / 015 |
 
-`UI-API-001`、`UI-API-002` 是 Spec 013 的硬阻塞。`UI-API-003` 可以通过“只实现状态槽”降级；`UI-API-004` 可以延后到 015，但 013 不得先创造临时字段。
+`UI-API-001`、`UI-API-002` 的合同阻塞已关闭。`UI-API-003` 通过“只实现状态槽”降级；`UI-API-004` 延后到 015，013 不得先创造临时字段。
 
 处理状态（2026-07-10）：
 
@@ -70,8 +70,8 @@
 
 ## Contract-only PR 拆分
 
-1. **013 前置合同：项目、环境与冲突 read model**  
-   关闭 `UI-API-001`、`UI-API-002`，并对 `UI-API-003`、`UI-API-004` 作明确降级或建模。更新 Spec 002/004/010、HTTP 语义、OpenAPI、生成类型和响应示例。
+1. **013 前置合同：项目、环境与冲突 read model（已完成）**
+   `UI-API-001`、`UI-API-002` 已关闭；`UI-API-003`、`UI-API-004` 已明确降级或延后。API `0.4.0`、HTTP 语义、Spec 002/013、生成类型和响应示例已经对齐。
 2. **004 草稿合同**  
    关闭 `UI-API-005` 到 `UI-API-007`、`UI-API-010` 的草稿部分。先合并合同，再实现 004。
 3. **006/007 领域与校验合同**  
@@ -83,6 +83,6 @@
 
 ## 审计结论
 
-- Spec 013 可以开始应用壳的视觉与路由基础，但在 `UI-API-001`、`UI-API-002` 合并前，不应实现 Production 判定和 revision 冲突交互。
+- Spec 013 的合同前置已满足，可以开始应用壳、Production 状态和 revision 冲突交互；最终 E2E 前仍须完成 API `0.4.0` 的 Go 运行时对齐。
 - Spec 014 必须等待 004、006、007 的 contract-only PR 全部合并。
 - Spec 015 必须消费服务端权威的 readiness、Plan lifecycle、risk items、confirmation requirements 和 Operation state，不能在前端复制规则。
