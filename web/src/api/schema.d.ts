@@ -95,6 +95,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List built-in configuration packs */
+        get: operations["listPacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{pack_name}/versions/{pack_version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_name: components["parameters"]["PackName"];
+                pack_version: components["parameters"]["PackVersion"];
+            };
+            cookie?: never;
+        };
+        /** Get a versioned configuration pack metadata */
+        get: operations["getPack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{pack_name}/versions/{pack_version}/schema": {
+        parameters: {
+            query?: {
+                /** @description Exact schema version understood by the client. Omit to retrieve the current schema. */
+                schema_version?: components["parameters"]["SchemaVersion"];
+            };
+            header?: never;
+            path: {
+                pack_name: components["parameters"]["PackName"];
+                pack_version: components["parameters"]["PackVersion"];
+            };
+            cookie?: never;
+        };
+        /** Get a configuration pack form schema */
+        get: operations["getPackSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -129,6 +189,18 @@ export interface components {
             data: {
                 deleted_id: string;
             };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PackListResponse: {
+            data: components["schemas"]["PackSummary"][];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PackMetadataResponse: {
+            data: components["schemas"]["PackMetadata"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PackSchemaResponse: {
+            data: components["schemas"]["PackSchema"];
             meta: components["schemas"]["ResponseMeta"];
         };
         ResponseMeta: {
@@ -169,6 +241,75 @@ export interface components {
             project_edit: true;
             /** @constant */
             environment_manage: true;
+        };
+        PackSummary: {
+            ref: string;
+            name: string;
+            version: string;
+            description: string;
+        };
+        PackMetadata: {
+            ref: string;
+            name: string;
+            version: string;
+            description: string;
+            capabilities: string[];
+            schema_version: number;
+            entity_types: components["schemas"]["EntityMetadata"][];
+        };
+        EntityMetadata: {
+            name: string;
+            label: string;
+            description: string;
+            id_rule: components["schemas"]["IDRule"];
+            /** @enum {string} */
+            deletion_policy: "restrict" | "cascade" | "allow";
+            environment_override_fields: string[];
+        };
+        IDRule: {
+            pattern: string;
+            min_length: number;
+            max_length: number;
+        };
+        PackSchema: {
+            version: number;
+            entities: components["schemas"]["EntitySchema"][];
+            migrations: components["schemas"]["SchemaMigration"][];
+        };
+        EntitySchema: {
+            name: string;
+            fields: components["schemas"]["FieldSchema"][];
+        };
+        FieldSchema: {
+            name: string;
+            /** @enum {string} */
+            type: "string" | "boolean" | "integer" | "number" | "object" | "array" | "reference";
+            required: boolean;
+            default: unknown;
+            /** @enum {string} */
+            sensitivity: "public" | "sensitive";
+            ui: components["schemas"]["FieldUI"];
+            validation: components["schemas"]["FieldValidation"];
+        };
+        FieldUI: {
+            label: string;
+            description: string;
+            control: string;
+            group: string;
+            order: number;
+            placeholder?: string;
+        };
+        FieldValidation: {
+            enum: unknown[];
+            min_length?: number;
+            max_length?: number;
+            minimum?: number;
+            maximum?: number;
+        };
+        SchemaMigration: {
+            from_version: number;
+            to_version: number;
+            description: string;
         };
         ErrorResponse: {
             error: components["schemas"]["Error"];
@@ -241,6 +382,15 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
+        /** @description The requested pack schema version is not compatible with this pack version. */
+        SchemaIncompatible: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
         /** @description Mutation body is not application/json. */
         UnsupportedMediaType: {
             headers: {
@@ -264,12 +414,18 @@ export interface components {
         EnvironmentID: string;
         /** @description Quoted local manifest revision returned by ETag. */
         IfMatch: string;
+        PackName: string;
+        PackVersion: string;
+        /** @description Exact schema version understood by the client. Omit to retrieve the current schema. */
+        SchemaVersion: number;
     };
     requestBodies: never;
     headers: {
         CacheControl: "no-store";
         /** @description Quoted local manifest revision. */
         ETag: string;
+        /** @description Quoted in-process Pack registry revision; this is independent of the project manifest revision. */
+        PackETag: string;
         RequestID: string;
     };
     pathItems: never;
@@ -544,6 +700,88 @@ export interface operations {
             409: components["responses"]["StateConflict"];
             412: components["responses"]["RevisionMismatch"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registered pack summaries */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["PackETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackListResponse"];
+                };
+            };
+        };
+    };
+    getPack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_name: components["parameters"]["PackName"];
+                pack_version: components["parameters"]["PackVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pack metadata */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["PackETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackMetadataResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPackSchema: {
+        parameters: {
+            query?: {
+                /** @description Exact schema version understood by the client. Omit to retrieve the current schema. */
+                schema_version?: components["parameters"]["SchemaVersion"];
+            };
+            header?: never;
+            path: {
+                pack_name: components["parameters"]["PackName"];
+                pack_version: components["parameters"]["PackVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versioned, declarative pack schema */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["PackETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackSchemaResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["SchemaIncompatible"];
         };
     };
 }

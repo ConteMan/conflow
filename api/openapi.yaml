@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Conflow Local API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Versioned same-origin API between the embedded React GUI and the local Go service.
 servers:
@@ -248,6 +248,75 @@ paths:
           $ref: "#/components/responses/RevisionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /packs:
+    get:
+      operationId: listPacks
+      summary: List built-in configuration packs
+      responses:
+        "200":
+          description: Registered pack summaries
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/PackETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackListResponse"
+  /packs/{pack_name}/versions/{pack_version}:
+    parameters:
+      - $ref: "#/components/parameters/PackName"
+      - $ref: "#/components/parameters/PackVersion"
+    get:
+      operationId: getPack
+      summary: Get a versioned configuration pack metadata
+      responses:
+        "200":
+          description: Pack metadata
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/PackETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackMetadataResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /packs/{pack_name}/versions/{pack_version}/schema:
+    parameters:
+      - $ref: "#/components/parameters/PackName"
+      - $ref: "#/components/parameters/PackVersion"
+      - $ref: "#/components/parameters/SchemaVersion"
+    get:
+      operationId: getPackSchema
+      summary: Get a configuration pack form schema
+      responses:
+        "200":
+          description: Versioned, declarative pack schema
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            ETag:
+              $ref: "#/components/headers/PackETag"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackSchemaResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/SchemaIncompatible"
 components:
   parameters:
     EnvironmentID:
@@ -265,6 +334,28 @@ components:
       schema:
         type: string
         pattern: '^"[1-9][0-9]*"$'
+    PackName:
+      name: pack_name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9-]{0,62}$"
+    PackVersion:
+      name: pack_version
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^v[1-9][0-9]*$"
+    SchemaVersion:
+      name: schema_version
+      in: query
+      required: false
+      description: Exact schema version understood by the client. Omit to retrieve the current schema.
+      schema:
+        type: integer
+        minimum: 1
   headers:
     CacheControl:
       schema:
@@ -272,6 +363,11 @@ components:
         const: no-store
     ETag:
       description: Quoted local manifest revision.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+    PackETag:
+      description: Quoted in-process Pack registry revision; this is independent of the project manifest revision.
       schema:
         type: string
         pattern: '^"[1-9][0-9]*"$'
@@ -311,6 +407,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     ValidationFailed:
       description: Request is structurally valid but violates project rules.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    SchemaIncompatible:
+      description: The requested pack schema version is not compatible with this pack version.
       content:
         application/json:
           schema:
@@ -401,6 +503,35 @@ components:
           properties:
             deleted_id:
               type: string
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    PackListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackSummary"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    PackMetadataResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/PackMetadata"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    PackSchemaResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/PackSchema"
         meta:
           $ref: "#/components/schemas/ResponseMeta"
     ResponseMeta:
@@ -496,6 +627,174 @@ components:
         environment_manage:
           type: boolean
           const: true
+    PackSummary:
+      type: object
+      additionalProperties: false
+      required: [ref, name, version, description]
+      properties:
+        ref:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{0,62}/v[1-9][0-9]*$"
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+    PackMetadata:
+      type: object
+      additionalProperties: false
+      required: [ref, name, version, description, capabilities, schema_version, entity_types]
+      properties:
+        ref:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{0,62}/v[1-9][0-9]*$"
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        schema_version:
+          type: integer
+          minimum: 1
+        entity_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityMetadata"
+    EntityMetadata:
+      type: object
+      additionalProperties: false
+      required: [name, label, description, id_rule, deletion_policy, environment_override_fields]
+      properties:
+        name:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        id_rule:
+          $ref: "#/components/schemas/IDRule"
+        deletion_policy:
+          type: string
+          enum: [restrict, cascade, allow]
+        environment_override_fields:
+          type: array
+          items:
+            type: string
+    IDRule:
+      type: object
+      additionalProperties: false
+      required: [pattern, min_length, max_length]
+      properties:
+        pattern:
+          type: string
+        min_length:
+          type: integer
+          minimum: 1
+        max_length:
+          type: integer
+          minimum: 1
+    PackSchema:
+      type: object
+      additionalProperties: false
+      required: [version, entities, migrations]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitySchema"
+        migrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchemaMigration"
+    EntitySchema:
+      type: object
+      additionalProperties: false
+      required: [name, fields]
+      properties:
+        name:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldSchema"
+    FieldSchema:
+      type: object
+      additionalProperties: false
+      required: [name, type, required, default, sensitivity, ui, validation]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [string, boolean, integer, number, object, array, reference]
+        required:
+          type: boolean
+        default: {}
+        sensitivity:
+          type: string
+          enum: [public, sensitive]
+        ui:
+          $ref: "#/components/schemas/FieldUI"
+        validation:
+          $ref: "#/components/schemas/FieldValidation"
+    FieldUI:
+      type: object
+      additionalProperties: false
+      required: [label, description, control, group, order]
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        control:
+          type: string
+        group:
+          type: string
+        order:
+          type: integer
+          minimum: 0
+        placeholder:
+          type: string
+    FieldValidation:
+      type: object
+      additionalProperties: false
+      required: [enum]
+      properties:
+        enum:
+          type: array
+          items: {}
+        min_length:
+          type: integer
+          minimum: 0
+        max_length:
+          type: integer
+          minimum: 0
+        minimum:
+          type: number
+        maximum:
+          type: number
+    SchemaMigration:
+      type: object
+      additionalProperties: false
+      required: [from_version, to_version, description]
+      properties:
+        from_version:
+          type: integer
+          minimum: 1
+        to_version:
+          type: integer
+          minimum: 1
+        description:
+          type: string
     ErrorResponse:
       type: object
       additionalProperties: false
