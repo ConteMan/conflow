@@ -22,7 +22,7 @@
 | [014](014-ui-domain-editor.md) | 业务配置编辑器 | 004、006、007、012、013 | 已实现 |
 | [015](015-ui-plan-release.md) | 校验、Plan、发布与回滚 UI | 008–012、014 | 已实现 |
 | [016](016-git-json-source.md) | Git JSON 源适配器与迁移 | 004、005、008 | 已实现 |
-| [017](017-git-review-workflow.md) | Git 评审工作流与审阅产物 | 008、016 | 待实现 |
+| [017](017-git-review-workflow.md) | Git 评审工作流与审阅产物 | 008、016 | 已实现 |
 | [018](018-cli-automation.md) | CLI 能力对齐与自动化契约 | 007–011、016、017 | 待实现 |
 | [019](019-release-update.md) | 跨平台发版、签名与更新 | 015、018 | 待实现 |
 
