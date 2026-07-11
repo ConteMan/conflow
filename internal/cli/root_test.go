@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -197,5 +198,83 @@ func TestSourceStatusAndSaveCommands(t *testing.T) {
 	}
 	if !strings.Contains(saveOutput.String(), "saved development") {
 		t.Fatalf("save output = %q", saveOutput.String())
+	}
+}
+
+func TestGitJSONSourceCommands(t *testing.T) {
+	workspace := cliGitJSONWorkspace(t)
+	for _, commandLine := range [][]string{
+		{"source", "inspect", "--workspace", workspace},
+		{"source", "import", "--workspace", workspace, "--environment", "development"},
+		{"source", "preview-save", "--workspace", workspace, "--environment", "development"},
+	} {
+		output := &bytes.Buffer{}
+		command := New("test")
+		command.SetOut(output)
+		command.SetArgs(commandLine)
+		if err := command.Execute(); err != nil {
+			t.Fatalf("%s: %v", strings.Join(commandLine, " "), err)
+		}
+		if !json.Valid(output.Bytes()) {
+			t.Fatalf("%s output is not JSON: %s", strings.Join(commandLine, " "), output.String())
+		}
+	}
+}
+
+func cliGitJSONWorkspace(t *testing.T) string {
+	t.Helper()
+	workspace := t.TempDir()
+	root := filepath.Join("..", "..", "testdata", "git-json-pdf-launcher")
+	for _, relative := range []string{"conflow-ad-profile.yaml", filepath.Join("config", "ads.json")} {
+		content, err := os.ReadFile(filepath.Join(root, relative))
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(workspace, relative)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest := `version: 1
+project:
+  id: pdf-launcher
+  name: PDF Launcher
+pack:
+  id: mobile-ad-monetization/v1
+source:
+  type: git-json
+  profile: conflow-ad-profile.yaml
+environments:
+  - id: development
+    name: Development
+    kind: development
+    provider:
+      type: firebase-remote-config
+      project_id: pdf-launcher-dev
+`
+	if err := os.MkdirAll(filepath.Join(workspace, ".conflow"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".conflow", "project.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ignored := ".conflow/draft.json\n.conflow/validation-results.json\n.conflow/operations.json\n.conflow/plans/\n.conflow/releases.json\n.conflow/remote-snapshots/\n"
+	if err := os.WriteFile(filepath.Join(workspace, ".gitignore"), []byte(ignored), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cliRunGit(t, workspace, "init", "--quiet")
+	cliRunGit(t, workspace, "add", ".")
+	cliRunGit(t, workspace, "-c", "user.name=Conflow Test", "-c", "user.email=conflow@example.invalid", "commit", "--quiet", "-m", "fixture")
+	return workspace
+}
+
+func cliRunGit(t *testing.T, workspace string, args ...string) {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", workspace}, args...)...)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}
 }

@@ -1,0 +1,56 @@
+version: 1
+files:
+  - path: config/ads.json
+    format: json
+mappings:
+  - name: feature-switches
+    collection: feature_switches
+    scope: baseline
+    file: config/ads.json
+    records_path: /flags
+    id_path: /key
+    fields:
+      key: {path: /key}
+      default_value: {path: /enabled, transform: string_to_boolean}
+      risk_level: {path: /risk}
+      rollback_method: {path: /rollback}
+  - name: frequency-policies
+    collection: frequency_policies
+    scope: baseline
+    file: config/ads.json
+    records_path: /frequency
+    id_path: /id
+    fields:
+      cooldown_ms: {path: /cooldown_seconds, transform: seconds_to_milliseconds}
+      interval_ms: {path: /interval_ms}
+      max_count: {path: /max_count}
+      shift_count: {path: /shift_count}
+      positions: {path: /positions}
+  - name: placements
+    collection: placements
+    scope: baseline
+    file: config/ads.json
+    records_path: /placements
+    id_path: /id
+    fields:
+      key: {path: /key}
+      ad_type: {path: /ad_type}
+      enabled: {path: /enabled}
+      network_mode: {path: /network}
+      frequency_policy_id: {path: /frequency_id}
+      load_timeout_ms: {path: /timeout_ms}
+      cache_policy: {path: /cache}
+      fallback_behavior: {path: /fallback}
+  - name: unit-bindings
+    collection: unit_bindings
+    scope: environment_override
+    file: config/ads.json
+    records_path: /unit_bindings
+    id_path: /id
+    environment_id_path: /environment
+    fields:
+      placement_id: {path: /placement}
+      environment_id: {path: /environment}
+      platform: {path: /platform}
+      unit_id_ref: {path: /unit_id}
+      status: {path: /status}

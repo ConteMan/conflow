@@ -29,10 +29,11 @@ type Capabilities struct {
 }
 
 type Status struct {
-	Type             string   `json:"type"`
-	Digest           string   `json:"digest"`
-	ExternalModified bool     `json:"external_modified"`
-	Paths            []string `json:"paths"`
+	Type             string        `json:"type"`
+	Digest           string        `json:"digest"`
+	ExternalModified bool          `json:"external_modified"`
+	Paths            []string      `json:"paths"`
+	Git              *GitWorkspace `json:"git,omitempty"`
 }
 
 type Adapter interface {

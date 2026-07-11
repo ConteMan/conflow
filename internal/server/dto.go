@@ -230,11 +230,46 @@ type sourceCapabilitiesDTO struct {
 }
 
 type sourceStatusDTO struct {
-	Type             string   `json:"type"`
-	Digest           string   `json:"digest"`
-	ExternalModified bool     `json:"external_modified"`
-	Paths            []string `json:"paths"`
+	Type             string           `json:"type"`
+	Digest           string           `json:"digest"`
+	ExternalModified bool             `json:"external_modified"`
+	Paths            []string         `json:"paths"`
+	Git              *gitWorkspaceDTO `json:"git,omitempty"`
 }
+
+type gitWorkspaceDTO struct {
+	Root   string `json:"root"`
+	Branch string `json:"branch"`
+	Dirty  bool   `json:"dirty"`
+}
+
+type sourceDiagnosticDTO struct {
+	Code    string `json:"code"`
+	Path    string `json:"path"`
+	Message string `json:"message"`
+}
+
+type sourceInspectDTO struct {
+	Workspace   gitWorkspaceDTO       `json:"workspace"`
+	ProfilePath string                `json:"profile_path"`
+	Matched     bool                  `json:"matched"`
+	Diagnostics []sourceDiagnosticDTO `json:"diagnostics"`
+}
+
+type sourceImportInput struct {
+	EnvironmentID          string  `json:"environment_id"`
+	ExpectedSourceRevision *string `json:"expected_source_revision"`
+}
+
+func (input sourceImportInput) valid() bool {
+	return input.EnvironmentID != "" && input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != ""
+}
+
+type sourcePreviewSaveInput struct {
+	EnvironmentID string `json:"environment_id"`
+}
+
+func (input sourcePreviewSaveInput) valid() bool { return input.EnvironmentID != "" }
 
 type projectDTO struct {
 	ID                        string                            `json:"id"`
@@ -383,7 +418,19 @@ func sourceDTOFrom(info app.SourceInfo) sourceDTO {
 }
 
 func sourceStatusDTOFrom(info app.SourceInfo) sourceStatusDTO {
-	return sourceStatusDTO{Type: info.Status.Type, Digest: info.Status.Digest, ExternalModified: info.Status.ExternalModified, Paths: append([]string{}, info.Status.Paths...)}
+	result := sourceStatusDTO{Type: info.Status.Type, Digest: info.Status.Digest, ExternalModified: info.Status.ExternalModified, Paths: append([]string{}, info.Status.Paths...)}
+	if info.Status.Git != nil {
+		result.Git = &gitWorkspaceDTO{Root: info.Status.Git.Root, Branch: info.Status.Git.Branch, Dirty: info.Status.Git.Dirty}
+	}
+	return result
+}
+
+func sourceInspectDTOFrom(result app.SourceInspectResult) sourceInspectDTO {
+	diagnostics := make([]sourceDiagnosticDTO, len(result.Diagnostics))
+	for index, diagnostic := range result.Diagnostics {
+		diagnostics[index] = sourceDiagnosticDTO{Code: diagnostic.Code, Path: diagnostic.Path, Message: diagnostic.Message}
+	}
+	return sourceInspectDTO{Workspace: gitWorkspaceDTO{Root: result.Workspace.Root, Branch: result.Workspace.Branch, Dirty: result.Workspace.Dirty}, ProfilePath: result.ProfilePath, Matched: result.Matched, Diagnostics: diagnostics}
 }
 
 func environmentsDTOFrom(environments []project.Environment) []environmentDTO {

@@ -90,6 +90,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /source:inspect:
+    post:
+      operationId: inspectSource
+      summary: Detect the Git workspace and validate the active mapping profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceInspectInput"
+      responses:
+        "200":
+          description: Git workspace and profile match report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceInspectResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /source:import:
+    post:
+      operationId: importSource
+      summary: Import Git JSON mapped entities into a target environment draft
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceImportInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/DraftMutationSucceeded"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/DraftRevisionMismatch"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /source:preview-save:
+    post:
+      operationId: previewSourceSave
+      summary: Preview Git JSON file diffs before a draft is saved
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourcePreviewSaveInput"
+      responses:
+        "200":
+          description: Per-file source diff and current source digest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourcePreviewSaveResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /project:
     get:
       operationId: getProject
@@ -503,10 +578,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StateConflict"
         "412":
           $ref: "#/components/responses/DraftSaveRevisionMismatch"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
   /drafts/{environment_id}/entities:
@@ -1747,7 +1826,7 @@ components:
       properties:
         type:
           type: string
-          enum: [managed-file]
+          enum: [managed-file, git-json]
         capabilities:
           $ref: "#/components/schemas/SourceCapabilities"
     SourceCapabilities:
@@ -1766,7 +1845,7 @@ components:
       properties:
         type:
           type: string
-          enum: [managed-file]
+          enum: [managed-file, git-json]
         digest:
           type: string
           minLength: 1
@@ -1779,7 +1858,108 @@ components:
           description: Non-null workspace-relative managed file paths. No credentials are included.
           items:
             type: string
-            pattern: '^\\.conflow/data(/.*)?$'
+            pattern: '^[A-Za-z0-9._/-]+$'
+        git:
+          $ref: "#/components/schemas/GitWorkspace"
+    GitWorkspace:
+      type: object
+      additionalProperties: false
+      required: [root, branch, dirty]
+      properties:
+        root:
+          type: string
+        branch:
+          type: string
+        dirty:
+          type: boolean
+    SourceDiagnostic:
+      type: object
+      additionalProperties: false
+      required: [code, path, message]
+      properties:
+        code:
+          type: string
+          enum: [profile_mismatch, unmapped_value, conditional_value]
+        path:
+          type: string
+        message:
+          type: string
+    SourceInspectInput:
+      type: object
+      additionalProperties: false
+    SourceInspectData:
+      type: object
+      additionalProperties: false
+      required: [workspace, profile_path, matched, diagnostics]
+      properties:
+        workspace:
+          $ref: "#/components/schemas/GitWorkspace"
+        profile_path:
+          type: string
+        matched:
+          type: boolean
+        diagnostics:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceDiagnostic"
+    SourceInspectResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/SourceInspectData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    SourceImportInput:
+      type: object
+      additionalProperties: false
+      required: [environment_id, expected_source_revision]
+      properties:
+        environment_id:
+          type: string
+        expected_source_revision:
+          type: string
+          minLength: 1
+    SourcePreviewSaveInput:
+      type: object
+      additionalProperties: false
+      required: [environment_id]
+      properties:
+        environment_id:
+          type: string
+    SourcePreviewFile:
+      type: object
+      additionalProperties: false
+      required: [path, diff, changed]
+      properties:
+        path:
+          type: string
+        diff:
+          type: string
+        changed:
+          type: boolean
+    SourcePreviewSaveData:
+      type: object
+      additionalProperties: false
+      required: [source_digest, files]
+      properties:
+        source_digest:
+          type: string
+          minLength: 1
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourcePreviewFile"
+    SourcePreviewSaveResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/SourcePreviewSaveData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
     ManifestState:
       type: object
       additionalProperties: false

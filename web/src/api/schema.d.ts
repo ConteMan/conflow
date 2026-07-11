@@ -72,6 +72,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/source:inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detect the Git workspace and validate the active mapping profile */
+        post: operations["inspectSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/source:import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Git JSON mapped entities into a target environment draft */
+        post: operations["importSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/source:preview-save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Git JSON file diffs before a draft is saved */
+        post: operations["previewSourceSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/project": {
         parameters: {
             query?: never;
@@ -685,7 +736,7 @@ export interface components {
         };
         Source: {
             /** @enum {string} */
-            type: "managed-file";
+            type: "managed-file" | "git-json";
             capabilities: components["schemas"]["SourceCapabilities"];
         };
         SourceCapabilities: {
@@ -694,13 +745,56 @@ export interface components {
         };
         SourceStatus: {
             /** @enum {string} */
-            type: "managed-file";
+            type: "managed-file" | "git-json";
             /** @description Opaque digest derived from canonical source bytes. */
             digest: string;
             /** @description Whether the current digest differs from the last successful source load. */
             external_modified: boolean;
             /** @description Non-null workspace-relative managed file paths. No credentials are included. */
             paths: string[];
+            git?: components["schemas"]["GitWorkspace"];
+        };
+        GitWorkspace: {
+            root: string;
+            branch: string;
+            dirty: boolean;
+        };
+        SourceDiagnostic: {
+            /** @enum {string} */
+            code: "profile_mismatch" | "unmapped_value" | "conditional_value";
+            path: string;
+            message: string;
+        };
+        SourceInspectInput: Record<string, never>;
+        SourceInspectData: {
+            workspace: components["schemas"]["GitWorkspace"];
+            profile_path: string;
+            matched: boolean;
+            diagnostics: components["schemas"]["SourceDiagnostic"][];
+        };
+        SourceInspectResponse: {
+            data: components["schemas"]["SourceInspectData"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        SourceImportInput: {
+            environment_id: string;
+            expected_source_revision: string;
+        };
+        SourcePreviewSaveInput: {
+            environment_id: string;
+        };
+        SourcePreviewFile: {
+            path: string;
+            diff: string;
+            changed: boolean;
+        };
+        SourcePreviewSaveData: {
+            source_digest: string;
+            files: components["schemas"]["SourcePreviewFile"][];
+        };
+        SourcePreviewSaveResponse: {
+            data: components["schemas"]["SourcePreviewSaveData"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         ManifestState: {
             project: components["schemas"]["Project"];
@@ -2032,6 +2126,86 @@ export interface operations {
             };
         };
     };
+    inspectSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceInspectInput"];
+            };
+        };
+        responses: {
+            /** @description Git workspace and profile match report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceInspectResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    importSource: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceImportInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DraftMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    previewSourceSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourcePreviewSaveInput"];
+            };
+        };
+        responses: {
+            /** @description Per-file source diff and current source digest */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcePreviewSaveResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     getProject: {
         parameters: {
             query?: never;
@@ -2472,8 +2646,10 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["StateConflict"];
             412: components["responses"]["DraftSaveRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationFailed"];
             428: components["responses"]["PreconditionRequired"];
         };
     };

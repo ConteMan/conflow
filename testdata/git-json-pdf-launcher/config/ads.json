@@ -1,0 +1,73 @@
+{
+  "flags": [
+    {
+      "enabled": "true",
+      "key": "ads_enabled",
+      "legacy_note": "preserve this field",
+      "risk": "low",
+      "rollback": "disable"
+    }
+  ],
+  "frequency": [
+    {
+      "cooldown_seconds": 120,
+      "id": "inter_global_cap",
+      "interval_ms": 3600000,
+      "max_count": 3,
+      "positions": [
+        "pdf_open"
+      ],
+      "shift_count": 0,
+      "unmanaged": {
+        "owner": "launcher"
+      }
+    }
+  ],
+  "metadata": {
+    "app": "PDF Launcher",
+    "unmanaged": true
+  },
+  "placements": [
+    {
+      "ad_type": "interstitial",
+      "cache": "memory",
+      "enabled": true,
+      "fallback": "continue",
+      "frequency_id": "inter_global_cap",
+      "id": "pdf_open_interstitial",
+      "key": "pdf_open",
+      "network": "hybrid",
+      "timeout_ms": 4000,
+      "unmanaged": "keep"
+    }
+  ],
+  "unit_bindings": [
+    {
+      "environment": "development",
+      "id": "ub_development_ios_pdf_open",
+      "placement": "pdf_open_interstitial",
+      "platform": "ios",
+      "status": "configured",
+      "unit_id": "dev-ios-unit",
+      "unmanaged": "keep"
+    },
+    {
+      "environment": "production",
+      "id": "ub_production_ios_pdf_open",
+      "placement": "pdf_open_interstitial",
+      "platform": "ios",
+      "status": "configured",
+      "unit_id": "prod-ios-unit",
+      "unmanaged": "keep"
+    },
+    {
+      "environment": "production",
+      "id": "ub_production_android_pdf_open",
+      "placement": "pdf_open_interstitial",
+      "platform": "android",
+      "status": "missing",
+      "unit_id": null,
+      "unmanaged": "keep"
+    }
+  ]
+}

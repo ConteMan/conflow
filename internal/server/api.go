@@ -15,6 +15,7 @@ import (
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/ConteMan/conflow/internal/release"
+	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
 )
 
@@ -150,6 +151,9 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/bootstrap", a.bootstrap)
 	mux.HandleFunc("GET /api/v1/source", a.getSource)
 	mux.HandleFunc("GET /api/v1/source/status", a.getSourceStatus)
+	mux.HandleFunc("POST /api/v1/source:inspect", a.inspectSource)
+	mux.HandleFunc("POST /api/v1/source:import", a.importSource)
+	mux.HandleFunc("POST /api/v1/source:preview-save", a.previewSourceSave)
 	mux.HandleFunc("GET /api/v1/project", a.getProject)
 	mux.HandleFunc("PUT /api/v1/project", a.updateProject)
 	mux.HandleFunc("GET /api/v1/environments", a.listEnvironments)
@@ -242,6 +246,56 @@ func (a *api) getSourceStatus(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 	writeSuccess(writer, request, http.StatusOK, sourceStatusDTOFrom(info), 1)
+}
+
+func (a *api) inspectSource(writer http.ResponseWriter, request *http.Request) {
+	if err := decodeJSON(writer, request, &struct{}{}); err != nil {
+		writeRequestError(writer, request, err)
+		return
+	}
+	result, err := a.service.InspectSource(request.Context())
+	if err != nil {
+		a.writeSourceError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, sourceInspectDTOFrom(result), 1)
+}
+
+func (a *api) importSource(writer http.ResponseWriter, request *http.Request) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input sourceImportInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	view, nextRevision, err := a.service.ImportSource(request.Context(), input.EnvironmentID, revision, *input.ExpectedSourceRevision)
+	if err != nil {
+		var conflict *draft.ConflictError
+		if errors.As(err, &conflict) {
+			a.writeDraftError(writer, request, err)
+			return
+		}
+		a.writeSourceError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), nextRevision)
+}
+
+func (a *api) previewSourceSave(writer http.ResponseWriter, request *http.Request) {
+	var input sourcePreviewSaveInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	preview, err := a.service.PreviewSourceSave(request.Context(), input.EnvironmentID)
+	if err != nil {
+		a.writeSourceError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, preview, 1)
 }
 
 func (a *api) getProject(writer http.ResponseWriter, request *http.Request) {
@@ -759,6 +813,19 @@ func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err 
 	}
 }
 
+func (a *api) writeSourceError(writer http.ResponseWriter, request *http.Request, err error) {
+	switch {
+	case errors.Is(err, source.ErrGitWorkspaceDirty):
+		writeAPIError(writer, request, http.StatusConflict, "git_workspace_dirty", "Git 工作区存在未提交变更，不能静默写回", 0)
+	case errors.Is(err, source.ErrRoundTripBlocked):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "round_trip_blocked", "源配置包含无法安全映射或写回的值", 0)
+	case errors.Is(err, draft.ErrEnvironmentNotFound), errors.Is(err, project.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
+	default:
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "source_operation_failed", "源适配器操作失败", 0)
+	}
+}
+
 func (a *api) writeReleaseError(writer http.ResponseWriter, request *http.Request, err error) {
 	var mismatch *app.RemoteETagMismatchError
 	var invalidated *app.PlanInvalidatedError
@@ -804,6 +871,8 @@ func (a *api) writeDraftError(writer http.ResponseWriter, request *http.Request,
 		writeDraftValidationError(writer, request, validation.Details)
 	case errors.Is(err, draft.ErrInvalidScope):
 		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "write_scope 不合法", 0)
+	case errors.Is(err, source.ErrGitWorkspaceDirty), errors.Is(err, source.ErrRoundTripBlocked):
+		a.writeSourceError(writer, request, err)
 	default:
 		a.writeError(writer, request, err)
 	}

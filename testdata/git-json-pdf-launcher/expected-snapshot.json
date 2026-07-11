@@ -1,0 +1,82 @@
+{
+  "baseline": {
+    "feature_switches": [
+      {
+        "id": "ads_enabled",
+        "fields": {
+          "key": "ads_enabled",
+          "default_value": true,
+          "risk_level": "low",
+          "rollback_method": "disable"
+        }
+      }
+    ],
+    "frequency_policies": [
+      {
+        "id": "inter_global_cap",
+        "fields": {
+          "cooldown_ms": 120000,
+          "interval_ms": 3600000,
+          "max_count": 3,
+          "shift_count": 0,
+          "positions": ["pdf_open"]
+        }
+      }
+    ],
+    "placements": [
+      {
+        "id": "pdf_open_interstitial",
+        "fields": {
+          "key": "pdf_open",
+          "ad_type": "interstitial",
+          "enabled": true,
+          "network_mode": "hybrid",
+          "frequency_policy_id": "inter_global_cap",
+          "load_timeout_ms": 4000,
+          "cache_policy": "memory",
+          "fallback_behavior": "continue"
+        }
+      }
+    ]
+  },
+  "environment_overrides": {
+    "development": {
+      "unit_bindings": [
+        {
+          "id": "ub_development_ios_pdf_open",
+          "fields": {
+            "placement_id": "pdf_open_interstitial",
+            "environment_id": "development",
+            "platform": "ios",
+            "unit_id_ref": "dev-ios-unit",
+            "status": "configured"
+          }
+        }
+      ]
+    },
+    "production": {
+      "unit_bindings": [
+        {
+          "id": "ub_production_ios_pdf_open",
+          "fields": {
+            "placement_id": "pdf_open_interstitial",
+            "environment_id": "production",
+            "platform": "ios",
+            "unit_id_ref": "prod-ios-unit",
+            "status": "configured"
+          }
+        },
+        {
+          "id": "ub_production_android_pdf_open",
+          "fields": {
+            "placement_id": "pdf_open_interstitial",
+            "environment_id": "production",
+            "platform": "android",
+            "unit_id_ref": null,
+            "status": "missing"
+          }
+        }
+      ]
+    }
+  }
+}

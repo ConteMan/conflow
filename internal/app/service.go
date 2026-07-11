@@ -84,12 +84,20 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 	if err != nil {
 		return nil, err
 	}
-	if manifest.Manifest.Source.Type != "managed-file" {
+	var adapter source.Adapter
+	switch manifest.Manifest.Source.Type {
+	case "managed-file":
+		adapter = source.OpenManagedFile(workspace)
+	case "git-json":
+		adapter, err = source.OpenGitJSON(workspace, manifest.Manifest.Source.Profile)
+		if err != nil {
+			return nil, err
+		}
+	default:
 		return nil, fmt.Errorf("unsupported source adapter %q", manifest.Manifest.Source.Type)
 	}
-	managed := source.OpenManagedFile(workspace)
 	draftStore, err := draft.Open(filepath.Join(workspace, ".conflow", "draft.json"), func() (draft.SourceSnapshot, error) {
-		snapshot, snapshotErr := managed.Load()
+		snapshot, snapshotErr := adapter.Load()
 		if snapshotErr != nil {
 			return draft.SourceSnapshot{}, snapshotErr
 		}
@@ -123,7 +131,7 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 			return provider.NewFirebase(provider.FirebaseConfig{ProjectID: environment.Provider.ProjectID, CredentialsPath: credentialPath}), nil
 		}
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, workspace: workspace, providerFor: factory}, nil
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: adapter, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, workspace: workspace, providerFor: factory}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -244,6 +252,66 @@ func (s *Service) SourceInfo(_ context.Context) (SourceInfo, error) {
 		return SourceInfo{}, err
 	}
 	return SourceInfo{Type: status.Type, Capabilities: s.source.Capabilities(), Status: status}, nil
+}
+
+type SourceInspectResult struct {
+	Workspace   source.GitWorkspace
+	ProfilePath string
+	Matched     bool
+	Diagnostics []source.MappingDiagnostic
+}
+
+func (s *Service) InspectSource(_ context.Context) (SourceInspectResult, error) {
+	adapter, ok := s.source.(*source.GitJSON)
+	if !ok {
+		return SourceInspectResult{}, errors.New("source inspect is only available for git-json")
+	}
+	result, err := adapter.Inspect()
+	if err != nil {
+		return SourceInspectResult{}, err
+	}
+	return SourceInspectResult{Workspace: result.Workspace, ProfilePath: result.ProfilePath, Matched: result.Matched, Diagnostics: result.Diagnostics}, nil
+}
+
+func (s *Service) PreviewSourceSave(ctx context.Context, environmentID string) (source.Preview, error) {
+	adapter, ok := s.source.(*source.GitJSON)
+	if !ok {
+		return source.Preview{}, errors.New("source preview-save is only available for git-json")
+	}
+	view, _, err := s.GetDraft(ctx, environmentID)
+	if err != nil {
+		return source.Preview{}, err
+	}
+	return adapter.Preview(source.SaveInput{ExpectedRevision: view.SourceRevision, EnvironmentID: environmentID, Baseline: view.Baseline.Resolved.Value, EnvironmentOverride: view.EnvironmentOverride.Resolved.Value})
+}
+
+// ImportSource installs the current source snapshot as explicit target-layer
+// draft replacements. The source itself is never modified by import.
+func (s *Service) ImportSource(ctx context.Context, environmentID string, expectedRevision uint64, expectedSourceRevision string) (draft.View, uint64, error) {
+	if _, ok := s.source.(*source.GitJSON); !ok {
+		return draft.View{}, 0, errors.New("source import is only available for git-json")
+	}
+	snapshot, err := s.source.Load()
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	baseline, err := json.Marshal(snapshot.Baseline)
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	view, revision, err := s.MutateDraft(ctx, environmentID, draft.Mutation{ExpectedRevision: expectedRevision, ExpectedSourceRevision: expectedSourceRevision, Scope: draft.ScopeBaseline, Action: "put", Configuration: baseline})
+	if err != nil {
+		return view, revision, err
+	}
+	override := snapshot.EnvironmentOverrides[environmentID]
+	if override == nil {
+		override = map[string]any{}
+	}
+	encodedOverride, err := json.Marshal(override)
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	return s.MutateDraft(ctx, environmentID, draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: expectedSourceRevision, Scope: draft.ScopeEnvironmentOverride, Action: "put", Configuration: encodedOverride})
 }
 
 // SaveDraft writes the resolved source replacement for the selected view and

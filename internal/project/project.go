@@ -40,7 +40,8 @@ type PackReference struct {
 }
 
 type Source struct {
-	Type string `yaml:"type"`
+	Type    string `yaml:"type"`
+	Profile string `yaml:"profile,omitempty"`
 }
 
 type Environment struct {
@@ -106,6 +107,9 @@ func Validate(manifest Manifest) error {
 	}
 	if manifest.Source.Type != "managed-file" && manifest.Source.Type != "git-json" {
 		validationErrors = append(validationErrors, errors.New("source.type must be managed-file or git-json"))
+	}
+	if manifest.Source.Type == "git-json" && strings.TrimSpace(manifest.Source.Profile) == "" {
+		validationErrors = append(validationErrors, errors.New("source.profile is required for git-json"))
 	}
 	if len(manifest.Environments) == 0 {
 		validationErrors = append(validationErrors, errors.New("at least one environment is required"))
