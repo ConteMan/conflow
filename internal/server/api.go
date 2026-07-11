@@ -785,6 +785,8 @@ func (a *api) writeReleaseError(writer http.ResponseWriter, request *http.Reques
 		writeAPIError(writer, request, http.StatusConflict, "rollback_preview_invalid", "回滚预览已失效、过期或不匹配", 0)
 	case errors.Is(err, app.ErrDefaultsFormat):
 		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "defaults format 必须是 xml、json 或 plist", 0)
+	case errors.Is(err, app.ErrRemoteSnapshotUnavailable):
+		writeAPIError(writer, request, http.StatusNotFound, "remote_snapshot_not_found", "远端快照不可用", 0)
 	case errors.Is(err, release.ErrCorrupt):
 		writeAPIError(writer, request, http.StatusServiceUnavailable, "release_audit_corrupt", "发布审计存储已损坏", 0)
 	default:

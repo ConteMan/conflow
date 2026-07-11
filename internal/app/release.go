@@ -584,6 +584,9 @@ func rollbackRequestDigest(request RollbackRequest) (string, error) {
 // values are client defaults already intended for distribution; credentials
 // and provider tokens are not part of the snapshot or this format.
 func (s *Service) Defaults(_ context.Context, environmentID, format string) ([]byte, string, string, error) {
+	if format != "json" && format != "xml" && format != "plist" {
+		return nil, "", "", ErrDefaultsFormat
+	}
 	if _, _, err := s.GetEnvironment(context.Background(), environmentID); err != nil {
 		return nil, "", "", err
 	}
@@ -592,7 +595,7 @@ func (s *Service) Defaults(_ context.Context, environmentID, format string) ([]b
 		return nil, "", "", err
 	}
 	if snapshot.Status != "available" {
-		return nil, "", "", ErrRollbackPreviewInvalid
+		return nil, "", "", ErrRemoteSnapshotUnavailable
 	}
 	digest := defaultsDigest(snapshot.Parameters)
 	metadata := map[string]string{"source_version": snapshot.Version, "source_etag": snapshot.RemoteETag, "digest": digest}
