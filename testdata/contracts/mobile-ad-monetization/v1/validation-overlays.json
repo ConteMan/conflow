@@ -28,15 +28,15 @@
         "readiness": "blocked",
         "cli_exit_code": 2,
         "diagnostics": [
-          {"code": "load_timeout_out_of_range", "path": "/placements/ad_app_open_001/load_timeout_ms", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_app_open_001"},
-          {"code": "network_mode_not_allowed", "path": "/placements/ad_native_007/network_mode", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_native_007"},
+          {"code": "production_enabled_placements_unbound", "path": "/unit_bindings", "severity": "blocking"},
           {"code": "feature_switch_default_not_boolean", "path": "/feature_switches/use_amazon_bidding/default_value", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:feature_switch:use_amazon_bidding"},
           {"code": "frequency_policy_still_referenced", "path": "/frequency_policies/inter_global_cap", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap"},
+          {"code": "load_timeout_out_of_range", "path": "/placements/ad_app_open_001/load_timeout_ms", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_app_open_001"},
           {"code": "reference_not_found", "path": "/placements/ad_native_001/frequency_policy_id", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_native_001"},
-          {"code": "production_unit_binding_missing", "path": "/unit_bindings/ub_production_ios_ad_native_006", "severity": "warning", "entity_ref": "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_native_006"},
-          {"code": "production_unit_binding_missing", "path": "/unit_bindings/ub_production_ios_ad_native_007", "severity": "warning", "entity_ref": "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_native_007"},
+          {"code": "network_mode_not_allowed", "path": "/placements/ad_native_007/network_mode", "severity": "error", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_native_007"},
           {"code": "frequency_policy_unused", "path": "/frequency_policies/legacy_campaign_cap", "severity": "warning", "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:legacy_campaign_cap"},
-          {"code": "production_enabled_placements_unbound", "path": "/unit_bindings", "severity": "blocking"}
+          {"code": "production_unit_binding_missing", "path": "/unit_bindings/ub_production_ios_ad_native_006", "severity": "warning", "entity_ref": "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_native_006"},
+          {"code": "production_unit_binding_missing", "path": "/unit_bindings/ub_production_ios_ad_native_007", "severity": "warning", "entity_ref": "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_native_007"}
         ]
       }
     },

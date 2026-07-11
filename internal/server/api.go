@@ -10,6 +10,7 @@ import (
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/validation"
 )
 
 type api struct {
@@ -36,6 +37,7 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}/schema", a.getPackSchema)
 	mux.HandleFunc("GET /api/v1/drafts/{environment_id}", a.getDraft)
 	mux.HandleFunc("PUT /api/v1/drafts/{environment_id}", a.replaceDraft)
+	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/diagnostics", a.getDiagnostics)
 	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities", a.listEntities)
 	mux.HandleFunc("POST /api/v1/drafts/{environment_id}/entities", a.createEntity)
 	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}", a.getEntity)
@@ -233,6 +235,24 @@ func (a *api) getDraft(writer http.ResponseWriter, request *http.Request) {
 	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), revision)
 }
 
+func (a *api) validateDraft(writer http.ResponseWriter, request *http.Request) {
+	result, revision, err := a.service.ValidateDraft(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeValidationError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, validationResultDTOFrom(result), revision)
+}
+
+func (a *api) getDiagnostics(writer http.ResponseWriter, request *http.Request) {
+	result, revision, err := a.service.Diagnostics(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeValidationError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, validationResultDTOFrom(result), revision)
+}
+
 func (a *api) listEntities(writer http.ResponseWriter, request *http.Request) {
 	values := request.URL.Query()["entity_type"]
 	if len(values) > 1 {
@@ -340,11 +360,16 @@ func (a *api) replaceDraft(writer http.ResponseWriter, request *http.Request) {
 
 func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 	path := strings.TrimPrefix(request.URL.Path, "/api/v1/drafts/")
-	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard"} {
+	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard", ":validate": "validate"} {
 		if strings.HasSuffix(path, suffix) {
 			environmentID := strings.TrimSuffix(path, suffix)
 			if environmentID == "" || strings.Contains(environmentID, "/") {
 				routeNotFound(writer, request)
+				return
+			}
+			if action == "validate" {
+				request.SetPathValue("environment_id", environmentID)
+				a.validateDraft(writer, request)
 				return
 			}
 			a.mutateDraftAction(writer, request, environmentID, action)
@@ -449,4 +474,12 @@ func (a *api) writeEntityError(writer http.ResponseWriter, request *http.Request
 	default:
 		a.writeDraftError(writer, request, err)
 	}
+}
+
+func (a *api) writeValidationError(writer http.ResponseWriter, request *http.Request, err error) {
+	if errors.Is(err, validation.ErrNotFound) {
+		writeAPIError(writer, request, http.StatusNotFound, "validation_not_found", "尚未运行完整校验", 0)
+		return
+	}
+	a.writeError(writer, request, err)
 }

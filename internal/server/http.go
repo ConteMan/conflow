@@ -40,7 +40,7 @@ func apiMiddleware(next http.Handler) http.Handler {
 			writeAPIError(writer, request, http.StatusForbidden, "invalid_origin", "请求 Origin 不允许", 0)
 			return
 		}
-		if requiresJSON(request.Method) && !hasJSONContentType(request.Header.Get("Content-Type")) {
+		if requiresJSON(request) && !hasJSONContentType(request.Header.Get("Content-Type")) {
 			writeAPIError(writer, request, http.StatusUnsupportedMediaType, "unsupported_media_type", "请求必须使用 application/json", 0)
 			return
 		}
@@ -89,8 +89,11 @@ func allowedOrigin(request *http.Request) bool {
 	return strings.EqualFold(origin.Host, request.Host)
 }
 
-func requiresJSON(method string) bool {
-	return method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch
+func requiresJSON(request *http.Request) bool {
+	if request.Method == http.MethodPost && strings.HasSuffix(request.URL.Path, ":validate") {
+		return false
+	}
+	return request.Method == http.MethodPost || request.Method == http.MethodPut || request.Method == http.MethodPatch
 }
 
 func hasJSONContentType(raw string) bool {

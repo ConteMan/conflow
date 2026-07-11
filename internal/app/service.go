@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/validation"
 )
 
 var (
@@ -24,6 +26,7 @@ type Service struct {
 	projects     *project.Store
 	packRegistry *packs.Registry
 	drafts       *draft.Store
+	validations  *validation.Store
 }
 
 func Initialize(workspace string) (string, error) {
@@ -57,7 +60,11 @@ func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore}, nil
+	validationStore, err := validation.Open(filepath.Join(workspace, ".conflow", "validation-results.json"))
+	if err != nil {
+		return nil, err
+	}
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, validations: validationStore}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -164,6 +171,61 @@ func (s *Service) MutateDraft(_ context.Context, environmentID string, mutation 
 		return draft.View{}, 0, err
 	}
 	return s.drafts.Mutate(schema, environments, environmentID, mutation)
+}
+
+// ValidateDraft runs the complete Spec 007 validation against one captured
+// DraftView and stores the resulting project-level draft revision.
+func (s *Service) ValidateDraft(_ context.Context, environmentID string) (validation.Result, uint64, error) {
+	view, revision, environment, err := s.validationContext(environmentID)
+	if err != nil {
+		return validation.Result{}, 0, err
+	}
+	result := validation.Result{
+		EnvironmentID:          environmentID,
+		ValidatedDraftRevision: revision,
+		ValidatedAt:            time.Now().UTC(),
+		Status:                 validation.StatusFresh,
+		Diagnostics: validation.Validate(validation.Input{
+			PackRef:         view.PackRef,
+			EnvironmentID:   environmentID,
+			EnvironmentKind: environment.Kind,
+			Effective:       view.Effective,
+		}),
+	}
+	result.Readiness = validation.ReadinessFor(result.Diagnostics)
+	if err := s.validations.Save(result); err != nil {
+		return validation.Result{}, 0, err
+	}
+	// A mutation may have completed while validation was executing. Preserve
+	// the captured revision and expose the result's actual freshness.
+	_, currentRevision, err := s.GetDraft(context.Background(), environmentID)
+	if err != nil {
+		return validation.Result{}, 0, err
+	}
+	result, err = s.validations.Get(environmentID, currentRevision)
+	return result, currentRevision, err
+}
+
+// Diagnostics returns the latest stored complete-validation result.
+func (s *Service) Diagnostics(ctx context.Context, environmentID string) (validation.Result, uint64, error) {
+	_, revision, err := s.GetDraft(ctx, environmentID)
+	if err != nil {
+		return validation.Result{}, 0, err
+	}
+	result, err := s.validations.Get(environmentID, revision)
+	return result, revision, err
+}
+
+func (s *Service) validationContext(environmentID string) (draft.View, uint64, project.Environment, error) {
+	view, revision, err := s.GetDraft(context.Background(), environmentID)
+	if err != nil {
+		return draft.View{}, 0, project.Environment{}, err
+	}
+	_, environment, err := s.GetEnvironment(context.Background(), environmentID)
+	if err != nil {
+		return draft.View{}, 0, project.Environment{}, err
+	}
+	return view, revision, environment, nil
 }
 
 func (s *Service) draftSchema(manifest project.Manifest) (draft.Schema, []draft.Environment, error) {
