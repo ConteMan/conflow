@@ -72,6 +72,79 @@ Conflow 尚未冻结稳定 manifest 格式，本约束直接纳入 manifest vers
 
 项目可选 `git-json` 源适配器，以读取并写回既有仓库中 `config/remote-config/` 一类结构。适配器映射是项目配置，不承担广告业务规则。
 
+## Git JSON Mapping Profile
+
+`git-json` 项目在 manifest 的 `source.profile` 指向仓库根目录内的声明式 YAML profile。profile 只描述既有 JSON/YAML 字段与 Pack 中立配置集合之间的格式映射；它不包含项目名称、发布凭据或业务校验规则。路径使用 RFC 6901 JSON Pointer，文件路径必须是仓库内相对路径。
+
+```yaml
+source:
+  type: git-json
+  profile: config/conflow-ad-profile.yaml
+```
+
+profile 的版本当前固定为 `1`。每个 `files` 条目声明可读写文件及其 `json` 或 `yaml` 格式；每个 `mappings` 条目将一个记录数组映射到一个集合。`scope: baseline` 写入项目基线，`scope: environment_override` 通过 `environment_id_path` 将记录分配到对应环境覆盖。`id_path` 和 `fields` 都相对于数组中的单条记录。
+
+```yaml
+version: 1
+files:
+  - path: config/ads.json
+    format: json
+mappings:
+  - name: parameters
+    collection: feature_switches
+    scope: baseline
+    file: config/ads.json
+    records_path: /parameters
+    id_path: /key
+    fields:
+      key: {path: /key}
+      default_value: {path: /enabled, transform: string_to_boolean}
+      risk_level: {path: /risk}
+      rollback_method: {path: /rollback}
+  - name: frequency
+    collection: frequency_policies
+    scope: baseline
+    file: config/ads.json
+    records_path: /frequency
+    id_path: /id
+    fields:
+      cooldown_ms: {path: /cooldown_seconds, transform: seconds_to_milliseconds}
+      interval_ms: {path: /interval_ms}
+      max_count: {path: /max_count}
+      shift_count: {path: /shift_count}
+      positions: {path: /positions}
+  - name: placements
+    collection: placements
+    scope: baseline
+    file: config/ads.json
+    records_path: /placements
+    id_path: /id
+    fields:
+      key: {path: /key}
+      ad_type: {path: /type}
+      enabled: {path: /enabled}
+      network_mode: {path: /network}
+      frequency_policy_id: {path: /frequency_id}
+      load_timeout_ms: {path: /timeout_ms}
+      cache_policy: {path: /cache}
+      fallback_behavior: {path: /fallback}
+  - name: environment-bindings
+    collection: unit_bindings
+    scope: environment_override
+    file: config/ads.json
+    records_path: /unit_bindings
+    id_path: /id
+    environment_id_path: /environment
+    fields:
+      placement_id: {path: /placement}
+      environment_id: {path: /environment}
+      platform: {path: /platform}
+      unit_id_ref: {path: /unit_id}
+      status: {path: /status}
+```
+
+支持的转换是 `identity`（或省略）、`seconds_to_milliseconds` 与 `string_to_boolean`，写回时使用其逆转换。未参与 mapping 的文件字段及记录字段保持原样。任何已映射字段缺失、转换失败、未知转换或出现 `conditionalValues` 条件值都会产生 round-trip 阻断诊断；`source:import` 和保存均不得绕过该阻断。保存前 `source:preview-save` 返回逐文件 diff、受影响文件和 source digest；保存只在 Git 工作区干净且 source revision 未变化时执行同目录原子替换。
+
 `project.release_confirmation_policy.production_low_risk_mode` 是项目级、版本化的发布确认策略，取值为 `environment_id`（默认）或 `acknowledgement`。为兼容已有 manifest，省略字段等价于默认值；新建或迁移后的 manifest 应显式写入默认值。它只放宽低风险 Production Plan 是否必须输入环境 ID；高风险逐项确认、blocking 风险和最终确认要求由服务端按 Plan 计算，不能由 UI 或环境名称推断。`environment.publish.requires_confirmation` 保留为一般确认适用性，不能用来表达确认强度。
 
 ## 环境覆盖
