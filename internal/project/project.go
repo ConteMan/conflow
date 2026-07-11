@@ -16,49 +16,49 @@ const manifestRelativePath = ".conflow/project.yaml"
 var projectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,62}$`)
 
 type Manifest struct {
-	Version      int           `yaml:"version"`
-	Project      Project       `yaml:"project"`
-	Pack         PackReference `yaml:"pack"`
-	Source       Source        `yaml:"source"`
-	Environments []Environment `yaml:"environments"`
+	Version      int           `yaml:"version" json:"version"`
+	Project      Project       `yaml:"project" json:"project"`
+	Pack         PackReference `yaml:"pack" json:"pack"`
+	Source       Source        `yaml:"source" json:"source"`
+	Environments []Environment `yaml:"environments" json:"environments"`
 }
 
 type Project struct {
-	ID                        string                    `yaml:"id"`
-	Name                      string                    `yaml:"name"`
-	ReleaseConfirmationPolicy ReleaseConfirmationPolicy `yaml:"release_confirmation_policy"`
+	ID                        string                    `yaml:"id" json:"id"`
+	Name                      string                    `yaml:"name" json:"name"`
+	ReleaseConfirmationPolicy ReleaseConfirmationPolicy `yaml:"release_confirmation_policy" json:"release_confirmation_policy"`
 }
 
 // ReleaseConfirmationPolicy is project-level by ADR-006. Empty values from
 // older manifests resolve to environment_id during plan construction.
 type ReleaseConfirmationPolicy struct {
-	ProductionLowRiskMode string `yaml:"production_low_risk_mode"`
+	ProductionLowRiskMode string `yaml:"production_low_risk_mode" json:"production_low_risk_mode"`
 }
 
 type PackReference struct {
-	ID string `yaml:"id"`
+	ID string `yaml:"id" json:"id"`
 }
 
 type Source struct {
-	Type    string `yaml:"type"`
-	Profile string `yaml:"profile,omitempty"`
+	Type    string `yaml:"type" json:"type"`
+	Profile string `yaml:"profile,omitempty" json:"profile,omitempty"`
 }
 
 type Environment struct {
-	ID       string   `yaml:"id"`
-	Name     string   `yaml:"name"`
-	Kind     string   `yaml:"kind"`
-	Provider Provider `yaml:"provider"`
-	Publish  Publish  `yaml:"publish"`
+	ID       string   `yaml:"id" json:"id"`
+	Name     string   `yaml:"name" json:"name"`
+	Kind     string   `yaml:"kind" json:"kind"`
+	Provider Provider `yaml:"provider" json:"provider"`
+	Publish  Publish  `yaml:"publish" json:"publish"`
 }
 
 type Provider struct {
-	Type      string `yaml:"type"`
-	ProjectID string `yaml:"project_id"`
+	Type      string `yaml:"type" json:"type"`
+	ProjectID string `yaml:"project_id" json:"project_id"`
 }
 
 type Publish struct {
-	RequiresConfirmation bool `yaml:"requires_confirmation"`
+	RequiresConfirmation bool `yaml:"requires_confirmation" json:"requires_confirmation"`
 }
 
 func ManifestPath(workspace string) string {

@@ -7,9 +7,14 @@ import (
 )
 
 func New(version string) *cobra.Command {
+	var jsonOutput bool
 	root := &cobra.Command{
-		Use:           "conflow",
-		Short:         "Local-first ConfigOps workbench",
+		Use:   "conflow",
+		Short: "Local-first ConfigOps workbench",
+		Long: `Local-first ConfigOps workbench.
+
+Automation exit codes: 0 success; 1 validation failure; 2 blocking validation;
+3 conflict; 4 provider failure; 64 command usage failure.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -28,8 +33,13 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newReleaseCommand())
 	root.AddCommand(newRollbackCommand())
 	root.AddCommand(newDefaultsCommand())
+	root.AddCommand(newProjectCommand())
+	root.AddCommand(newEnvironmentCommand())
+	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "write a stable JSON automation envelope to stdout")
+	configureAutomation(root, &jsonOutput)
 	root.SetHelpFunc(func(command *cobra.Command, args []string) {
 		fmt.Fprint(command.OutOrStdout(), command.UsageString())
 	})
+	ensureExamples(root)
 	return root
 }
