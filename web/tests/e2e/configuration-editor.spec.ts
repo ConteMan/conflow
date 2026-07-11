@@ -89,7 +89,8 @@ test("新建广告位后回到列表并显示未发布修改", async ({ page }) 
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
   await page.getByLabel("稳定 ID").fill("ad_interstitial_011"); await page.getByLabel("广告位键").fill("interstitial_test_entry");
   await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
-  await expect(page.getByRole("row", { name: /interstitial_test_entry/ })).toBeVisible(); await expect(page.getByText("未发布修改")).toBeVisible();
+  const createdRow = page.getByRole("row", { name: /interstitial_test_entry/ });
+  await expect(createdRow).toBeVisible(); await expect(createdRow.getByText("未发布修改", { exact: true })).toBeVisible();
 });
 
 test("编辑保存后在列表标记未发布修改", async ({ page }) => {
@@ -113,7 +114,7 @@ test("422 将字段错误定位到对应表单行", async ({ page }) => {
 
 test("环境绑定矩阵以环境覆盖范围写入", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "编辑 app_open_cold_start" }).click();
-  await page.getByLabel("编辑 Development ios 绑定").click(); await page.getByLabel("Development ios 单元 ID").fill("ios_dev_changed"); await page.getByRole("button", { name: "保存" }).click();
+  await page.getByLabel("编辑 Development ios 绑定").click(); await page.getByLabel("Development ios 单元 ID").fill("ios_dev_changed"); await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByText("ios_dev_changed")).toBeVisible();
 });
 
