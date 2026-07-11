@@ -168,7 +168,7 @@ export function getDraftEntityReferences(environmentID: string, entityType: stri
 }
 
 export function validateDraft(environmentID: string): Promise<ValidationResponse> {
-  return request(`/drafts/${encodeURIComponent(environmentID)}:validate`, { method: "POST" });
+  return request(`/drafts/${encodeURIComponent(environmentID)}:validate`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
 
 export function getDraftDiagnostics(environmentID: string, signal?: AbortSignal): Promise<ValidationResponse> {
@@ -176,7 +176,7 @@ export function getDraftDiagnostics(environmentID: string, signal?: AbortSignal)
 }
 
 export function createPlan(environmentID: string): Promise<OperationResponse> {
-  return request(`/drafts/${encodeURIComponent(environmentID)}:plan`, { method: "POST" });
+  return request(`/drafts/${encodeURIComponent(environmentID)}:plan`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
 
 export function getOperation(operationID: string, signal?: AbortSignal): Promise<OperationResponse> {
