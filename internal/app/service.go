@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/operation"
 	"github.com/ConteMan/conflow/internal/packs"
+	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/remote"
 	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
 )
@@ -22,12 +25,30 @@ var (
 	ErrPackRegistryUnavailable = errors.New("pack registry is unavailable")
 )
 
+// PlanInvalidatedError is the 409 precondition domain for local inputs.
+// Remote ETag conflicts intentionally use RemoteETagMismatchError instead.
+type PlanInvalidatedError struct{ PlanID, Reason string }
+
+func (e *PlanInvalidatedError) Error() string { return "plan invalidated: " + e.Reason }
+
+// RemoteETagMismatchError is the 412 domain used by a publish preflight.
+// It contains only the protected remote summary, never provider credentials.
+type RemoteETagMismatchError struct {
+	PlanID, Expected string
+	Current          remote.Snapshot
+}
+
+func (e *RemoteETagMismatchError) Error() string { return "remote etag mismatch" }
+
 type Service struct {
 	projects     *project.Store
 	packRegistry *packs.Registry
 	drafts       *draft.Store
 	source       source.Adapter
 	validations  *validation.Store
+	operations   *operation.Store
+	plans        *plan.Store
+	remote       remote.Store
 }
 
 func Initialize(workspace string) (string, error) {
@@ -68,7 +89,15 @@ func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore}, nil
+	operationStore, err := operation.Open(filepath.Join(workspace, ".conflow", "operations.json"))
+	if err != nil {
+		return nil, err
+	}
+	planStore, err := plan.Open(filepath.Join(workspace, ".conflow", "plans"))
+	if err != nil {
+		return nil, err
+	}
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace)}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -286,6 +315,189 @@ func (s *Service) validationContext(environmentID string) (draft.View, uint64, p
 		return draft.View{}, 0, project.Environment{}, err
 	}
 	return view, revision, environment, nil
+}
+
+// StartPlan always creates a durable Operation before starting work. The
+// operation store is deliberately the recovery authority for callers that
+// disconnect while this local workflow runs.
+func (s *Service) StartPlan(ctx context.Context, environmentID string) (operation.Operation, error) {
+	if _, _, err := s.GetEnvironment(ctx, environmentID); err != nil {
+		return operation.Operation{}, err
+	}
+	op, err := s.operations.Create("plan")
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	go s.buildPlan(op.OperationID, environmentID)
+	return op, nil
+}
+
+func (s *Service) Operation(_ context.Context, id string) (operation.Operation, error) {
+	return s.operations.Get(id)
+}
+
+func (s *Service) buildPlan(operationID, environmentID string) {
+	fail := func(stage string, err error) {
+		_, _ = s.operations.Update(operationID, "failed", stage, &operation.Failure{Code: "plan_build_failed", Message: err.Error(), Retryable: false, Stage: stage}, nil, "unchanged")
+	}
+	_, _ = s.operations.Update(operationID, "running", "reading_remote", nil, nil, "unchanged")
+	remoteSnapshot, err := s.remote.Current(environmentID)
+	if err != nil {
+		fail("reading_remote", err)
+		return
+	}
+	_, _ = s.operations.Update(operationID, "running", "compiling", nil, nil, "unchanged")
+	view, revision, environment, err := s.validationContext(environmentID)
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	validationResult, _, err := s.ValidateDraft(context.Background(), environmentID)
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	manifest, err := s.projects.Snapshot()
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	schema, environments, err := s.draftSchema(manifest.Manifest)
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	sourceSnapshot, err := s.source.Load()
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	clean, err := draft.BuildView(schema, environments, draftSourceSnapshot(sourceSnapshot), draft.State{Revision: 1, EnvironmentOverrides: map[string]map[string]any{}}, environmentID)
+	if err != nil {
+		fail("compiling", err)
+		return
+	}
+	mode := manifest.Manifest.Project.ReleaseConfirmationPolicy.ProductionLowRiskMode
+	if mode == "" {
+		mode = "environment_id"
+	}
+	_, _ = s.operations.Update(operationID, "running", "analyzing", nil, nil, "unchanged")
+	built, err := plan.Build(plan.Input{EnvironmentID: environmentID, EnvironmentKind: environment.Kind, PackRef: view.PackRef, SourceDigest: view.SourceRevision, DraftRevision: revision, Desired: view.Effective, Baseline: clean.Effective, BaseLayer: view.Baseline.Resolved.Value, RemoteSnapshot: remoteSnapshot, ValidationReady: validationResult.Readiness == validation.ReadinessReady && validationResult.Status == validation.StatusFresh, ProductionLowRiskMode: mode})
+	if err != nil {
+		fail("analyzing", err)
+		return
+	}
+	if err := s.plans.Save(built); err != nil {
+		fail("analyzing", err)
+		return
+	}
+	_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "plan", ResourceID: built.Plan.PlanID, Href: "/api/v1/plans/" + built.Plan.PlanID}, "unchanged")
+}
+
+func (s *Service) GetPlan(ctx context.Context, id string) (plan.Plan, error) {
+	p, err := s.plans.Get(id)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if p.Status == "invalidated" || p.Status == "expired" {
+		return p, nil
+	}
+	if !time.Now().UTC().Before(p.ExpiresAt) {
+		p.Status = "expired"
+		p.InvalidationReason = "ttl_expired"
+		_ = s.plans.Update(p)
+		return p, nil
+	}
+	_, revision, err := s.GetDraft(ctx, p.EnvironmentID)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if revision != p.DraftRevision {
+		p.Status = "invalidated"
+		p.InvalidationReason = "draft_revision_changed"
+		_ = s.plans.Update(p)
+		return p, nil
+	}
+	info, err := s.SourceInfo(ctx)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if info.Status.Digest != p.SourceDigest {
+		p.Status = "invalidated"
+		p.InvalidationReason = "source_digest_changed"
+		_ = s.plans.Update(p)
+		return p, nil
+	}
+	current, err := s.remote.Current(p.EnvironmentID)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if p.RemoteETag != nil {
+		if current.Status != "available" {
+			p.Status = "invalidated"
+			p.InvalidationReason = "remote_snapshot_unavailable"
+		} else if current.RemoteETag != *p.RemoteETag {
+			p.Status = "invalidated"
+			p.InvalidationReason = "remote_etag_changed"
+		}
+		if p.Status == "invalidated" {
+			_ = s.plans.Update(p)
+		}
+	}
+	return p, nil
+}
+
+func (s *Service) PlanArtifact(ctx context.Context, planID, name string) ([]byte, plan.ArtifactMetadata, plan.Plan, error) {
+	p, err := s.GetPlan(ctx, planID)
+	if err != nil {
+		return nil, plan.ArtifactMetadata{}, plan.Plan{}, err
+	}
+	b, m, err := s.plans.Artifact(planID, name)
+	return b, m, p, err
+}
+
+// CheckPlanForPublish is the reusable preflight boundary for Spec 009. It is
+// deliberately not an HTTP endpoint: this Spec creates Plans but does not add
+// publishing. Its typed errors preserve the frozen 409/412 error separation.
+func (s *Service) CheckPlanForPublish(ctx context.Context, id string) (plan.Plan, error) {
+	p, err := s.plans.Get(id)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if !time.Now().UTC().Before(p.ExpiresAt) {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "ttl_expired"}
+	}
+	_, revision, err := s.GetDraft(ctx, p.EnvironmentID)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if revision != p.DraftRevision {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "draft_revision_changed"}
+	}
+	info, err := s.SourceInfo(ctx)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if info.Status.Digest != p.SourceDigest {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "source_digest_changed"}
+	}
+	if p.Status != "ready" || p.RemoteETag == nil {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "remote_snapshot_unavailable"}
+	}
+	if len(p.BlockingReasons) > 0 {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: p.BlockingReasons[0].ReasonCode}
+	}
+	current, err := s.remote.Current(p.EnvironmentID)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if current.Status != "available" {
+		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "remote_snapshot_unavailable"}
+	}
+	if current.RemoteETag != *p.RemoteETag {
+		return plan.Plan{}, &RemoteETagMismatchError{PlanID: id, Expected: *p.RemoteETag, Current: current}
+	}
+	return p, nil
 }
 
 func (s *Service) draftSchema(manifest project.Manifest) (draft.Schema, []draft.Environment, error) {

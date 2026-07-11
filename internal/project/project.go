@@ -24,8 +24,15 @@ type Manifest struct {
 }
 
 type Project struct {
-	ID   string `yaml:"id"`
-	Name string `yaml:"name"`
+	ID                        string                    `yaml:"id"`
+	Name                      string                    `yaml:"name"`
+	ReleaseConfirmationPolicy ReleaseConfirmationPolicy `yaml:"release_confirmation_policy"`
+}
+
+// ReleaseConfirmationPolicy is project-level by ADR-006. Empty values from
+// older manifests resolve to environment_id during plan construction.
+type ReleaseConfirmationPolicy struct {
+	ProductionLowRiskMode string `yaml:"production_low_risk_mode"`
 }
 
 type PackReference struct {
@@ -84,6 +91,9 @@ func Validate(manifest Manifest) error {
 	} else if len([]rune(projectName)) > 120 {
 		validationErrors = append(validationErrors, errors.New("project.name must be at most 120 characters"))
 	}
+	if mode := manifest.Project.ReleaseConfirmationPolicy.ProductionLowRiskMode; mode != "" && mode != "environment_id" && mode != "acknowledgement" {
+		validationErrors = append(validationErrors, errors.New("project.release_confirmation_policy.production_low_risk_mode must be environment_id or acknowledgement"))
+	}
 	if manifest.Pack.ID == "" {
 		validationErrors = append(validationErrors, errors.New("pack.id is required"))
 	}
@@ -139,7 +149,7 @@ func CreateExample(workspace string) (string, error) {
 	}
 	manifest := Manifest{
 		Version: 1,
-		Project: Project{ID: "photo-editor", Name: "Photo Editor"},
+		Project: Project{ID: "photo-editor", Name: "Photo Editor", ReleaseConfirmationPolicy: ReleaseConfirmationPolicy{ProductionLowRiskMode: "environment_id"}},
 		Pack:    PackReference{ID: "mobile-ad-monetization/v1"},
 		Source:  Source{Type: "managed-file"},
 		Environments: []Environment{

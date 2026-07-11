@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -8,10 +9,80 @@ import (
 
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/operation"
 	"github.com/ConteMan/conflow/internal/packs"
+	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/validation"
 )
+
+func (a *api) createPlan(writer http.ResponseWriter, request *http.Request) {
+	op, err := a.service.StartPlan(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	_, revision, err := a.service.GetDraft(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, revision)
+}
+
+func (a *api) getOperation(writer http.ResponseWriter, request *http.Request) {
+	op, err := a.service.Operation(request.Context(), request.PathValue("operation_id"))
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, op, 1)
+}
+
+func (a *api) getPlan(writer http.ResponseWriter, request *http.Request) {
+	p, err := a.service.GetPlan(request.Context(), request.PathValue("plan_id"))
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, p, 1)
+}
+
+func (a *api) getPlanArtifact(writer http.ResponseWriter, request *http.Request) {
+	content, metadata, p, err := a.service.PlanArtifact(request.Context(), request.PathValue("plan_id"), request.PathValue("artifact_name"))
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	if p.Status == "invalidated" || p.Status == "expired" {
+		writeAPIError(writer, request, http.StatusConflict, "plan_invalidated", "计划已失效，必须重新构建", 0)
+		return
+	}
+	writer.Header().Set("Content-Type", metadata.MediaType)
+	writer.WriteHeader(http.StatusOK)
+	_, _ = writer.Write(content)
+}
+
+// events is a deliberately small SSE enhancement. GET Operation remains the
+// durable authority; this emits a current snapshot for a requested operation.
+func (a *api) events(writer http.ResponseWriter, request *http.Request) {
+	operationID := request.URL.Query().Get("operation_id")
+	if operationID == "" {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "operation_id 是必填项", 0)
+		return
+	}
+	op, err := a.service.Operation(request.Context(), operationID)
+	if err != nil {
+		a.writePlanError(writer, request, err)
+		return
+	}
+	writer.Header().Set("Content-Type", "text/event-stream")
+	writer.Header().Set("Cache-Control", "no-store")
+	encoded, _ := json.Marshal(op)
+	_, _ = writer.Write([]byte("event: operation\ndata: "))
+	_, _ = writer.Write(encoded)
+	_, _ = writer.Write([]byte("\n\n"))
+}
 
 type api struct {
 	service *app.Service
@@ -47,6 +118,10 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}", a.deleteEntity)
 	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}/referenced-by", a.getEntityReferences)
 	mux.HandleFunc("POST /api/v1/drafts/", a.draftAction)
+	mux.HandleFunc("GET /api/v1/plans/{plan_id}", a.getPlan)
+	mux.HandleFunc("GET /api/v1/plans/{plan_id}/artifacts/{artifact_name}", a.getPlanArtifact)
+	mux.HandleFunc("GET /api/v1/operations/{operation_id}", a.getOperation)
+	mux.HandleFunc("GET /api/v1/events", a.events)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments/{environment_id}", methodNotAllowed)
@@ -125,7 +200,7 @@ func (a *api) updateProject(writer http.ResponseWriter, request *http.Request) {
 		writeRequestError(writer, request, err)
 		return
 	}
-	snapshot, err := a.service.UpdateProject(request.Context(), revision, project.Project{ID: input.ID, Name: input.Name})
+	snapshot, err := a.service.UpdateProject(request.Context(), revision, project.Project{ID: input.ID, Name: input.Name, ReleaseConfirmationPolicy: input.ReleaseConfirmationPolicy})
 	if err != nil {
 		a.writeError(writer, request, err)
 		return
@@ -380,6 +455,16 @@ func (a *api) replaceDraft(writer http.ResponseWriter, request *http.Request) {
 
 func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 	path := strings.TrimPrefix(request.URL.Path, "/api/v1/drafts/")
+	if strings.HasSuffix(path, ":plan") {
+		environmentID := strings.TrimSuffix(path, ":plan")
+		if environmentID == "" || strings.Contains(environmentID, "/") {
+			routeNotFound(writer, request)
+			return
+		}
+		request.SetPathValue("environment_id", environmentID)
+		a.createPlan(writer, request)
+		return
+	}
 	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard", ":validate": "validate", ":save": "save"} {
 		if strings.HasSuffix(path, suffix) {
 			environmentID := strings.TrimSuffix(path, suffix)
@@ -524,4 +609,15 @@ func (a *api) writeValidationError(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	a.writeError(writer, request, err)
+}
+
+func (a *api) writePlanError(writer http.ResponseWriter, request *http.Request, err error) {
+	switch {
+	case errors.Is(err, operation.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "operation_not_found", "操作不存在", 0)
+	case errors.Is(err, plan.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "plan_not_found", "计划不存在", 0)
+	default:
+		a.writeError(writer, request, err)
+	}
 }

@@ -16,6 +16,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newVersionCommand(version))
 	root.AddCommand(newInitCommand())
 	root.AddCommand(newValidateCommand())
+	root.AddCommand(newPlanCommand())
 	root.AddCommand(newSourceCommand())
 	root.AddCommand(newSaveCommand())
 	root.AddCommand(newServeCommand())

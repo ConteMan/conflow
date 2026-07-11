@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -125,6 +127,40 @@ func TestInitAndValidateCommands(t *testing.T) {
 	}
 	if got := validateOutput.String(); got != "validated photo-editor with 2 environments\n" {
 		t.Fatalf("validate output = %q", got)
+	}
+}
+
+func TestPlanCommandWritesArtifactsToOutputDirectory(t *testing.T) {
+	workspace := t.TempDir()
+	init := New("test")
+	init.SetArgs([]string{"init", "--dir", workspace})
+	if err := init.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := filepath.Join(t.TempDir(), "plan-output")
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	command.SetArgs([]string{"plan", "--workspace", workspace, "--environment", "development", "--format", "json", "--output", outputDirectory})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"review.json", "review.md"} {
+		if _, err := os.Stat(filepath.Join(outputDirectory, name)); err != nil {
+			t.Fatalf("output artifact %q: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(outputDirectory, "provider-input.json")); !os.IsNotExist(err) {
+		t.Fatalf("preview-only output provider artifact error = %v", err)
+	}
+	var result struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "preview_only" {
+		t.Fatalf("plan status = %q", result.Status)
 	}
 }
 
