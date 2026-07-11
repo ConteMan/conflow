@@ -20,8 +20,10 @@ export type CreateEntityInput = components["schemas"]["CreateEntityInput"];
 export type EntityMutationInput = components["schemas"]["EntityMutationInput"];
 export type DraftStructuralErrorDetail = components["schemas"]["DraftStructuralErrorDetail"];
 export type FieldSchema = components["schemas"]["FieldSchema"];
+export type EntityReference = components["schemas"]["EntityReference"];
+export type EntityReferencesResponse = components["schemas"]["EntityReferencesResponse"];
 
-type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"];
+type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
 type ProjectResponse = components["schemas"]["ProjectResponse"];
 type EnvironmentResponse = components["schemas"]["EnvironmentResponse"];
@@ -35,6 +37,7 @@ export class ConflowAPIError extends Error {
   readonly currentRevision?: number;
   readonly currentState?: ManifestState | DraftView;
   readonly details?: DraftStructuralErrorDetail[];
+  readonly references?: EntityReference[];
 
   constructor(status: number, error: APIErrorResponse["error"] | ConflictResponse["error"]) {
     super(error.message);
@@ -47,6 +50,7 @@ export class ConflowAPIError extends Error {
       this.currentState = error.current_state;
     }
     if (error.code === "validation_failed" && "details" in error) this.details = error.details as DraftStructuralErrorDetail[];
+    if (error.code === "entity_referenced" && "references" in error) this.references = error.references as EntityReference[];
   }
 }
 
@@ -143,4 +147,12 @@ export function createDraftEntity(environmentID: string, revision: number, input
 
 export function replaceDraftEntity(environmentID: string, entityType: string, entityID: string, revision: number, input: EntityMutationInput): Promise<EntityResponse> {
   return request(`/drafts/${encodeURIComponent(environmentID)}/entities/${encodeURIComponent(entityType)}/${encodeURIComponent(entityID)}`, mutationInit("PUT", revision, input));
+}
+
+export function deleteDraftEntity(environmentID: string, entityType: string, entityID: string, revision: number, input: components["schemas"]["EntityDeleteInput"]): Promise<EntityResponse> {
+  return request(`/drafts/${encodeURIComponent(environmentID)}/entities/${encodeURIComponent(entityType)}/${encodeURIComponent(entityID)}`, mutationInit("DELETE", revision, input));
+}
+
+export function getDraftEntityReferences(environmentID: string, entityType: string, entityID: string, signal?: AbortSignal): Promise<EntityReferencesResponse> {
+  return request(`/drafts/${encodeURIComponent(environmentID)}/entities/${encodeURIComponent(entityType)}/${encodeURIComponent(entityID)}/referenced-by`, { signal });
 }

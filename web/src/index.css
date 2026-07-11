@@ -180,6 +180,8 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .entity-table th, .entity-table td { height: 52px; }
 .entity-table td:nth-last-child(2) { width: 132px; }
 .entity-table tr { cursor: pointer; }
+.entity-table .row-actions { width: 84px; white-space: nowrap; }
+.row-delete { color: var(--danger); }
 .row-open { color: var(--text-muted); }
 .status-chip, .dirty-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .status-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -217,6 +219,8 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .switch-control span { width: 18px; height: 18px; border-radius: 50%; background: white; box-shadow: 0 1px 2px rgb(0 0 0 / 20%); transition: transform .15s ease; }
 .switch-control--on { background: var(--accent); }
 .switch-control--on span { transform: translateX(20px); }
+.immutable-field { display: grid; gap: 7px; align-content: start; }
+.immutable-field code { min-height: 40px; display: flex; align-items: center; padding: 0 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-muted); }
 .detail-sidebar { display: grid; gap: 14px; }
 .change-summary { padding: 18px; }
 .change-summary dl { display: grid; gap: 11px; margin: 0; }
@@ -244,6 +248,51 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .binding-edit input { min-width: 0; height: 32px; }
 .binding-edit .button { min-height: 32px; padding: 0 9px; font-size: 12px; }
 .binding-edit .link-button { padding: 0 4px; font-size: 12px; }
+
+.frequency-table { min-width: 760px; }
+.frequency-drawer { position: fixed; z-index: 40; top: 64px; right: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(510px, 100vw); height: calc(100dvh - 64px); border-left: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-overlay); }
+.frequency-drawer > header, .frequency-drawer > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.frequency-drawer > header h2 { margin: 0 0 5px; font-size: 18px; }
+.frequency-drawer > header code { color: var(--text-muted); }
+.frequency-drawer > footer { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+.frequency-drawer > footer .button:first-child { margin-right: auto; color: var(--danger); }
+.frequency-drawer-body { min-height: 0; overflow-y: auto; padding: 22px 24px; }
+.drawer-scope { display: flex; gap: 8px; align-items: center; margin: 0 0 18px; padding: 11px 12px; border-radius: var(--radius-sm); color: var(--warning); background: var(--warning-soft); font-size: 13px; }
+.frequency-fields { display: grid; gap: 15px; }
+.affected-entities { margin-top: 26px; border-top: 1px solid var(--border); }
+.affected-entities header { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 9px; }
+.affected-entities h3 { margin: 0; font-size: 15px; }
+.affected-entities header span { color: var(--warning); font-size: 12px; font-weight: 700; }
+.affected-entities > p { color: var(--text-muted); font-size: 13px; }
+.affected-entities > button, .referenced-delete > button { display: grid; width: 100%; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border: 0; border-top: 1px solid var(--border); color: var(--text); text-align: left; background: transparent; }
+.affected-entities > button code, .referenced-delete > button code { grid-column: 2; color: var(--text-muted); font-size: 11px; }
+.affected-entities > button svg:last-child, .referenced-delete > button svg:last-child { grid-column: 3; grid-row: 1 / span 2; }
+.more-references { color: var(--accent) !important; }
+.switch-list { overflow: hidden; }
+.switch-list > header { display: flex; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.switch-list > header span { color: var(--text-muted); font-size: 12px; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.switch-row--high { background: var(--warning-soft); }
+.switch-row > div:first-child { display: grid; gap: 4px; }
+.switch-row > div:first-child code { color: var(--text-muted); }
+.switch-row-meta { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
+.switch-row-meta > span { max-width: 290px; color: var(--text-muted); font-size: 12px; }
+.switch-error { margin: 12px 18px; }
+.risk-tag { display: inline-flex; min-height: 26px; align-items: center; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.risk-tag--low { color: var(--success); background: var(--success-soft); }
+.risk-tag--medium { color: var(--warning); background: var(--warning-soft); }
+.risk-tag--high { color: var(--danger); background: var(--danger-soft); }
+.binding-overview { overflow: auto; }
+.binding-overview table { min-width: 1000px; width: 100%; border-collapse: collapse; }
+.binding-overview th { height: 42px; padding: 0 13px; color: var(--text-muted); background: var(--surface-muted); font-size: 12px; text-align: left; }
+.binding-overview td { min-width: 130px; height: 58px; padding: 8px 13px; border-top: 1px solid var(--border); }
+.binding-overview td:first-child { display: grid; gap: 3px; min-width: 210px; }
+.binding-overview tr { cursor: pointer; }
+.binding-overview-cell--missing { color: var(--danger); background: var(--danger-soft); }
+.delete-dialog-content { padding: 22px; }
+.delete-dialog-content p { margin: 0; }
+.referenced-delete { padding: 0 22px 14px; }
+.referenced-delete .danger-callout { margin: 0 -22px 10px; background: var(--danger-soft); }
 
 @media (max-width: 920px) {
   .entity-toolbar { align-items: center; justify-content: flex-start; flex-wrap: wrap; margin: 0 0 16px; }
