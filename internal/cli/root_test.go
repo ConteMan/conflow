@@ -77,7 +77,7 @@ func TestValidateCompleteValidationReturnsSeverityExitCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	configuration := []byte(`{"placements":[{"id":"invalid_placement","enabled":false,"load_timeout_ms":500}]}`)
+	configuration := []byte(`{"placements":[{"id":"invalid_placement","fields":{"enabled":false,"load_timeout_ms":500}}]}`)
 	if _, _, err := service.MutateDraft(context.Background(), "production", draft.Mutation{
 		ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: draft.ScopeBaseline, Action: "put", Configuration: configuration,
 	}); err != nil {

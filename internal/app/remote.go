@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/ConteMan/conflow/internal/entities"
 	"github.com/ConteMan/conflow/internal/remote"
 )
 
@@ -47,21 +48,15 @@ func (s *Service) RemoteProjection(ctx context.Context, environmentID string) (R
 	}
 	result := RemoteProjection{EnvironmentID: environmentID, SnapshotETag: snapshot.RemoteETag, ObservedAt: snapshot.ObservedAt.UTC().Format("2006-01-02T15:04:05Z"), Projections: []RemoteValueProjection{}}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {
-		for _, raw := range asRecords(view.Effective[collection]) {
-			id, _ := raw["id"].(string)
-			if id == "" {
-				continue
-			}
-			fields := make([]string, 0, len(raw))
-			for field := range raw {
-				if field != "id" {
-					fields = append(fields, field)
-				}
+		for _, record := range entities.Records(view.Effective, collection) {
+			fields := make([]string, 0, len(record.Fields))
+			for field := range record.Fields {
+				fields = append(fields, field)
 			}
 			sort.Strings(fields)
 			for _, field := range fields {
-				key := remoteParameterKey(entityType, id, field)
-				projection := RemoteValueProjection{ProjectionID: projectionID(environmentID, key), EntityRef: "entity:" + view.PackRef + ":" + entityType + ":" + id, FieldPath: "/" + field, ParameterKey: key, SnapshotETag: snapshot.RemoteETag, ObservedAt: result.ObservedAt, Availability: "unmapped", Redacted: false, ReasonCode: "parameter_unmapped"}
+				key := remoteParameterKey(entityType, record.ID, field)
+				projection := RemoteValueProjection{ProjectionID: projectionID(environmentID, key), EntityRef: "entity:" + view.PackRef + ":" + entityType + ":" + record.ID, FieldPath: "/" + field, ParameterKey: key, SnapshotETag: snapshot.RemoteETag, ObservedAt: result.ObservedAt, Availability: "unmapped", Redacted: false, ReasonCode: "parameter_unmapped"}
 				if entityType == "unit_binding" || field == "unit_id_ref" {
 					projection.Availability = "redacted"
 					projection.Redacted = true
@@ -80,16 +75,6 @@ func (s *Service) RemoteProjection(ctx context.Context, environmentID string) (R
 	return result, nil
 }
 
-func asRecords(value any) []map[string]any {
-	values, _ := value.([]any)
-	result := make([]map[string]any, 0, len(values))
-	for _, value := range values {
-		if record, ok := value.(map[string]any); ok {
-			result = append(result, record)
-		}
-	}
-	return result
-}
 func remoteParameterKey(typ, id, field string) string {
 	if typ == "frequency_policy" && field == "cooldown_ms" {
 		return "ad_frequency_" + id
@@ -120,12 +105,9 @@ func inspectRemote(snapshot *remote.Snapshot, desired map[string]any) {
 	}
 	expected := map[string]bool{}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {
-		for _, record := range asRecords(desired[collection]) {
-			id, _ := record["id"].(string)
-			for field := range record {
-				if field != "id" {
-					expected[remoteParameterKey(entityType, id, field)] = true
-				}
+		for _, record := range entities.Records(desired, collection) {
+			for field := range record.Fields {
+				expected[remoteParameterKey(entityType, record.ID, field)] = true
 			}
 		}
 	}

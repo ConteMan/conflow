@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/entities"
 	"github.com/ConteMan/conflow/internal/packs"
 )
 
@@ -21,11 +22,8 @@ var (
 )
 
 // EntityRecord is the Pack-neutral record representation exposed by the
-// entity resource. The configuration replacement stores records in arrays.
-type EntityRecord struct {
-	ID     string         `json:"id"`
-	Fields map[string]any `json:"fields"`
-}
+// entity resource. Its runtime collection shape is owned by entities.Record.
+type EntityRecord = entities.Record
 
 type EntityPresence struct {
 	Present bool          `json:"present"`
@@ -309,31 +307,11 @@ func recordPresence(record EntityRecord, ok bool) EntityPresence {
 }
 
 func records(configuration map[string]any, collection string) []EntityRecord {
-	values, ok := configuration[collection].([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]EntityRecord, 0, len(values))
-	for _, value := range values {
-		object, ok := value.(map[string]any)
-		if !ok {
-			continue
-		}
-		id, _ := object["id"].(string)
-		fields, _ := object["fields"].(map[string]any)
-		if id != "" && fields != nil {
-			result = append(result, EntityRecord{ID: id, Fields: cloneConfiguration(fields)})
-		}
-	}
-	return result
+	return entities.Records(configuration, collection)
 }
 
 func recordsValue(records []EntityRecord) []any {
-	result := make([]any, len(records))
-	for index, record := range records {
-		result[index] = map[string]any{"id": record.ID, "fields": cloneConfiguration(record.Fields)}
-	}
-	return result
+	return entities.Values(records)
 }
 
 func findRecord(records []EntityRecord, id string) (EntityRecord, bool) {

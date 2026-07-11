@@ -143,7 +143,7 @@ func TestRemoteProjectionMapsEditorFieldsAndRedactsUnitIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	configuration := []byte(`{"frequency_policies":[{"id":"inter_global_cap","cooldown_ms":120000}],"unit_bindings":[{"id":"banner","unit_id_ref":"secret-ref"}]}`)
+	configuration := []byte(`{"frequency_policies":[{"id":"inter_global_cap","fields":{"cooldown_ms":120000}}],"unit_bindings":[{"id":"banner","fields":{"unit_id_ref":"secret-ref"}}]}`)
 	if _, _, err := service.MutateDraft(context.Background(), "development", draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: draft.ScopeBaseline, Action: "put", Configuration: configuration}); err != nil {
 		t.Fatal(err)
 	}
