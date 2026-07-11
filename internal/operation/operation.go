@@ -16,6 +16,16 @@ import (
 )
 
 var ErrNotFound = errors.New("operation not found")
+var ErrInvalidStage = errors.New("operation stage is invalid for operation type")
+
+// AllowedStages freezes the Spec 009 workflow boundaries. Other operation
+// types remain extensible for later Specs, while read workflows cannot be
+// accidentally routed through a publishing stage.
+var AllowedStages = map[string]map[string]bool{
+	"remote_pull":     {"queued": true, "reading_remote": true, "snapshotting": true, "completed": true},
+	"remote_validate": {"queued": true, "validating_remote": true, "completed": true},
+	"plan":            {"queued": true, "reading_remote": true, "compiling": true, "analyzing": true, "completed": true},
+}
 
 type Failure struct {
 	Code      string `json:"code"`
@@ -91,6 +101,9 @@ func (s *Store) Update(id, status, stage string, failure *Failure, result *Resul
 	op, ok := s.items[id]
 	if !ok {
 		return Operation{}, ErrNotFound
+	}
+	if stage != "" && AllowedStages[op.OperationType] != nil && !AllowedStages[op.OperationType][stage] {
+		return Operation{}, fmt.Errorf("%w: %s/%s", ErrInvalidStage, op.OperationType, stage)
 	}
 	if status != "" {
 		op.Status = status

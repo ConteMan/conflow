@@ -53,6 +53,10 @@ type errorDTO struct {
 	CurrentRevision uint64 `json:"current_revision,omitempty"`
 }
 
+type remoteValidateInput struct {
+	PlanID string `json:"plan_id"`
+}
+
 type replaceDraftInput struct {
 	ExpectedSourceRevision *string         `json:"expected_source_revision"`
 	WriteScope             string          `json:"write_scope"`
