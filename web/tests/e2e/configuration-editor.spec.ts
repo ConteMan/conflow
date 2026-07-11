@@ -24,7 +24,7 @@ function field(name: string, type: string, label: string, group: string, default
 }
 function placementSchemaOrder(name: string) { return ["key", "ad_type", "enabled", "network_mode", "frequency_policy_id", "load_timeout_ms", "cache_policy", "fallback_behavior"].indexOf(name); }
 
-async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "validation" | "referenced" = "normal") {
+async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "validation" | "referenced" | "stale" = "normal") {
   let revision = 1;
   let dirty = false;
   const placements = [...fixture.entities.placements.slice(0, 3), fixture.entities.placements.find((item) => item.id === "ad_interstitial_001")!].map((item) => ({ ...item }));
@@ -40,6 +40,13 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
     if (path === "/api/v1/bootstrap") return json(route, { ...state, meta: { ...state.meta, revision } });
     if (path === "/api/v1/packs/mobile-ad-monetization/versions/v1") return json(route, { data: { ref: "mobile-ad-monetization/v1", name: "mobile-ad-monetization", version: "v1", description: "广告配置", capabilities: ["entities"], schema_version: 1, entity_types: [] }, meta: meta(revision) });
     if (path === "/api/v1/packs/mobile-ad-monetization/versions/v1/schema") return json(route, { data: { version: 1, entities: [{ name: "placement", fields: placementSchema }], migrations: [] }, meta: meta(revision) });
+    const validateMatch = path.match(/^\/api\/v1\/drafts\/([^/]+):validate$/);
+    if (validateMatch && method === "POST") return json(route, validationResult(validateMatch[1], "fresh"));
+    const diagnosticsMatch = path.match(/^\/api\/v1\/drafts\/([^/]+)\/diagnostics$/);
+    if (diagnosticsMatch && method === "GET") {
+      if (mode === "normal" || mode === "conflict" || mode === "validation" || mode === "referenced") return json(route, { error: { code: "validation_not_found", message: "尚未运行完整校验", request_id: "req_validation_not_found" } }, 404);
+      return json(route, validationResult(diagnosticsMatch[1], "stale"));
+    }
     const draftMatch = path.match(/^\/api\/v1\/drafts\/([^/]+)$/);
     if (draftMatch && method === "GET") return json(route, { data: draft(draftMatch[1], placements, dirty), meta: meta(revision) });
     const listMatch = path.match(/^\/api\/v1\/drafts\/([^/]+)\/entities$/);
@@ -108,6 +115,14 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
       dirty = true; revision += 1;
       return json(target, { data: view("unit_binding", input.entity.id, input.entity.fields, true), meta: meta(revision) }, pathID ? 200 : 201);
     }
+
+    function validationResult(environmentID: string, status: "fresh" | "stale") {
+      return { data: { environment_id: environmentID, validated_draft_revision: 1, validated_at: "2026-07-11T09:30:00Z", status, readiness: "blocked", diagnostics: [
+        { code: "placement_frequency_policy_invalid", path: "/placements/ad_app_open_001/frequency_policy_id", severity: "error", message: "广告位绑定的频控策略不适用于当前广告类型。", entity_ref: "entity:mobile-ad-monetization/v1:placement:ad_app_open_001", fix_suggestion: "选择兼容的频控策略后重新运行校验。" },
+        { code: "frequency_policy_needs_review", path: "/frequency_policies/inter_global_cap", severity: "warning", message: "频控策略的周期上限接近风险阈值。", entity_ref: "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap", fix_suggestion: "确认业务指标后保留或降低上限。" },
+        { code: "binding_review", path: "/unit_bindings/ub_production_ios_ad_app_open_001", severity: "info", message: "Production iOS 单元 ID 建议在发布前复核。", entity_ref: "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_app_open_001", fix_suggestion: "确认单元 ID 对应 Production 项目。" },
+      ] }, meta: meta(revision) };
+    }
   });
 }
 
@@ -118,6 +133,26 @@ test("列表加载后可按类型和文本筛选", async ({ page }) => {
   await expect(page.getByRole("row", { name: /app_open_cold_start/ })).toHaveCount(0);
   await page.getByLabel("按类型筛选").selectOption("all"); await page.getByPlaceholder("搜索名称或 key").fill("warm_resume");
   await expect(page.getByRole("row", { name: /app_open_warm_resume/ })).toBeVisible();
+});
+
+test("运行校验显示摘要、行锚点和广告位详情诊断", async ({ page }) => {
+  await mockConfigurationAPI(page); await page.goto("/#configuration");
+  await page.getByRole("button", { name: "运行校验" }).click();
+  await expect(page.getByText("存在阻断", { exact: true })).toBeVisible();
+  await expect(page.getByText("阻断 1 · 警告 1 · 建议 1", { exact: true })).toBeVisible();
+  const row = page.getByRole("row", { name: /app_open_cold_start/ });
+  await expect(row.getByLabel("阻断 1 项")).toBeVisible();
+  await row.getByRole("button", { name: "编辑 app_open_cold_start" }).click();
+  const diagnostics = page.getByLabel("此广告位的校验问题");
+  await expect(diagnostics).toContainText("广告位绑定的频控策略不适用于当前广告类型。");
+  await expect(diagnostics).toContainText("建议：选择兼容的频控策略后重新运行校验。");
+});
+
+test("历史校验结果为 stale 时提示重新运行", async ({ page }) => {
+  await mockConfigurationAPI(page, "stale"); await page.goto("/#configuration");
+  await expect(page.getByText("结果可能已过期", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重新运行校验" }).first().click();
+  await expect(page.getByText("结果可能已过期", { exact: true })).toHaveCount(0);
 });
 
 test("新建广告位后回到列表并显示未发布修改", async ({ page }) => {
