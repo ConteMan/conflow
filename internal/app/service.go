@@ -181,6 +181,12 @@ func (s *Service) draftSchema(manifest project.Manifest) (draft.Schema, []draft.
 	}
 	schema := draft.Schema{PackRef: manifest.Pack.ID, Defaults: map[string]any{}, Fields: []draft.Field{}}
 	for _, entity := range definition.Schema.Entities {
+		metadata := entityMetadata(definition.Metadata.EntityTypes, entity.Name)
+		if metadata.Collection != "" {
+			schema.Defaults[metadata.Collection] = []any{}
+			schema.Fields = append(schema.Fields, draft.Field{Path: "/" + pointerToken(metadata.Collection), Type: "array", EnvironmentOverrideAllowed: len(metadata.EnvironmentOverrideFields) > 0, Default: []any{}})
+			continue
+		}
 		entityDefaults := map[string]any{}
 		for _, field := range entity.Fields {
 			var defaultValue any
@@ -199,6 +205,15 @@ func (s *Service) draftSchema(manifest project.Manifest) (draft.Schema, []draft.
 		environments[index] = draft.Environment{ID: environment.ID, Name: environment.Name, Kind: environment.Kind}
 	}
 	return schema, environments, nil
+}
+
+func entityMetadata(entities []packs.EntityMetadata, name string) packs.EntityMetadata {
+	for _, entity := range entities {
+		if entity.Name == name {
+			return entity
+		}
+	}
+	return packs.EntityMetadata{}
 }
 
 func rawValues(values []json.RawMessage) []any {
