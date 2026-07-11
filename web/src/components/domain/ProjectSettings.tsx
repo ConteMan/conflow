@@ -3,14 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import type { Project, UpdateProjectInput } from "../../api/client";
 import { Button } from "../ui/Button";
 
-export function ProjectSettings({ project, busy, readOnly, onSave }: { project: Project; busy: boolean; readOnly: boolean; onSave: (value: UpdateProjectInput) => Promise<boolean> }) {
+export function ProjectSettings({ project, busy, readOnly, onManageEnvironments, onSave }: { project: Project; busy: boolean; readOnly: boolean; onManageEnvironments: () => void; onSave: (value: UpdateProjectInput) => Promise<boolean> }) {
   const [id, setId] = useState(project.id);
   const [name, setName] = useState(project.name);
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setId(project.id); setName(project.name); }, [project]);
   return (
     <main className="page-container narrow-page">
-      <header className="page-heading"><div><h1>项目资料</h1><p>项目名称用于界面识别；稳定 ID 用于清单和 API。</p></div></header>
+      <header className="page-heading"><div><h1>项目资料</h1><p>项目名称用于界面识别；稳定 ID 用于清单和 API。</p></div><Button onClick={onManageEnvironments}>管理环境</Button></header>
       {readOnly ? <div className="readonly-banner"><LockKeyhole size={18} /><div><strong>当前为只读模式</strong><p>服务端未授予项目编辑能力。</p></div></div> : null}
       <section className="panel settings-panel"><form onSubmit={(event) => { event.preventDefault(); void onSave({ id: id.trim(), name: name.trim() }); }}>
         <label>项目名称<input ref={nameRef} value={name} maxLength={120} disabled={readOnly} onChange={(event) => setName(event.target.value)} required /></label>

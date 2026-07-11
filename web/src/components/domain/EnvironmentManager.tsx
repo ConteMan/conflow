@@ -56,7 +56,7 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
   const [name, setName] = useState(environment?.name ?? "");
   const [kind, setKind] = useState<EnvironmentKind>(environment?.kind ?? "staging");
   const [projectId, setProjectId] = useState(environment?.provider.project_id ?? "");
-  const [requiresConfirmation, setRequiresConfirmation] = useState(environment?.publish.requires_confirmation ?? true);
+  const requiresConfirmation = environment?.publish.requires_confirmation ?? true;
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!environment) return;
@@ -64,7 +64,6 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
     setName(environment.name);
     setKind(environment.kind);
     setProjectId(environment.provider.project_id);
-    setRequiresConfirmation(environment.publish.requires_confirmation);
   }, [environment]);
   useEffect(() => { nameRef.current?.focus(); }, [mode, environment?.id]);
   const valid = id.trim().length >= 2 && name.trim().length > 0 && projectId.trim().length > 0;
@@ -76,7 +75,7 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
         <label>环境 ID<div className="locked-input"><input value={id} disabled={mode === "edit" || readOnly} pattern="[a-z][a-z0-9-]{1,62}" onChange={(event) => setId(event.target.value)} required />{mode === "edit" ? <LockKeyhole size={15} /> : null}</div><small>{mode === "edit" ? "创建后不可修改" : "2–63 位小写字母、数字或连字符"}</small></label>
         <label>环境类型<select value={kind} disabled={mode === "edit" || readOnly} onChange={(event) => setKind(event.target.value as EnvironmentKind)}>{(["development", "staging", "production", "custom"] as EnvironmentKind[]).map((value) => <option value={value} key={value}>{kindLabel(value)}</option>)}</select><small>{mode === "edit" ? "类型由服务端保留，无法修改" : "只有 Production 会触发持续风险标识"}</small></label>
         <label>Firebase 项目<input value={projectId} maxLength={128} disabled={readOnly} onChange={(event) => setProjectId(event.target.value)} required /></label>
-        <label className="checkbox-field"><input type="checkbox" checked={requiresConfirmation} disabled={readOnly} onChange={(event) => setRequiresConfirmation(event.target.checked)} /><span><strong>发布前需要确认</strong><small>Provider 发布能力尚未接入；此处保存清单策略。</small></span><ShieldCheck size={18} /></label>
+        <div className="policy-info-card"><ShieldCheck size={18} /><span><strong>发布确认强度</strong><b>遵循项目级策略</b><small>Provider 发布能力尚未接入。</small></span></div>
         <div className="form-actions">{mode === "create" ? <Button type="button" onClick={onCancel}>取消</Button> : environment ? <Button type="button" variant="ghost" disabled={!canDelete || readOnly} icon={<Trash2 size={16} />} onClick={() => onRequestDelete(environment)}>删除</Button> : null}<Button type="submit" variant="primary" disabled={!valid || busy || readOnly} icon={<Save size={16} />}>{busy ? "保存中…" : "保存环境"}</Button></div>
       </form>
     </aside>

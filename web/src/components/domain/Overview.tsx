@@ -1,20 +1,22 @@
-import { Boxes, Cloud, ExternalLink, GitBranch, ShieldCheck } from "lucide-react";
+import { Boxes, Cloud, ExternalLink, GitBranch, Settings, ShieldCheck, SwitchCamera } from "lucide-react";
 import type { Environment, PackMetadata, Project } from "../../api/client";
 import { Button } from "../ui/Button";
 
-export function Overview({ project, selectedEnvironment, environments, pack, onManageEnvironments }: {
+export function Overview({ project, selectedEnvironment, environments, pack, onManageEnvironments, onManageProject, onSwitchEnvironment }: {
   project: Project;
   selectedEnvironment: Environment;
   environments: Environment[];
   pack: PackMetadata | null;
   onManageEnvironments: (environmentId?: string) => void;
+  onManageProject: () => void;
+  onSwitchEnvironment: () => void;
 }) {
   const production = selectedEnvironment.kind === "production";
   return (
     <main className="page-container">
-      {production ? <section className="production-banner"><ShieldCheck /><div><strong>你正在查看 Production</strong><p>修改会影响真实用户；发布能力将在后续 Spec 接入。</p></div></section> : null}
+      {production ? <section className="production-banner"><ShieldCheck /><div><strong>你正在查看 Production</strong><p>修改会影响真实用户；发布能力将在后续 Spec 接入。</p></div><Button className="production-switch" icon={<SwitchCamera size={16} />} onClick={onSwitchEnvironment}>切换环境</Button></section> : null}
       <header className="page-heading">
-        <div><span className="eyebrow">项目概览</span><h1>{project.name}</h1><p>{selectedEnvironment.name} · {kindLabel(selectedEnvironment.kind)}</p></div>
+        <div><span className="eyebrow">项目概览</span><div className="project-title"><h1>{project.name}</h1><Button className="project-settings-link" icon={<Settings size={15} />} onClick={onManageProject}>项目设置</Button></div><p>{uniqueSubtitle(project.name, selectedEnvironment.name)}</p></div>
         <Button onClick={() => onManageEnvironments()}>管理环境</Button>
       </header>
       <section className="metric-grid" aria-label="项目状态">
@@ -53,3 +55,7 @@ export function kindLabel(kind: Environment["kind"]) {
 }
 
 function sourceLabel(source: Project["source_type"]) { return source === "managed-file" ? "托管文件" : "Git JSON"; }
+
+function uniqueSubtitle(projectName: string, environmentName: string) {
+  return [...new Set([projectName, environmentName])].join(" · ");
+}
