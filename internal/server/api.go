@@ -676,6 +676,8 @@ func (a *api) writeReleaseError(writer http.ResponseWriter, request *http.Reques
 		writeRemoteETagMismatch(writer, request, mismatch)
 	case errors.Is(err, app.ErrIdempotencyRequired):
 		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "Idempotency-Key 是必填项", 0)
+	case errors.Is(err, plan.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "plan_not_found", "计划不存在", 0)
 	case errors.Is(err, release.ErrIdempotencyConflict):
 		writeAPIError(writer, request, http.StatusConflict, "idempotency_conflict", "相同幂等键不能用于不同请求", 0)
 	case errors.As(err, &invalidated):
