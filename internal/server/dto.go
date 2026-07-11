@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 
+	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 )
@@ -48,6 +49,52 @@ type errorDTO struct {
 	Message         string `json:"message"`
 	RequestID       string `json:"request_id"`
 	CurrentRevision uint64 `json:"current_revision,omitempty"`
+}
+
+type replaceDraftInput struct {
+	ExpectedSourceRevision *string         `json:"expected_source_revision"`
+	WriteScope             string          `json:"write_scope"`
+	Configuration          json.RawMessage `json:"configuration"`
+}
+
+func (input replaceDraftInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != "" && input.WriteScope != "" && input.Configuration != nil
+}
+
+type draftScopeMutationInput struct {
+	ExpectedSourceRevision *string `json:"expected_source_revision"`
+	WriteScope             string  `json:"write_scope"`
+}
+
+func (input draftScopeMutationInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != "" && input.WriteScope != ""
+}
+
+type draftViewDTO = draft.View
+
+func draftViewDTOFrom(view draft.View) draftViewDTO { return view }
+
+type draftConflictEnvelope struct {
+	Error draftConflictDTO `json:"error"`
+}
+type draftConflictDTO struct {
+	Code                  string       `json:"code"`
+	Message               string       `json:"message"`
+	RequestID             string       `json:"request_id"`
+	CurrentRevision       uint64       `json:"current_revision"`
+	CurrentSourceRevision string       `json:"current_source_revision"`
+	ConflictScope         string       `json:"conflict_scope"`
+	CurrentState          draftViewDTO `json:"current_state"`
+}
+
+type draftValidationEnvelope struct {
+	Error draftValidationDTO `json:"error"`
+}
+type draftValidationDTO struct {
+	Code      string                  `json:"code"`
+	Message   string                  `json:"message"`
+	RequestID string                  `json:"request_id"`
+	Details   []draft.StructuralError `json:"details"`
 }
 
 type bootstrapData struct {
@@ -161,6 +208,7 @@ type fieldSchemaDTO struct {
 	Name        string             `json:"name"`
 	Type        string             `json:"type"`
 	Required    bool               `json:"required"`
+	Nullable    bool               `json:"nullable"`
 	Default     json.RawMessage    `json:"default"`
 	Sensitivity string             `json:"sensitivity"`
 	UI          fieldUIDTO         `json:"ui"`
@@ -269,6 +317,7 @@ func packSchemaDTOFrom(schema packs.Schema) packSchemaDTO {
 				Name:        field.Name,
 				Type:        string(field.Type),
 				Required:    field.Required,
+				Nullable:    field.Nullable,
 				Default:     append(json.RawMessage(nil), field.Default...),
 				Sensitivity: string(field.Sensitivity),
 				UI:          fieldUIDTO{Label: field.UI.Label, Description: field.UI.Description, Control: field.UI.Control, Group: field.UI.Group, Order: field.UI.Order, Placeholder: field.UI.Placeholder},
