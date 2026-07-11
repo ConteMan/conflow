@@ -12,7 +12,7 @@
 | [004](004-draft-layering.md) | 草稿与分层配置模型 | 002、003 | 已实现 |
 | [005](005-managed-file-source.md) | Managed File 源适配器 | 004 | 待实现 |
 | [006](006-mobile-ad-pack.md) | 移动广告配置包领域模型 | 003、004 | 已实现 |
-| [007](007-validation-engine.md) | 校验、引用完整性与发布就绪度 | 006 | 待实现 |
+| [007](007-validation-engine.md) | 校验、引用完整性与发布就绪度 | 006 | 已实现 |
 | [008](008-plan-semantic-diff.md) | 构建计划、语义 Diff 与风险分析 | 005、007 | 待实现 |
 | [009](009-firebase-read-validate.md) | Firebase 认证、拉取与预校验 | 002、005、008 | 待实现 |
 | [010](010-firebase-publish.md) | Firebase 发布与并发保护 | 008、009 | 待实现 |
