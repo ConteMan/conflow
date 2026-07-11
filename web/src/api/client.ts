@@ -22,6 +22,9 @@ export type DraftStructuralErrorDetail = components["schemas"]["DraftStructuralE
 export type FieldSchema = components["schemas"]["FieldSchema"];
 export type EntityReference = components["schemas"]["EntityReference"];
 export type EntityReferencesResponse = components["schemas"]["EntityReferencesResponse"];
+export type Diagnostic = components["schemas"]["Diagnostic"];
+export type ValidationResult = components["schemas"]["ValidationResult"];
+export type ValidationResponse = components["schemas"]["ValidationResponse"];
 
 type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
@@ -155,4 +158,12 @@ export function deleteDraftEntity(environmentID: string, entityType: string, ent
 
 export function getDraftEntityReferences(environmentID: string, entityType: string, entityID: string, signal?: AbortSignal): Promise<EntityReferencesResponse> {
   return request(`/drafts/${encodeURIComponent(environmentID)}/entities/${encodeURIComponent(entityType)}/${encodeURIComponent(entityID)}/referenced-by`, { signal });
+}
+
+export function validateDraft(environmentID: string): Promise<ValidationResponse> {
+  return request(`/drafts/${encodeURIComponent(environmentID)}:validate`, { method: "POST" });
+}
+
+export function getDraftDiagnostics(environmentID: string, signal?: AbortSignal): Promise<ValidationResponse> {
+  return request(`/drafts/${encodeURIComponent(environmentID)}/diagnostics`, { signal });
 }
