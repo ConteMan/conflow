@@ -182,15 +182,17 @@ type sourceStatusDTO struct {
 }
 
 type projectDTO struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	PackRef    string `json:"pack_ref"`
-	SourceType string `json:"source_type"`
+	ID                        string                            `json:"id"`
+	Name                      string                            `json:"name"`
+	PackRef                   string                            `json:"pack_ref"`
+	SourceType                string                            `json:"source_type"`
+	ReleaseConfirmationPolicy project.ReleaseConfirmationPolicy `json:"release_confirmation_policy,omitempty"`
 }
 
 type updateProjectInput struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                        string                            `json:"id"`
+	Name                      string                            `json:"name"`
+	ReleaseConfirmationPolicy project.ReleaseConfirmationPolicy `json:"release_confirmation_policy"`
 }
 
 type environmentDTO struct {
@@ -313,10 +315,11 @@ type schemaMigrationDTO struct {
 
 func projectDTOFrom(manifest project.Manifest) projectDTO {
 	return projectDTO{
-		ID:         manifest.Project.ID,
-		Name:       manifest.Project.Name,
-		PackRef:    manifest.Pack.ID,
-		SourceType: manifest.Source.Type,
+		ID:                        manifest.Project.ID,
+		Name:                      manifest.Project.Name,
+		PackRef:                   manifest.Pack.ID,
+		SourceType:                manifest.Source.Type,
+		ReleaseConfirmationPolicy: manifest.Project.ReleaseConfirmationPolicy,
 	}
 }
 
