@@ -117,6 +117,37 @@ func TestFirebaseValidateMapsClientErrorAndTimeout(t *testing.T) {
 	}
 }
 
+func TestFirebasePublishUsesIfMatchAndMapsConflict(t *testing.T) {
+	var receivedIfMatch string
+	server := newFakeServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			_, _ = w.Write([]byte(`{"access_token":"test-access-token"}`))
+			return
+		}
+		if r.Method != http.MethodPut {
+			t.Fatalf("method=%s", r.Method)
+		}
+		receivedIfMatch = r.Header.Get("If-Match")
+		if receivedIfMatch == "stale" {
+			w.WriteHeader(http.StatusPreconditionFailed)
+			return
+		}
+		w.Header().Set("ETag", "after")
+		_, _ = w.Write([]byte(`{"version":{"versionNumber":"8"},"parameters":{}}`))
+	}))
+	defer server.Close()
+	credential := writeServiceAccount(t, server.URL+"/token")
+	client := NewFirebase(FirebaseConfig{ProjectID: "test-project", CredentialsPath: credential, BaseURL: server.URL + "/v1", HTTPClient: server.Client()})
+	published, err := client.Publish(context.Background(), []byte(`{"parameters":{}}`), "before")
+	if err != nil || receivedIfMatch != "before" || published.ETag != "after" || published.Version != "8" {
+		t.Fatalf("published=%#v if-match=%q err=%v", published, receivedIfMatch, err)
+	}
+	_, err = client.Publish(context.Background(), []byte(`{"parameters":{}}`), "stale")
+	if !errors.Is(err, ErrETagMismatch) {
+		t.Fatalf("conflict=%v", err)
+	}
+}
+
 func newFakeServer(t *testing.T, handler http.Handler) *httptest.Server {
 	t.Helper()
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")

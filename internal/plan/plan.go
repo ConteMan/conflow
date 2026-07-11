@@ -334,7 +334,9 @@ func confirmations(in Input, risks []RiskItem, blocking []BlockingReason) Confir
 	if in.EnvironmentKind == "production" && len(required) == 0 && in.ProductionLowRiskMode != "acknowledgement" {
 		env = "required"
 	}
-	return ConfirmationRequirements{RequiresAcknowledgement: len(required) > 0 || env == "required", EnvironmentIDRequirement: env, RequiredRiskItemIDs: required, PolicySource: "project.release_confirmation_policy"}
+	// Every release remains an explicit acknowledgement. The project policy only
+	// relaxes the extra production environment-ID input for a low-risk Plan.
+	return ConfirmationRequirements{RequiresAcknowledgement: true, EnvironmentIDRequirement: env, RequiredRiskItemIDs: required, PolicySource: "project.release_confirmation_policy"}
 }
 func highestSeverity(risks []RiskItem, blocking []BlockingReason) string {
 	if len(blocking) > 0 {

@@ -179,6 +179,15 @@ func writeDraftValidationError(writer http.ResponseWriter, request *http.Request
 	writeJSON(writer, http.StatusUnprocessableEntity, draftValidationEnvelope{Error: draftValidationDTO{Code: "validation_failed", Message: "草稿 replacement 不符合 Pack schema", RequestID: requestID(request), Details: details}})
 }
 
+func writeRemoteETagMismatch(writer http.ResponseWriter, request *http.Request, mismatch *app.RemoteETagMismatchError) {
+	current := mismatch.Current
+	writeJSON(writer, http.StatusPreconditionFailed, remoteETagMismatchEnvelope{Error: remoteETagMismatchDTO{
+		Code: "remote_etag_mismatch", Message: "远端配置已变化，必须重新构建计划后再发布", RequestID: requestID(request), PlanID: mismatch.PlanID, ExpectedRemoteETag: mismatch.Expected,
+		CurrentRemote: remoteAuditDTO{RemoteETag: current.RemoteETag, Version: current.Version, ObservedAt: current.ObservedAt.UTC().Format(time.RFC3339), Summary: current.Summary},
+		Rebuild:       rebuildDTO{Required: true, PlanEndpoint: "/api/v1/drafts/" + mismatch.EnvironmentID + ":plan", ReasonCode: "remote_etag_changed"},
+	}})
+}
+
 func writeEntityReferenced(writer http.ResponseWriter, request *http.Request, revision uint64, references []app.EntityReference) {
 	writer.Header().Set("ETag", strconv.Quote(strconv.FormatUint(revision, 10)))
 	writeJSON(writer, http.StatusConflict, entityReferencedEnvelope{Error: entityReferencedDTO{Code: "entity_referenced", Message: "实体仍被有效配置引用", RequestID: requestID(request), CurrentRevision: revision, References: references}})

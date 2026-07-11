@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ConteMan/conflow/internal/draft"
@@ -16,6 +17,7 @@ import (
 	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/provider"
+	"github.com/ConteMan/conflow/internal/release"
 	"github.com/ConteMan/conflow/internal/remote"
 	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
@@ -35,8 +37,8 @@ func (e *PlanInvalidatedError) Error() string { return "plan invalidated: " + e.
 // RemoteETagMismatchError is the 412 domain used by a publish preflight.
 // It contains only the protected remote summary, never provider credentials.
 type RemoteETagMismatchError struct {
-	PlanID, Expected string
-	Current          remote.Snapshot
+	PlanID, EnvironmentID, Expected string
+	Current                         remote.Snapshot
 }
 
 func (e *RemoteETagMismatchError) Error() string { return "remote etag mismatch" }
@@ -50,6 +52,8 @@ type Service struct {
 	operations   *operation.Store
 	plans        *plan.Store
 	remote       remote.Store
+	releases     *release.Store
+	releaseMu    sync.Mutex
 	workspace    string
 	providerFor  func(project.Environment) (provider.Adapter, error)
 }
@@ -106,6 +110,10 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 	if err != nil {
 		return nil, err
 	}
+	releaseStore, err := release.Open(filepath.Join(workspace, ".conflow", "releases.json"))
+	if err != nil {
+		return nil, err
+	}
 	if factory == nil {
 		factory = func(environment project.Environment) (provider.Adapter, error) {
 			credentialPath, configErr := provider.LoadCredentialReference(workspace, environment.ID)
@@ -115,7 +123,7 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 			return provider.NewFirebase(provider.FirebaseConfig{ProjectID: environment.Provider.ProjectID, CredentialsPath: credentialPath}), nil
 		}
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), workspace: workspace, providerFor: factory}, nil
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, workspace: workspace, providerFor: factory}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -684,7 +692,7 @@ func (s *Service) CheckPlanForPublish(ctx context.Context, id string) (plan.Plan
 		return plan.Plan{}, &PlanInvalidatedError{PlanID: id, Reason: "remote_snapshot_unavailable"}
 	}
 	if current.RemoteETag != *p.RemoteETag {
-		return plan.Plan{}, &RemoteETagMismatchError{PlanID: id, Expected: *p.RemoteETag, Current: current}
+		return plan.Plan{}, &RemoteETagMismatchError{PlanID: id, EnvironmentID: p.EnvironmentID, Expected: *p.RemoteETag, Current: current}
 	}
 	return p, nil
 }

@@ -20,7 +20,7 @@ type Summary struct {
 	ConditionCount        int `json:"condition_count"`
 	// HasUnmodeledConditions is set by the snapshot reader until Spec 009
 	// supplies condition-level Firebase Remote Config data for comparison.
-	HasUnmodeledConditions bool `json:"has_unmodeled_conditions"`
+	HasUnmodeledConditions bool `json:"-"`
 	// These observations are provider-internal comparison facts. They are not
 	// serialized in the public RemoteSummary contract and never contain values.
 	HasUnknownParameters    bool   `json:"-"`
@@ -73,16 +73,18 @@ func (s *FileStore) Current(environmentID string) (Snapshot, error) {
 		return Snapshot{Status: "unavailable", UnavailableReason: ProviderUnavailable}, nil
 	}
 	var raw struct {
-		RemoteETag string          `json:"remote_etag"`
-		Version    string          `json:"version"`
-		ObservedAt time.Time       `json:"observed_at"`
-		Summary    Summary         `json:"summary"`
-		Parameters map[string]any  `json:"parameters"`
-		Template   json.RawMessage `json:"template"`
+		RemoteETag             string          `json:"remote_etag"`
+		Version                string          `json:"version"`
+		ObservedAt             time.Time       `json:"observed_at"`
+		Summary                Summary         `json:"summary"`
+		HasUnmodeledConditions bool            `json:"has_unmodeled_conditions"`
+		Parameters             map[string]any  `json:"parameters"`
+		Template               json.RawMessage `json:"template"`
 	}
 	if err := json.Unmarshal(content, &raw); err != nil {
 		return Snapshot{}, fmt.Errorf("parse remote snapshot: %w", err)
 	}
+	raw.Summary.HasUnmodeledConditions = raw.HasUnmodeledConditions
 	return Snapshot{Status: "available", RemoteETag: raw.RemoteETag, Version: raw.Version, ObservedAt: raw.ObservedAt, Summary: &raw.Summary, Parameters: raw.Parameters, Template: raw.Template}, nil
 }
 
@@ -98,13 +100,14 @@ func (s *FileStore) Save(environmentID string, snapshot Snapshot) error {
 		return err
 	}
 	raw := struct {
-		RemoteETag string          `json:"remote_etag"`
-		Version    string          `json:"version"`
-		ObservedAt time.Time       `json:"observed_at"`
-		Summary    Summary         `json:"summary"`
-		Parameters map[string]any  `json:"parameters"`
-		Template   json.RawMessage `json:"template"`
-	}{snapshot.RemoteETag, snapshot.Version, snapshot.ObservedAt, *snapshot.Summary, snapshot.Parameters, snapshot.Template}
+		RemoteETag             string          `json:"remote_etag"`
+		Version                string          `json:"version"`
+		ObservedAt             time.Time       `json:"observed_at"`
+		Summary                Summary         `json:"summary"`
+		HasUnmodeledConditions bool            `json:"has_unmodeled_conditions"`
+		Parameters             map[string]any  `json:"parameters"`
+		Template               json.RawMessage `json:"template"`
+	}{snapshot.RemoteETag, snapshot.Version, snapshot.ObservedAt, *snapshot.Summary, snapshot.Summary.HasUnmodeledConditions, snapshot.Parameters, snapshot.Template}
 	b, err := json.Marshal(raw)
 	if err != nil {
 		return err

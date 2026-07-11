@@ -7,6 +7,7 @@ import (
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/release"
 	"github.com/ConteMan/conflow/internal/validation"
 )
 
@@ -56,6 +57,48 @@ type errorDTO struct {
 type remoteValidateInput struct {
 	PlanID string `json:"plan_id"`
 }
+
+type createReleaseInput struct {
+	PlanID                string                 `json:"plan_id"`
+	ExpectedDraftRevision uint64                 `json:"expected_draft_revision"`
+	ExpectedRemoteETag    string                 `json:"expected_remote_etag"`
+	Confirmation          releaseConfirmationDTO `json:"confirmation"`
+}
+type releaseConfirmationDTO struct {
+	Acknowledged            *bool    `json:"acknowledged"`
+	EnvironmentID           string   `json:"environment_id"`
+	AcknowledgedRiskItemIDs []string `json:"acknowledged_risk_item_ids"`
+}
+
+func (input createReleaseInput) valid() bool {
+	return input.PlanID != "" && input.ExpectedDraftRevision > 0 && input.ExpectedRemoteETag != "" && input.Confirmation.Acknowledged != nil && input.Confirmation.AcknowledgedRiskItemIDs != nil
+}
+
+type remoteETagMismatchEnvelope struct {
+	Error remoteETagMismatchDTO `json:"error"`
+}
+type remoteETagMismatchDTO struct {
+	Code               string         `json:"code"`
+	Message            string         `json:"message"`
+	RequestID          string         `json:"request_id"`
+	PlanID             string         `json:"plan_id"`
+	ExpectedRemoteETag string         `json:"expected_remote_etag"`
+	CurrentRemote      remoteAuditDTO `json:"current_remote"`
+	Rebuild            rebuildDTO     `json:"rebuild"`
+}
+type remoteAuditDTO struct {
+	RemoteETag string `json:"remote_etag"`
+	Version    string `json:"version"`
+	ObservedAt string `json:"observed_at"`
+	Summary    any    `json:"summary"`
+}
+type rebuildDTO struct {
+	Required     bool   `json:"required"`
+	PlanEndpoint string `json:"plan_endpoint"`
+	ReasonCode   string `json:"reason_code"`
+}
+
+type releaseDTO = release.Release
 
 type replaceDraftInput struct {
 	ExpectedSourceRevision *string         `json:"expected_source_revision"`

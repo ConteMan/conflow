@@ -41,7 +41,9 @@ func NewFirebase(config FirebaseConfig) *Firebase {
 	return &Firebase{config: config}
 }
 
-func (f *Firebase) Capabilities() Capabilities { return Capabilities{Pull: true, Validate: true} }
+func (f *Firebase) Capabilities() Capabilities {
+	return Capabilities{Pull: true, Validate: true, Publish: true}
+}
 func (f *Firebase) Status(context.Context) Status {
 	if strings.TrimSpace(f.config.CredentialsPath) == "" || strings.TrimSpace(f.config.ProjectID) == "" {
 		return Status{Status: "not_configured", Capabilities: f.Capabilities()}
@@ -127,6 +129,53 @@ func (f *Firebase) Validate(ctx context.Context, input []byte) error {
 		return ErrUnavailable
 	}
 	return nil
+}
+
+// Publish performs the only destructive Firebase operation. The caller must
+// have already compared the current ETag; If-Match closes the race afterwards.
+func (f *Firebase) Publish(ctx context.Context, input []byte, expectedETag string) (Template, error) {
+	if !json.Valid(input) || strings.TrimSpace(expectedETag) == "" {
+		return Template{}, ErrValidation
+	}
+	token, err := f.accessToken(ctx)
+	if err != nil {
+		return Template{}, SafeError(err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, f.templateURL(), strings.NewReader(string(input)))
+	if err != nil {
+		return Template{}, ErrUnavailable
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("If-Match", expectedETag)
+	resp, err := f.config.HTTPClient.Do(req)
+	if err != nil {
+		return Template{}, SafeError(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return Template{}, ErrUnauthorized
+	}
+	if resp.StatusCode == http.StatusPreconditionFailed {
+		return Template{}, ErrETagMismatch
+	}
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		return Template{}, ErrValidation
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Template{}, ErrUnavailable
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	if err != nil || !json.Valid(body) {
+		return Template{}, ErrUnavailable
+	}
+	var metadata struct {
+		Version struct {
+			VersionNumber string `json:"versionNumber"`
+		} `json:"version"`
+	}
+	_ = json.Unmarshal(body, &metadata)
+	return Template{Raw: body, ETag: resp.Header.Get("ETag"), Version: metadata.Version.VersionNumber, ObservedAt: time.Now().UTC()}, nil
 }
 
 func (f *Firebase) templateURL() string {

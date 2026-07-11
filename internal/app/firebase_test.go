@@ -18,9 +18,10 @@ import (
 )
 
 type fakeFirebase struct {
-	template             provider.Template
-	pullErr, validateErr error
-	validated            []byte
+	template                         provider.Template
+	pullErr, validateErr, publishErr error
+	validated                        []byte
+	published                        []byte
 }
 
 func (f *fakeFirebase) Connect(context.Context) error { return f.pullErr }
@@ -32,8 +33,19 @@ func (f *fakeFirebase) Validate(_ context.Context, input []byte) error {
 	f.validated = append([]byte(nil), input...)
 	return f.validateErr
 }
+func (f *fakeFirebase) Publish(_ context.Context, input []byte, expectedETag string) (provider.Template, error) {
+	if f.publishErr != nil {
+		return provider.Template{}, f.publishErr
+	}
+	if expectedETag != f.template.ETag {
+		return provider.Template{}, provider.ErrETagMismatch
+	}
+	f.published = append([]byte(nil), input...)
+	f.template = provider.Template{Raw: append([]byte(nil), input...), ETag: "etag-after", Version: "2", ObservedAt: time.Now().UTC()}
+	return f.template, nil
+}
 func (f *fakeFirebase) Capabilities() provider.Capabilities {
-	return provider.Capabilities{Pull: true, Validate: true}
+	return provider.Capabilities{Pull: true, Validate: true, Publish: true}
 }
 
 func TestPullValidateAndConditionRiskUseProviderBoundary(t *testing.T) {

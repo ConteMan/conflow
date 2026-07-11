@@ -142,6 +142,7 @@ func parseManifest(content []byte) (Manifest, error) {
 	if err := yaml.Unmarshal(content, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("%w: %v", ErrInvalidManifest, err)
 	}
+	normalize(&manifest)
 	if err := Validate(manifest); err != nil {
 		return Manifest{}, fmt.Errorf("%w: %v", ErrInvalidManifest, err)
 	}
