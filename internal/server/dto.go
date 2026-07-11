@@ -7,6 +7,7 @@ import (
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/validation"
 )
 
 type healthResponse struct {
@@ -116,6 +117,10 @@ func (input draftScopeMutationInput) valid() bool {
 type draftViewDTO = draft.View
 
 func draftViewDTOFrom(view draft.View) draftViewDTO { return view }
+
+type validationResultDTO = validation.Result
+
+func validationResultDTOFrom(result validation.Result) validationResultDTO { return result }
 
 type draftConflictEnvelope struct {
 	Error draftConflictDTO `json:"error"`
