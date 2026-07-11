@@ -208,18 +208,18 @@ Spec 007 的 `POST /drafts/{environment_id}:validate` 对一次捕获的 DraftVi
 
 相同用户、环境、动作和幂等键在保留期内只能产生一个结果。请求体不同但复用键时返回 `409 idempotency_conflict`。
 
-发布请求必须引用已经生成且未过期的 `plan_id`，并提交：
+发布请求必须引用已经生成且 `status=ready` 的未过期 Plan，并提交：
 
 - `expected_draft_revision`；
 - `expected_remote_etag`；
 - `confirmation.environment_id`；
-- 对高风险发布要求的确认短语或二次确认状态。
+- `confirmation.acknowledged`、可选 `confirmation.environment_id` 与 `confirmation.acknowledged_risk_item_ids[]`。
 
-服务端发布前重新校验上述值；前端确认不能代替服务端检查。
+Plan 返回服务端计算的 `confirmation_requirements`；服务端发布前重新校验上述值、项目级确认策略、风险项和 blocking reasons，前端确认不能代替服务端检查。低风险 Production Plan 是否要求输入环境 ID 只由 `project.release_confirmation_policy.production_low_risk_mode` 决定，默认要求；高风险逐项确认不可被该策略放宽。
 
 ## 9. 长任务与事件
 
-拉取远端、生成计划、发布、回滚和 Git 操作可能成为长任务。此类请求返回 `202 Accepted`：
+拉取远端、生成计划、发布、回滚 preview、回滚和 Git 操作可能成为长任务。此类请求返回 `202 Accepted`：
 
 ```json
 {
@@ -234,7 +234,9 @@ Spec 007 的 `POST /drafts/{environment_id}:validate` 对一次捕获的 DraftVi
 - `GET /api/v1/operations/{operation_id}` 获取权威状态。
 - `GET /api/v1/events?operation_id=...` 使用 Server-Sent Events 提供进度增强。
 - SSE 断开不影响任务；前端回退轮询 Operation。
-- 状态固定为 `pending`、`running`、`succeeded`、`failed`、`cancelled`。
+- 状态固定为 `pending`、`running`、`succeeded`、`failed`、`cancelled`。`stage` 是稳定枚举：`queued`、`reading_remote`、`snapshotting`、`compiling`、`analyzing`、`validating_remote`、`submitting`、`verifying`、`recording_audit`、`completed`、`cancelled`。
+- Operation 总是包含 `remote_state`：`unchanged`、`changed` 或 `unknown`。读取、编译、预校验失败均为 `unchanged`；发布/回滚在提交后连接中断等无法判定情形才为 `unknown`，UI 必须据此提示人工核对而非宣称远端未变。
+- `failure` 是结构化 `{code, message, retryable, stage}`；`result` 是 `{resource_type, resource_id, href}`，例如 `plan`、`remote_snapshot`、`release` 或 `rollback_preview`。GET Operation 是恢复权威，SSE 只提供临时进度，不能携带完整远端模板或敏感值。
 - 进度事件不包含凭据、原始 token、完整 Firebase 模板或敏感路径。
 
 ## 10. 端点资源图
@@ -269,6 +271,7 @@ Spec 007 的 `POST /drafts/{environment_id}:validate` 对一次捕获的 DraftVi
 - 前端展示加载、空状态、失败、过期、冲突、只读和危险确认七类通用状态。
 - `bootstrap.capabilities` 是服务端权威能力；字段为 `false` 时前端必须进入对应只读状态，不得先发送写请求再依赖错误恢复。当前可写的本地项目返回 `true`，后续只读 Source Adapter 可返回 `false`。
 - UI 可以乐观更新低风险本地字段，但发布、删除、回滚和 Provider 操作不得使用不可恢复的乐观成功提示。
+- 线上当前值 caption 只读取受保护远端快照的脱敏 `remote/projection`；它按 `entity_ref + field_path` 定位，不能作为发布授权，也不返回完整 Firebase 模板或敏感值。
 
 ## 13. 测试门禁
 

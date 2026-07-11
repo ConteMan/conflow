@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Conflow Local API
-  version: 0.7.0
+  version: 0.8.0
   description: |
     Versioned same-origin API between the embedded React GUI and the local Go service.
 servers:
@@ -743,6 +743,573 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /drafts/{environment_id}:plan:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: createPlan
+      summary: Asynchronously build an immutable Plan from the current draft and remote snapshot
+      responses:
+        "202":
+          description: Plan construction Operation. Poll the returned operation until its result references a Plan.
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_plan_01JEXAMPLE
+                  operation_type: plan
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+  /plans/{plan_id}:
+    parameters:
+      - $ref: "#/components/parameters/PlanID"
+    get:
+      operationId: getPlan
+      summary: Get an immutable Plan and its server-authoritative risk and confirmation requirements
+      responses:
+        "200":
+          description: Plan read model
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanResponse"
+              example:
+                data:
+                  plan_id: plan_01JEXAMPLE
+                  environment_id: staging
+                  status: ready
+                  snapshot_token: pst_01JEXAMPLE
+                  draft_revision: 13
+                  source_digest: sha256:source-fixture-1
+                  remote_etag: etag-remote-57
+                  created_at: "2026-07-11T10:00:04Z"
+                  expires_at: "2026-07-11T10:15:04Z"
+                  content_digest: sha256:plan-fixture-1
+                  remote_snapshot:
+                    status: available
+                    remote_etag: etag-remote-57
+                    version: "57"
+                    observed_at: "2026-07-11T10:00:02Z"
+                    summary:
+                      parameter_count: 42
+                      managed_parameter_count: 18
+                      condition_count: 0
+                      content_digest: sha256:remote-fixture-57
+                  semantic_changes: []
+                  affected_entities: []
+                  remote_parameter_changes: []
+                  artifact_metadata: []
+                  severity: high
+                  risk_items: []
+                  blocking_reasons: []
+                  confirmation_requirements:
+                    requires_acknowledgement: true
+                    environment_id_requirement: not_required
+                    required_risk_item_ids: []
+                    policy_source: project.release_confirmation_policy
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /plans/{plan_id}/artifacts/{artifact_name}:
+    parameters:
+      - $ref: "#/components/parameters/PlanID"
+      - $ref: "#/components/parameters/ArtifactName"
+    get:
+      operationId: getPlanArtifact
+      summary: Download one non-sensitive immutable Plan artifact
+      responses:
+        "200":
+          description: Artifact bytes. The content type equals the selected artifact metadata media_type.
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                plan_id: plan_01JEXAMPLE
+                content_digest: sha256:plan-fixture-1
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+  /environments/{environment_id}/provider:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    get:
+      operationId: getProviderStatus
+      summary: Get provider connection status without credentials
+      responses:
+        "200":
+          description: Provider status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderStatusResponse"
+              example:
+                data:
+                  environment_id: production
+                  provider_type: firebase-remote-config
+                  status: connected
+                  capabilities:
+                    pull: true
+                    validate: true
+                    publish: true
+                    rollback: true
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/provider:connect:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: connectProvider
+      summary: Asynchronously verify the configured provider credential reference
+      responses:
+        "202":
+          description: Provider connection Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_connect_01JEXAMPLE
+                  operation_type: provider_connect
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/remote:pull:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: pullRemoteSnapshot
+      summary: Asynchronously pull and protect the current remote snapshot
+      responses:
+        "202":
+          description: Remote pull Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_pull_01JEXAMPLE
+                  operation_type: remote_pull
+                  status: running
+                  stage: reading_remote
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:01Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 2
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/remote:validate:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    post:
+      operationId: validateRemotePlan
+      summary: Asynchronously validate a ready Plan with the provider without publishing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoteValidateInput"
+      responses:
+        "202":
+          description: Remote validation Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_validate_01JEXAMPLE
+                  operation_type: remote_validate
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+  /environments/{environment_id}/remote/projection:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    get:
+      operationId: getRemoteProjection
+      summary: Get the latest redacted provider-neutral remote value projection for UI captions
+      responses:
+        "200":
+          description: Redacted remote value projection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteProjectionResponse"
+              example:
+                data:
+                  environment_id: production
+                  snapshot_etag: etag-remote-57
+                  observed_at: "2026-07-11T10:00:02Z"
+                  projections:
+                    - projection_id: rvp_01JEXAMPLE
+                      entity_ref: entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap
+                      field_path: /cooldown_ms
+                      parameter_key: ad_frequency_inter_global_cap
+                      value_summary: "30 seconds"
+                      snapshot_etag: etag-remote-57
+                      observed_at: "2026-07-11T10:00:02Z"
+                      availability: available
+                      redacted: false
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /operations/{operation_id}:
+    parameters:
+      - $ref: "#/components/parameters/OperationID"
+    get:
+      operationId: getOperation
+      summary: Get the authoritative recoverable state of an asynchronous operation
+      responses:
+        "200":
+          description: Operation status and optional result or structured failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_publish_01JEXAMPLE
+                  operation_type: publish
+                  status: succeeded
+                  stage: completed
+                  remote_state: changed
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:08Z"
+                  result:
+                    resource_type: release
+                    resource_id: rel_01JEXAMPLE
+                    href: /api/v1/environments/production/releases/rel_01JEXAMPLE
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 5
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /events:
+    get:
+      operationId: streamOperationEvents
+      summary: Stream non-authoritative progress events for one Operation
+      parameters:
+        - $ref: "#/components/parameters/OperationIDQuery"
+      responses:
+        "200":
+          description: Server-Sent Event stream. Reconnect by polling GET /operations/{operation_id}.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: "event: progress\\ndata: {\"operation_id\":\"op_plan_01JEXAMPLE\",\"stage\":\"analyzing\"}\\n\\n"
+  /environments/{environment_id}/releases:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+    get:
+      operationId: listReleases
+      summary: List release and failed-attempt audit records for an environment
+      responses:
+        "200":
+          description: Release history in descending creation order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleasesResponse"
+              example:
+                data:
+                  - release_id: rel_01JEXAMPLE
+                    environment_id: production
+                    kind: publish
+                    outcome: succeeded
+                    created_at: "2026-07-11T10:00:08Z"
+                    completed_at: "2026-07-11T10:00:08Z"
+                    operation_id: op_publish_01JEXAMPLE
+                    remote_state: changed
+                    semantic_summary: "5 direct changes, 10 affected entities"
+                    risk_summary: high
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createRelease
+      summary: Asynchronously publish a ready Plan with idempotency and server-validated confirmation
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReleaseInput"
+      responses:
+        "202":
+          description: Publish Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_publish_01JEXAMPLE
+                  operation_type: publish
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "409":
+          $ref: "#/components/responses/StateConflict"
+        "412":
+          description: Remote ETag changed; no remote update was sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteETagMismatchResponse"
+              example:
+                error:
+                  code: remote_etag_mismatch
+                  message: Remote configuration changed; rebuild the Plan before publishing.
+                  request_id: req_01JEXAMPLE
+                  plan_id: plan_01JEXAMPLE
+                  expected_remote_etag: etag-remote-57
+                  current_remote:
+                    remote_etag: etag-remote-58
+                    version: "58"
+                    observed_at: "2026-07-11T10:02:00Z"
+                    summary:
+                      parameter_count: 43
+                      managed_parameter_count: 18
+                      condition_count: 0
+                      content_digest: sha256:remote-fixture-58
+                  rebuild:
+                    required: true
+                    plan_endpoint: /api/v1/drafts/production:plan
+                    reason_code: remote_etag_changed
+  /environments/{environment_id}/releases/{release_id}:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+      - $ref: "#/components/parameters/ReleaseID"
+    get:
+      operationId: getRelease
+      summary: Get one redacted Release audit record
+      responses:
+        "200":
+          description: Release audit record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseResponse"
+              example:
+                data:
+                  release_id: rel_01JEXAMPLE
+                  environment_id: production
+                  kind: publish
+                  outcome: succeeded
+                  created_at: "2026-07-11T10:00:08Z"
+                  completed_at: "2026-07-11T10:00:08Z"
+                  plan_id: plan_01JEXAMPLE
+                  source_digest: sha256:source-fixture-1
+                  plan_digest: sha256:plan-fixture-1
+                  remote_before:
+                    remote_etag: etag-remote-57
+                    version: "57"
+                    observed_at: "2026-07-11T10:00:02Z"
+                    summary:
+                      parameter_count: 42
+                      managed_parameter_count: 18
+                      condition_count: 0
+                      content_digest: sha256:remote-fixture-57
+                  remote_after:
+                    remote_etag: etag-remote-58
+                    version: "58"
+                    observed_at: "2026-07-11T10:00:08Z"
+                    summary:
+                      parameter_count: 42
+                      managed_parameter_count: 18
+                      condition_count: 0
+                      content_digest: sha256:remote-fixture-58
+                  semantic_summary: "5 direct changes, 10 affected entities"
+                  risk_summary: high
+                  operation_id: op_publish_01JEXAMPLE
+                  remote_state: changed
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/releases/{release_id}:rollback-preview:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+      - $ref: "#/components/parameters/ReleaseID"
+    post:
+      operationId: createRollbackPreview
+      summary: Asynchronously build a rollback preview against the current remote state
+      responses:
+        "202":
+          description: Rollback preview Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_rollback_preview_01JEXAMPLE
+                  operation_type: rollback_preview
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:00:00Z"
+                  updated_at: "2026-07-11T10:00:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/releases/{release_id}/rollback-preview:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+      - $ref: "#/components/parameters/ReleaseID"
+    get:
+      operationId: getRollbackPreview
+      summary: Get the latest immutable rollback preview for a release
+      responses:
+        "200":
+          description: Rollback preview read model
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RollbackPreviewResponse"
+              example:
+                data:
+                  rollback_preview_id: rbp_01JEXAMPLE
+                  environment_id: production
+                  target_release_id: rel_01JEXAMPLE
+                  target_remote_version: "57"
+                  status: ready
+                  expected_remote_etag: etag-remote-58
+                  created_at: "2026-07-11T10:03:00Z"
+                  expires_at: "2026-07-11T10:18:00Z"
+                  current_remote:
+                    remote_etag: etag-remote-58
+                    version: "58"
+                    observed_at: "2026-07-11T10:03:00Z"
+                    summary:
+                      parameter_count: 42
+                      managed_parameter_count: 18
+                      condition_count: 0
+                      content_digest: sha256:remote-fixture-58
+                  semantic_changes: []
+                  remote_parameter_changes: []
+                  severity: medium
+                  risk_items: []
+                  blocking_reasons: []
+                  confirmation_requirements:
+                    requires_acknowledgement: true
+                    environment_id_requirement: required
+                    required_risk_item_ids: []
+                    policy_source: project.release_confirmation_policy
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /environments/{environment_id}/releases/{release_id}:rollback:
+    parameters:
+      - $ref: "#/components/parameters/EnvironmentID"
+      - $ref: "#/components/parameters/ReleaseID"
+    post:
+      operationId: rollbackRelease
+      summary: Asynchronously roll back using an unexpired preview, idempotency key, and server-validated confirmation
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RollbackInput"
+      responses:
+        "202":
+          description: Rollback Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+              example:
+                data:
+                  operation_id: op_rollback_01JEXAMPLE
+                  operation_type: rollback
+                  status: pending
+                  stage: queued
+                  remote_state: unchanged
+                  created_at: "2026-07-11T10:04:00Z"
+                  updated_at: "2026-07-11T10:04:00Z"
+                meta:
+                  request_id: req_01JEXAMPLE
+                  revision: 1
+        "409":
+          $ref: "#/components/responses/StateConflict"
+        "412":
+          $ref: "#/components/responses/RemoteETagMismatch"
 components:
   parameters:
     EnvironmentID:
@@ -802,6 +1369,50 @@ components:
       schema:
         type: string
         pattern: "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+    PlanID:
+      name: plan_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^plan_[A-Za-z0-9_-]{6,127}$"
+    ArtifactName:
+      name: artifact_name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9._-]{1,128}$"
+    OperationID:
+      name: operation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^op_[A-Za-z0-9_-]{6,127}$"
+    OperationIDQuery:
+      name: operation_id
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: "^op_[A-Za-z0-9_-]{6,127}$"
+    ReleaseID:
+      name: release_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^rel_[A-Za-z0-9_-]{6,127}$"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated opaque key unique for this environment and action during the retention window.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 255
   headers:
     CacheControl:
       schema:
@@ -1037,6 +1648,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/EntityReferencedErrorResponse"
+    RemoteETagMismatch:
+      description: Remote ETag changed; no remote update was sent.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RemoteETagMismatchResponse"
           example:
             error:
               code: entity_referenced
@@ -1273,6 +1890,8 @@ components:
         source_type:
           type: string
           enum: [managed-file, git-json]
+        release_confirmation_policy:
+          $ref: "#/components/schemas/ReleaseConfirmationPolicy"
     UpdateProjectInput:
       type: object
       additionalProperties: false
@@ -1285,6 +1904,8 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        release_confirmation_policy:
+          $ref: "#/components/schemas/ReleaseConfirmationPolicy"
     Environment:
       type: object
       additionalProperties: false
@@ -2245,3 +2866,732 @@ components:
           type: string
         message:
           type: string
+    ReleaseConfirmationPolicy:
+      type: object
+      additionalProperties: false
+      required: [production_low_risk_mode]
+      properties:
+        production_low_risk_mode:
+          type: string
+          enum: [environment_id, acknowledgement]
+          description: Project-level policy that can only relax the environment ID input for low-risk Production Plans.
+      example:
+        production_low_risk_mode: environment_id
+    OperationStatus:
+      type: string
+      enum: [pending, running, succeeded, failed, cancelled]
+    OperationStage:
+      type: string
+      enum: [queued, reading_remote, snapshotting, compiling, analyzing, validating_remote, submitting, verifying, recording_audit, completed, cancelled]
+    OperationType:
+      type: string
+      enum: [provider_connect, remote_pull, remote_validate, plan, publish, rollback_preview, rollback]
+    RemoteState:
+      type: string
+      enum: [unchanged, changed, unknown]
+      description: Whether the Operation changed the remote provider state. Unknown requires an explicit remote verification.
+    OperationFailure:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable, stage]
+      properties:
+        code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{0,127}$"
+        message:
+          type: string
+        retryable:
+          type: boolean
+        stage:
+          $ref: "#/components/schemas/OperationStage"
+    OperationResult:
+      type: object
+      additionalProperties: false
+      required: [resource_type, resource_id, href]
+      properties:
+        resource_type:
+          type: string
+          enum: [plan, remote_snapshot, release, rollback_preview]
+        resource_id:
+          type: string
+        href:
+          type: string
+          pattern: "^/api/v1/"
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [operation_id, operation_type, status, stage, remote_state, created_at, updated_at]
+      properties:
+        operation_id:
+          type: string
+          pattern: "^op_[A-Za-z0-9_-]{6,127}$"
+        operation_type:
+          $ref: "#/components/schemas/OperationType"
+        status:
+          $ref: "#/components/schemas/OperationStatus"
+        stage:
+          $ref: "#/components/schemas/OperationStage"
+        remote_state:
+          $ref: "#/components/schemas/RemoteState"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        failure:
+          $ref: "#/components/schemas/OperationFailure"
+        result:
+          $ref: "#/components/schemas/OperationResult"
+    OperationResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Operation"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    RemoteSummary:
+      type: object
+      additionalProperties: false
+      required: [parameter_count, managed_parameter_count, condition_count, content_digest]
+      properties:
+        parameter_count:
+          type: integer
+          minimum: 0
+        managed_parameter_count:
+          type: integer
+          minimum: 0
+        condition_count:
+          type: integer
+          minimum: 0
+        content_digest:
+          type: string
+    RemoteSnapshot:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [available, unavailable]
+        remote_etag:
+          type: string
+        version:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        summary:
+          $ref: "#/components/schemas/RemoteSummary"
+        unavailable_reason:
+          type: string
+          enum: [provider_unavailable, provider_unauthorized, remote_snapshot_missing, provider_capability_unavailable]
+    PlanStatus:
+      type: string
+      enum: [ready, preview_only, invalidated, expired]
+    PlanInvalidationReason:
+      type: string
+      enum: [draft_revision_changed, source_digest_changed, remote_etag_changed, remote_snapshot_unavailable, ttl_expired, provider_capability_changed]
+    PlanChangeKind:
+      type: string
+      enum: [created, updated, deleted, overridden]
+    PlanNodeID:
+      type: string
+      pattern: "^node_[A-Za-z0-9_-]{6,127}$"
+    SemanticChange:
+      type: object
+      additionalProperties: false
+      required: [node_id, change_kind, summary, affected_entity_node_ids, remote_parameter_node_ids]
+      properties:
+        node_id:
+          $ref: "#/components/schemas/PlanNodeID"
+        change_kind:
+          $ref: "#/components/schemas/PlanChangeKind"
+        summary:
+          type: string
+        direct_entity_ref:
+          $ref: "#/components/schemas/EntityRef"
+        field_path:
+          type: string
+          description: RFC 6901 path within direct_entity_ref when one field caused the change.
+        before_summary:
+          type: string
+        after_summary:
+          type: string
+        affected_entity_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        affected_entity_node_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+        remote_parameter_node_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+    AffectedEntity:
+      type: object
+      additionalProperties: false
+      required: [node_id, entity_ref, entity_type, entity_id, impact_kind, caused_by_semantic_change_ids]
+      properties:
+        node_id:
+          $ref: "#/components/schemas/PlanNodeID"
+        entity_ref:
+          $ref: "#/components/schemas/EntityRef"
+        entity_type:
+          $ref: "#/components/schemas/EntityType"
+        entity_id:
+          type: string
+        impact_kind:
+          type: string
+          enum: [direct, inherited, referenced, compiled]
+        caused_by_semantic_change_ids:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+    RemoteParameterChange:
+      type: object
+      additionalProperties: false
+      required: [node_id, parameter_key, change_kind, managed, caused_by_semantic_change_ids, affected_entity_node_ids]
+      properties:
+        node_id:
+          $ref: "#/components/schemas/PlanNodeID"
+        parameter_key:
+          type: string
+        change_kind:
+          $ref: "#/components/schemas/PlanChangeKind"
+        before_summary:
+          type: string
+        after_summary:
+          type: string
+        managed:
+          type: boolean
+        projection_id:
+          type: string
+        caused_by_semantic_change_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+        affected_entity_node_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+    PlanArtifactMetadata:
+      type: object
+      additionalProperties: false
+      required: [artifact_name, media_type, content_digest, size_bytes, sensitive, available]
+      properties:
+        artifact_name:
+          type: string
+        media_type:
+          type: string
+        content_digest:
+          type: string
+        size_bytes:
+          type: integer
+          minimum: 0
+        sensitive:
+          type: boolean
+        available:
+          type: boolean
+    RiskSeverity:
+      type: string
+      enum: [low, medium, high, blocking]
+    RiskItem:
+      type: object
+      additionalProperties: false
+      required: [risk_item_id, severity, reason_code, summary, semantic_change_ids, remote_parameter_node_ids, acknowledgement_required]
+      properties:
+        risk_item_id:
+          type: string
+          pattern: "^risk_[A-Za-z0-9_-]{6,127}$"
+        severity:
+          $ref: "#/components/schemas/RiskSeverity"
+        reason_code:
+          type: string
+          enum: [shared_frequency_policy_relaxed, global_feature_switch_changed, production_network_mode_changed, unit_binding_changed, managed_parameter_deleted, unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
+        summary:
+          type: string
+        entity_ref:
+          $ref: "#/components/schemas/EntityRef"
+        semantic_change_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+        remote_parameter_node_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanNodeID"
+        acknowledgement_required:
+          type: boolean
+    BlockingReason:
+      type: object
+      additionalProperties: false
+      required: [reason_code, summary]
+      properties:
+        reason_code:
+          type: string
+          enum: [unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
+        summary:
+          type: string
+        risk_item_id:
+          type: string
+        node_id:
+          $ref: "#/components/schemas/PlanNodeID"
+    ConfirmationRequirements:
+      type: object
+      additionalProperties: false
+      required: [requires_acknowledgement, environment_id_requirement, required_risk_item_ids, policy_source]
+      properties:
+        requires_acknowledgement:
+          type: boolean
+        environment_id_requirement:
+          type: string
+          enum: [required, not_required]
+        required_risk_item_ids:
+          type: array
+          items:
+            type: string
+            pattern: "^risk_[A-Za-z0-9_-]{6,127}$"
+        policy_source:
+          type: string
+          const: project.release_confirmation_policy
+    Plan:
+      type: object
+      additionalProperties: false
+      required: [plan_id, environment_id, status, snapshot_token, draft_revision, source_digest, created_at, expires_at, content_digest, remote_snapshot, semantic_changes, affected_entities, remote_parameter_changes, artifact_metadata, severity, risk_items, blocking_reasons, confirmation_requirements]
+      properties:
+        plan_id:
+          type: string
+          pattern: "^plan_[A-Za-z0-9_-]{6,127}$"
+        environment_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/PlanStatus"
+        snapshot_token:
+          type: string
+        draft_revision:
+          type: integer
+          minimum: 1
+        source_digest:
+          type: string
+        remote_etag:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        invalidation_reason:
+          $ref: "#/components/schemas/PlanInvalidationReason"
+        content_digest:
+          type: string
+        remote_snapshot:
+          $ref: "#/components/schemas/RemoteSnapshot"
+        semantic_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticChange"
+        affected_entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffectedEntity"
+        remote_parameter_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteParameterChange"
+        artifact_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanArtifactMetadata"
+        severity:
+          $ref: "#/components/schemas/RiskSeverity"
+        risk_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskItem"
+        blocking_reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockingReason"
+        confirmation_requirements:
+          $ref: "#/components/schemas/ConfirmationRequirements"
+    PlanResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Plan"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    ProviderCapabilities:
+      type: object
+      additionalProperties: false
+      required: [pull, validate, publish, rollback]
+      properties:
+        pull:
+          type: boolean
+        validate:
+          type: boolean
+        publish:
+          type: boolean
+        rollback:
+          type: boolean
+    ProviderStatus:
+      type: object
+      additionalProperties: false
+      required: [environment_id, provider_type, status, capabilities]
+      properties:
+        environment_id:
+          type: string
+        provider_type:
+          type: string
+          const: firebase-remote-config
+        status:
+          type: string
+          enum: [connected, unavailable, unauthorized, not_configured]
+        capabilities:
+          $ref: "#/components/schemas/ProviderCapabilities"
+    ProviderStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/ProviderStatus"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    RemoteValidateInput:
+      type: object
+      additionalProperties: false
+      required: [plan_id]
+      properties:
+        plan_id:
+          type: string
+          pattern: "^plan_[A-Za-z0-9_-]{6,127}$"
+    RemoteValueProjection:
+      type: object
+      additionalProperties: false
+      required: [projection_id, entity_ref, field_path, parameter_key, value_summary, snapshot_etag, observed_at, availability, redacted]
+      properties:
+        projection_id:
+          type: string
+          pattern: "^rvp_[A-Za-z0-9_-]{6,127}$"
+        entity_ref:
+          $ref: "#/components/schemas/EntityRef"
+        field_path:
+          type: string
+          description: RFC 6901 path within entity_ref.
+        parameter_key:
+          type: string
+        value_summary:
+          type: string
+        snapshot_etag:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        availability:
+          type: string
+          enum: [available, redacted, unmapped, unavailable]
+        redacted:
+          type: boolean
+        reason_code:
+          type: string
+          enum: [sensitive_value, parameter_unmapped, remote_snapshot_unavailable]
+    RemoteProjection:
+      type: object
+      additionalProperties: false
+      required: [environment_id, snapshot_etag, observed_at, projections]
+      properties:
+        environment_id:
+          type: string
+        snapshot_etag:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        projections:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteValueProjection"
+    RemoteProjectionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/RemoteProjection"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    ReleaseConfirmation:
+      type: object
+      additionalProperties: false
+      required: [acknowledged, acknowledged_risk_item_ids]
+      properties:
+        acknowledged:
+          type: boolean
+        environment_id:
+          type: string
+        acknowledged_risk_item_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^risk_[A-Za-z0-9_-]{6,127}$"
+    CreateReleaseInput:
+      type: object
+      additionalProperties: false
+      required: [plan_id, expected_draft_revision, expected_remote_etag, confirmation]
+      properties:
+        plan_id:
+          type: string
+          pattern: "^plan_[A-Za-z0-9_-]{6,127}$"
+        expected_draft_revision:
+          type: integer
+          minimum: 1
+        expected_remote_etag:
+          type: string
+          minLength: 1
+        confirmation:
+          $ref: "#/components/schemas/ReleaseConfirmation"
+    RemoteETagMismatchError:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, plan_id, expected_remote_etag, current_remote, rebuild]
+      properties:
+        code:
+          type: string
+          const: remote_etag_mismatch
+        message:
+          type: string
+        request_id:
+          type: string
+        plan_id:
+          type: string
+        expected_remote_etag:
+          type: string
+        current_remote:
+          type: object
+          additionalProperties: false
+          required: [remote_etag, version, observed_at, summary]
+          properties:
+            remote_etag:
+              type: string
+            version:
+              type: string
+            observed_at:
+              type: string
+              format: date-time
+            summary:
+              $ref: "#/components/schemas/RemoteSummary"
+        rebuild:
+          type: object
+          additionalProperties: false
+          required: [required, plan_endpoint, reason_code]
+          properties:
+            required:
+              type: boolean
+              const: true
+            plan_endpoint:
+              type: string
+              pattern: "^/api/v1/drafts/"
+            reason_code:
+              type: string
+              const: remote_etag_changed
+    RemoteETagMismatchResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/RemoteETagMismatchError"
+    ReleaseKind:
+      type: string
+      enum: [publish, rollback]
+    ReleaseOutcome:
+      type: string
+      enum: [succeeded, failed]
+    RemoteAuditState:
+      type: object
+      additionalProperties: false
+      required: [remote_etag, version, observed_at, summary]
+      properties:
+        remote_etag:
+          type: string
+        version:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        summary:
+          $ref: "#/components/schemas/RemoteSummary"
+    ReleaseSummary:
+      type: object
+      additionalProperties: false
+      required: [release_id, environment_id, kind, outcome, created_at, operation_id, remote_state, semantic_summary, risk_summary]
+      properties:
+        release_id:
+          type: string
+          pattern: "^rel_[A-Za-z0-9_-]{6,127}$"
+        environment_id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ReleaseKind"
+        outcome:
+          $ref: "#/components/schemas/ReleaseOutcome"
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        operation_id:
+          type: string
+        remote_state:
+          $ref: "#/components/schemas/RemoteState"
+        semantic_summary:
+          type: string
+        risk_summary:
+          $ref: "#/components/schemas/RiskSeverity"
+    Release:
+      type: object
+      additionalProperties: false
+      required: [release_id, environment_id, kind, outcome, created_at, operation_id, remote_state, semantic_summary, risk_summary]
+      properties:
+        release_id:
+          type: string
+          pattern: "^rel_[A-Za-z0-9_-]{6,127}$"
+        environment_id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ReleaseKind"
+        outcome:
+          $ref: "#/components/schemas/ReleaseOutcome"
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        operation_id:
+          type: string
+        remote_state:
+          $ref: "#/components/schemas/RemoteState"
+        semantic_summary:
+          type: string
+        risk_summary:
+          $ref: "#/components/schemas/RiskSeverity"
+        plan_id:
+          type: string
+        rollback_of_release_id:
+          type: string
+        source_digest:
+          type: string
+        plan_digest:
+          type: string
+        remote_before:
+          $ref: "#/components/schemas/RemoteAuditState"
+        remote_after:
+          $ref: "#/components/schemas/RemoteAuditState"
+        failure:
+          $ref: "#/components/schemas/OperationFailure"
+    ReleasesResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseSummary"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    ReleaseResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Release"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    RollbackPreviewStatus:
+      type: string
+      enum: [ready, invalidated, expired]
+    RollbackPreview:
+      type: object
+      additionalProperties: false
+      required: [rollback_preview_id, environment_id, target_release_id, target_remote_version, status, expected_remote_etag, created_at, expires_at, current_remote, semantic_changes, remote_parameter_changes, severity, risk_items, blocking_reasons, confirmation_requirements]
+      properties:
+        rollback_preview_id:
+          type: string
+          pattern: "^rbp_[A-Za-z0-9_-]{6,127}$"
+        environment_id:
+          type: string
+        target_release_id:
+          type: string
+        target_remote_version:
+          type: string
+        status:
+          $ref: "#/components/schemas/RollbackPreviewStatus"
+        expected_remote_etag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        invalidation_reason:
+          $ref: "#/components/schemas/PlanInvalidationReason"
+        current_remote:
+          $ref: "#/components/schemas/RemoteAuditState"
+        semantic_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticChange"
+        remote_parameter_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteParameterChange"
+        severity:
+          $ref: "#/components/schemas/RiskSeverity"
+        risk_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskItem"
+        blocking_reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockingReason"
+        confirmation_requirements:
+          $ref: "#/components/schemas/ConfirmationRequirements"
+    RollbackPreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/RollbackPreview"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    RollbackInput:
+      type: object
+      additionalProperties: false
+      required: [rollback_preview_id, expected_remote_etag, confirmation]
+      properties:
+        rollback_preview_id:
+          type: string
+          pattern: "^rbp_[A-Za-z0-9_-]{6,127}$"
+        expected_remote_etag:
+          type: string
+          minLength: 1
+        confirmation:
+          $ref: "#/components/schemas/ReleaseConfirmation"

@@ -368,6 +368,295 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drafts/{environment_id}:plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously build an immutable Plan from the current draft and remote snapshot */
+        post: operations["createPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{plan_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: components["parameters"]["PlanID"];
+            };
+            cookie?: never;
+        };
+        /** Get an immutable Plan and its server-authoritative risk and confirmation requirements */
+        get: operations["getPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{plan_id}/artifacts/{artifact_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: components["parameters"]["PlanID"];
+                artifact_name: components["parameters"]["ArtifactName"];
+            };
+            cookie?: never;
+        };
+        /** Download one non-sensitive immutable Plan artifact */
+        get: operations["getPlanArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** Get provider connection status without credentials */
+        get: operations["getProviderStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/provider:connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously verify the configured provider credential reference */
+        post: operations["connectProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/remote:pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously pull and protect the current remote snapshot */
+        post: operations["pullRemoteSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/remote:validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously validate a ready Plan with the provider without publishing */
+        post: operations["validateRemotePlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/remote/projection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** Get the latest redacted provider-neutral remote value projection for UI captions */
+        get: operations["getRemoteProjection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operations/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: components["parameters"]["OperationID"];
+            };
+            cookie?: never;
+        };
+        /** Get the authoritative recoverable state of an asynchronous operation */
+        get: operations["getOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream non-authoritative progress events for one Operation */
+        get: operations["streamOperationEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** List release and failed-attempt audit records for an environment */
+        get: operations["listReleases"];
+        put?: never;
+        /** Asynchronously publish a ready Plan with idempotency and server-validated confirmation */
+        post: operations["createRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/releases/{release_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        /** Get one redacted Release audit record */
+        get: operations["getRelease"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/releases/{release_id}:rollback-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously build a rollback preview against the current remote state */
+        post: operations["createRollbackPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/releases/{release_id}/rollback-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        /** Get the latest immutable rollback preview for a release */
+        get: operations["getRollbackPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/environments/{environment_id}/releases/{release_id}:rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asynchronously roll back using an unexpired preview, idempotency key, and server-validated confirmation */
+        post: operations["rollbackRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -457,10 +746,12 @@ export interface components {
             pack_ref: string;
             /** @enum {string} */
             source_type: "managed-file" | "git-json";
+            release_confirmation_policy?: components["schemas"]["ReleaseConfirmationPolicy"];
         };
         UpdateProjectInput: {
             id: string;
             name: string;
+            release_confirmation_policy?: components["schemas"]["ReleaseConfirmationPolicy"];
         };
         /**
          * @example {
@@ -924,6 +1215,348 @@ export interface components {
             code: string;
             message: string;
         };
+        /**
+         * @example {
+         *       "production_low_risk_mode": "environment_id"
+         *     }
+         */
+        ReleaseConfirmationPolicy: {
+            /**
+             * @description Project-level policy that can only relax the environment ID input for low-risk Production Plans.
+             * @enum {string}
+             */
+            production_low_risk_mode: "environment_id" | "acknowledgement";
+        };
+        /** @enum {string} */
+        OperationStatus: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+        /** @enum {string} */
+        OperationStage: "queued" | "reading_remote" | "snapshotting" | "compiling" | "analyzing" | "validating_remote" | "submitting" | "verifying" | "recording_audit" | "completed" | "cancelled";
+        /** @enum {string} */
+        OperationType: "provider_connect" | "remote_pull" | "remote_validate" | "plan" | "publish" | "rollback_preview" | "rollback";
+        /**
+         * @description Whether the Operation changed the remote provider state. Unknown requires an explicit remote verification.
+         * @enum {string}
+         */
+        RemoteState: "unchanged" | "changed" | "unknown";
+        OperationFailure: {
+            code: string;
+            message: string;
+            retryable: boolean;
+            stage: components["schemas"]["OperationStage"];
+        };
+        OperationResult: {
+            /** @enum {string} */
+            resource_type: "plan" | "remote_snapshot" | "release" | "rollback_preview";
+            resource_id: string;
+            href: string;
+        };
+        Operation: {
+            operation_id: string;
+            operation_type: components["schemas"]["OperationType"];
+            status: components["schemas"]["OperationStatus"];
+            stage: components["schemas"]["OperationStage"];
+            remote_state: components["schemas"]["RemoteState"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            failure?: components["schemas"]["OperationFailure"];
+            result?: components["schemas"]["OperationResult"];
+        };
+        OperationResponse: {
+            data: components["schemas"]["Operation"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        RemoteSummary: {
+            parameter_count: number;
+            managed_parameter_count: number;
+            condition_count: number;
+            content_digest: string;
+        };
+        RemoteSnapshot: {
+            /** @enum {string} */
+            status: "available" | "unavailable";
+            remote_etag?: string;
+            version?: string;
+            /** Format: date-time */
+            observed_at?: string;
+            summary?: components["schemas"]["RemoteSummary"];
+            /** @enum {string} */
+            unavailable_reason?: "provider_unavailable" | "provider_unauthorized" | "remote_snapshot_missing" | "provider_capability_unavailable";
+        };
+        /** @enum {string} */
+        PlanStatus: "ready" | "preview_only" | "invalidated" | "expired";
+        /** @enum {string} */
+        PlanInvalidationReason: "draft_revision_changed" | "source_digest_changed" | "remote_etag_changed" | "remote_snapshot_unavailable" | "ttl_expired" | "provider_capability_changed";
+        /** @enum {string} */
+        PlanChangeKind: "created" | "updated" | "deleted" | "overridden";
+        PlanNodeID: string;
+        SemanticChange: {
+            node_id: components["schemas"]["PlanNodeID"];
+            change_kind: components["schemas"]["PlanChangeKind"];
+            summary: string;
+            direct_entity_ref?: components["schemas"]["EntityRef"];
+            /** @description RFC 6901 path within direct_entity_ref when one field caused the change. */
+            field_path?: string;
+            before_summary?: string;
+            after_summary?: string;
+            affected_entity_ids?: components["schemas"]["EntityRef"][];
+            affected_entity_node_ids: components["schemas"]["PlanNodeID"][];
+            remote_parameter_node_ids: components["schemas"]["PlanNodeID"][];
+        };
+        AffectedEntity: {
+            node_id: components["schemas"]["PlanNodeID"];
+            entity_ref: components["schemas"]["EntityRef"];
+            entity_type: components["schemas"]["EntityType"];
+            entity_id: string;
+            /** @enum {string} */
+            impact_kind: "direct" | "inherited" | "referenced" | "compiled";
+            caused_by_semantic_change_ids: components["schemas"]["PlanNodeID"][];
+        };
+        RemoteParameterChange: {
+            node_id: components["schemas"]["PlanNodeID"];
+            parameter_key: string;
+            change_kind: components["schemas"]["PlanChangeKind"];
+            before_summary?: string;
+            after_summary?: string;
+            managed: boolean;
+            projection_id?: string;
+            caused_by_semantic_change_ids: components["schemas"]["PlanNodeID"][];
+            affected_entity_node_ids: components["schemas"]["PlanNodeID"][];
+        };
+        PlanArtifactMetadata: {
+            artifact_name: string;
+            media_type: string;
+            content_digest: string;
+            size_bytes: number;
+            sensitive: boolean;
+            available: boolean;
+        };
+        /** @enum {string} */
+        RiskSeverity: "low" | "medium" | "high" | "blocking";
+        RiskItem: {
+            risk_item_id: string;
+            severity: components["schemas"]["RiskSeverity"];
+            /** @enum {string} */
+            reason_code: "shared_frequency_policy_relaxed" | "global_feature_switch_changed" | "production_network_mode_changed" | "unit_binding_changed" | "managed_parameter_deleted" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            summary: string;
+            entity_ref?: components["schemas"]["EntityRef"];
+            semantic_change_ids: components["schemas"]["PlanNodeID"][];
+            remote_parameter_node_ids: components["schemas"]["PlanNodeID"][];
+            acknowledgement_required: boolean;
+        };
+        BlockingReason: {
+            /** @enum {string} */
+            reason_code: "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            summary: string;
+            risk_item_id?: string;
+            node_id?: components["schemas"]["PlanNodeID"];
+        };
+        ConfirmationRequirements: {
+            requires_acknowledgement: boolean;
+            /** @enum {string} */
+            environment_id_requirement: "required" | "not_required";
+            required_risk_item_ids: string[];
+            /** @constant */
+            policy_source: "project.release_confirmation_policy";
+        };
+        Plan: {
+            plan_id: string;
+            environment_id: string;
+            status: components["schemas"]["PlanStatus"];
+            snapshot_token: string;
+            draft_revision: number;
+            source_digest: string;
+            remote_etag?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            invalidation_reason?: components["schemas"]["PlanInvalidationReason"];
+            content_digest: string;
+            remote_snapshot: components["schemas"]["RemoteSnapshot"];
+            semantic_changes: components["schemas"]["SemanticChange"][];
+            affected_entities: components["schemas"]["AffectedEntity"][];
+            remote_parameter_changes: components["schemas"]["RemoteParameterChange"][];
+            artifact_metadata: components["schemas"]["PlanArtifactMetadata"][];
+            severity: components["schemas"]["RiskSeverity"];
+            risk_items: components["schemas"]["RiskItem"][];
+            blocking_reasons: components["schemas"]["BlockingReason"][];
+            confirmation_requirements: components["schemas"]["ConfirmationRequirements"];
+        };
+        PlanResponse: {
+            data: components["schemas"]["Plan"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ProviderCapabilities: {
+            pull: boolean;
+            validate: boolean;
+            publish: boolean;
+            rollback: boolean;
+        };
+        ProviderStatus: {
+            environment_id: string;
+            /** @constant */
+            provider_type: "firebase-remote-config";
+            /** @enum {string} */
+            status: "connected" | "unavailable" | "unauthorized" | "not_configured";
+            capabilities: components["schemas"]["ProviderCapabilities"];
+        };
+        ProviderStatusResponse: {
+            data: components["schemas"]["ProviderStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        RemoteValidateInput: {
+            plan_id: string;
+        };
+        RemoteValueProjection: {
+            projection_id: string;
+            entity_ref: components["schemas"]["EntityRef"];
+            /** @description RFC 6901 path within entity_ref. */
+            field_path: string;
+            parameter_key: string;
+            value_summary: string;
+            snapshot_etag: string;
+            /** Format: date-time */
+            observed_at: string;
+            /** @enum {string} */
+            availability: "available" | "redacted" | "unmapped" | "unavailable";
+            redacted: boolean;
+            /** @enum {string} */
+            reason_code?: "sensitive_value" | "parameter_unmapped" | "remote_snapshot_unavailable";
+        };
+        RemoteProjection: {
+            environment_id: string;
+            snapshot_etag: string;
+            /** Format: date-time */
+            observed_at: string;
+            projections: components["schemas"]["RemoteValueProjection"][];
+        };
+        RemoteProjectionResponse: {
+            data: components["schemas"]["RemoteProjection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReleaseConfirmation: {
+            acknowledged: boolean;
+            environment_id?: string;
+            acknowledged_risk_item_ids: string[];
+        };
+        CreateReleaseInput: {
+            plan_id: string;
+            expected_draft_revision: number;
+            expected_remote_etag: string;
+            confirmation: components["schemas"]["ReleaseConfirmation"];
+        };
+        RemoteETagMismatchError: {
+            /** @constant */
+            code: "remote_etag_mismatch";
+            message: string;
+            request_id: string;
+            plan_id: string;
+            expected_remote_etag: string;
+            current_remote: {
+                remote_etag: string;
+                version: string;
+                /** Format: date-time */
+                observed_at: string;
+                summary: components["schemas"]["RemoteSummary"];
+            };
+            rebuild: {
+                /** @constant */
+                required: true;
+                plan_endpoint: string;
+                /** @constant */
+                reason_code: "remote_etag_changed";
+            };
+        };
+        RemoteETagMismatchResponse: {
+            error: components["schemas"]["RemoteETagMismatchError"];
+        };
+        /** @enum {string} */
+        ReleaseKind: "publish" | "rollback";
+        /** @enum {string} */
+        ReleaseOutcome: "succeeded" | "failed";
+        RemoteAuditState: {
+            remote_etag: string;
+            version: string;
+            /** Format: date-time */
+            observed_at: string;
+            summary: components["schemas"]["RemoteSummary"];
+        };
+        ReleaseSummary: {
+            release_id: string;
+            environment_id: string;
+            kind: components["schemas"]["ReleaseKind"];
+            outcome: components["schemas"]["ReleaseOutcome"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            completed_at?: string;
+            operation_id: string;
+            remote_state: components["schemas"]["RemoteState"];
+            semantic_summary: string;
+            risk_summary: components["schemas"]["RiskSeverity"];
+        };
+        Release: {
+            release_id: string;
+            environment_id: string;
+            kind: components["schemas"]["ReleaseKind"];
+            outcome: components["schemas"]["ReleaseOutcome"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            completed_at?: string;
+            operation_id: string;
+            remote_state: components["schemas"]["RemoteState"];
+            semantic_summary: string;
+            risk_summary: components["schemas"]["RiskSeverity"];
+            plan_id?: string;
+            rollback_of_release_id?: string;
+            source_digest?: string;
+            plan_digest?: string;
+            remote_before?: components["schemas"]["RemoteAuditState"];
+            remote_after?: components["schemas"]["RemoteAuditState"];
+            failure?: components["schemas"]["OperationFailure"];
+        };
+        ReleasesResponse: {
+            data: components["schemas"]["ReleaseSummary"][];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReleaseResponse: {
+            data: components["schemas"]["Release"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @enum {string} */
+        RollbackPreviewStatus: "ready" | "invalidated" | "expired";
+        RollbackPreview: {
+            rollback_preview_id: string;
+            environment_id: string;
+            target_release_id: string;
+            target_remote_version: string;
+            status: components["schemas"]["RollbackPreviewStatus"];
+            expected_remote_etag: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            invalidation_reason?: components["schemas"]["PlanInvalidationReason"];
+            current_remote: components["schemas"]["RemoteAuditState"];
+            semantic_changes: components["schemas"]["SemanticChange"][];
+            remote_parameter_changes: components["schemas"]["RemoteParameterChange"][];
+            severity: components["schemas"]["RiskSeverity"];
+            risk_items: components["schemas"]["RiskItem"][];
+            blocking_reasons: components["schemas"]["BlockingReason"][];
+            confirmation_requirements: components["schemas"]["ConfirmationRequirements"];
+        };
+        RollbackPreviewResponse: {
+            data: components["schemas"]["RollbackPreview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        RollbackInput: {
+            rollback_preview_id: string;
+            expected_remote_etag: string;
+            confirmation: components["schemas"]["ReleaseConfirmation"];
+        };
     };
     responses: {
         /** @description Malformed JSON, unknown fields, or invalid request headers. */
@@ -1182,6 +1815,15 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
+                "application/json": components["schemas"]["EntityReferencedErrorResponse"];
+            };
+        };
+        /** @description Remote ETag changed; no remote update was sent. */
+        RemoteETagMismatch: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
                 /**
                  * @example {
                  *       "error": {
@@ -1200,7 +1842,7 @@ export interface components {
                  *       }
                  *     }
                  */
-                "application/json": components["schemas"]["EntityReferencedErrorResponse"];
+                "application/json": components["schemas"]["RemoteETagMismatchResponse"];
             };
         };
         /** @description Request is structurally valid but violates project rules. */
@@ -1252,6 +1894,13 @@ export interface components {
         EntityTypeQuery: components["schemas"]["EntityType"];
         EntityType: components["schemas"]["EntityType"];
         EntityID: string;
+        PlanID: string;
+        ArtifactName: string;
+        OperationID: string;
+        OperationIDQuery: string;
+        ReleaseID: string;
+        /** @description Client-generated opaque key unique for this environment and action during the retention window. */
+        IdempotencyKey: string;
     };
     requestBodies: never;
     headers: {
@@ -2104,6 +2753,789 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+        };
+    };
+    createPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plan construction Operation. Poll the returned operation until its result references a Plan. */
+            202: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_plan_01JEXAMPLE",
+                     *         "operation_type": "plan",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["StateConflict"];
+        };
+    };
+    getPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: components["parameters"]["PlanID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plan read model */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "plan_id": "plan_01JEXAMPLE",
+                     *         "environment_id": "staging",
+                     *         "status": "ready",
+                     *         "snapshot_token": "pst_01JEXAMPLE",
+                     *         "draft_revision": 13,
+                     *         "source_digest": "sha256:source-fixture-1",
+                     *         "remote_etag": "etag-remote-57",
+                     *         "created_at": "2026-07-11T10:00:04Z",
+                     *         "expires_at": "2026-07-11T10:15:04Z",
+                     *         "content_digest": "sha256:plan-fixture-1",
+                     *         "remote_snapshot": {
+                     *           "status": "available",
+                     *           "remote_etag": "etag-remote-57",
+                     *           "version": "57",
+                     *           "observed_at": "2026-07-11T10:00:02Z",
+                     *           "summary": {
+                     *             "parameter_count": 42,
+                     *             "managed_parameter_count": 18,
+                     *             "condition_count": 0,
+                     *             "content_digest": "sha256:remote-fixture-57"
+                     *           }
+                     *         },
+                     *         "semantic_changes": [],
+                     *         "affected_entities": [],
+                     *         "remote_parameter_changes": [],
+                     *         "artifact_metadata": [],
+                     *         "severity": "high",
+                     *         "risk_items": [],
+                     *         "blocking_reasons": [],
+                     *         "confirmation_requirements": {
+                     *           "requires_acknowledgement": true,
+                     *           "environment_id_requirement": "not_required",
+                     *           "required_risk_item_ids": [],
+                     *           "policy_source": "project.release_confirmation_policy"
+                     *         }
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["PlanResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlanArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: components["parameters"]["PlanID"];
+                artifact_name: components["parameters"]["ArtifactName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact bytes. The content type equals the selected artifact metadata media_type. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "plan_id": "plan_01JEXAMPLE",
+                     *       "content_digest": "sha256:plan-fixture-1"
+                     *     }
+                     */
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["StateConflict"];
+        };
+    };
+    getProviderStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "environment_id": "production",
+                     *         "provider_type": "firebase-remote-config",
+                     *         "status": "connected",
+                     *         "capabilities": {
+                     *           "pull": true,
+                     *           "validate": true,
+                     *           "publish": true,
+                     *           "rollback": true
+                     *         }
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ProviderStatusResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    connectProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider connection Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_connect_01JEXAMPLE",
+                     *         "operation_type": "provider_connect",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    pullRemoteSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote pull Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_pull_01JEXAMPLE",
+                     *         "operation_type": "remote_pull",
+                     *         "status": "running",
+                     *         "stage": "reading_remote",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:01Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 2
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    validateRemotePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoteValidateInput"];
+            };
+        };
+        responses: {
+            /** @description Remote validation Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_validate_01JEXAMPLE",
+                     *         "operation_type": "remote_validate",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["StateConflict"];
+        };
+    };
+    getRemoteProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted remote value projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "environment_id": "production",
+                     *         "snapshot_etag": "etag-remote-57",
+                     *         "observed_at": "2026-07-11T10:00:02Z",
+                     *         "projections": [
+                     *           {
+                     *             "projection_id": "rvp_01JEXAMPLE",
+                     *             "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap",
+                     *             "field_path": "/cooldown_ms",
+                     *             "parameter_key": "ad_frequency_inter_global_cap",
+                     *             "value_summary": "30 seconds",
+                     *             "snapshot_etag": "etag-remote-57",
+                     *             "observed_at": "2026-07-11T10:00:02Z",
+                     *             "availability": "available",
+                     *             "redacted": false
+                     *           }
+                     *         ]
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["RemoteProjectionResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: components["parameters"]["OperationID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation status and optional result or structured failure */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_publish_01JEXAMPLE",
+                     *         "operation_type": "publish",
+                     *         "status": "succeeded",
+                     *         "stage": "completed",
+                     *         "remote_state": "changed",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:08Z",
+                     *         "result": {
+                     *           "resource_type": "release",
+                     *           "resource_id": "rel_01JEXAMPLE",
+                     *           "href": "/api/v1/environments/production/releases/rel_01JEXAMPLE"
+                     *         }
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 5
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    streamOperationEvents: {
+        parameters: {
+            query: {
+                operation_id: components["parameters"]["OperationIDQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Event stream. Reconnect by polling GET /operations/{operation_id}. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /** @example event: progress\ndata: {"operation_id":"op_plan_01JEXAMPLE","stage":"analyzing"}\n\n */
+                    "text/event-stream": string;
+                };
+            };
+        };
+    };
+    listReleases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release history in descending creation order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": [
+                     *         {
+                     *           "release_id": "rel_01JEXAMPLE",
+                     *           "environment_id": "production",
+                     *           "kind": "publish",
+                     *           "outcome": "succeeded",
+                     *           "created_at": "2026-07-11T10:00:08Z",
+                     *           "completed_at": "2026-07-11T10:00:08Z",
+                     *           "operation_id": "op_publish_01JEXAMPLE",
+                     *           "remote_state": "changed",
+                     *           "semantic_summary": "5 direct changes, 10 affected entities",
+                     *           "risk_summary": "high"
+                     *         }
+                     *       ],
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ReleasesResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated opaque key unique for this environment and action during the retention window. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReleaseInput"];
+            };
+        };
+        responses: {
+            /** @description Publish Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_publish_01JEXAMPLE",
+                     *         "operation_type": "publish",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            409: components["responses"]["StateConflict"];
+            /** @description Remote ETag changed; no remote update was sent. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "remote_etag_mismatch",
+                     *         "message": "Remote configuration changed; rebuild the Plan before publishing.",
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "plan_id": "plan_01JEXAMPLE",
+                     *         "expected_remote_etag": "etag-remote-57",
+                     *         "current_remote": {
+                     *           "remote_etag": "etag-remote-58",
+                     *           "version": "58",
+                     *           "observed_at": "2026-07-11T10:02:00Z",
+                     *           "summary": {
+                     *             "parameter_count": 43,
+                     *             "managed_parameter_count": 18,
+                     *             "condition_count": 0,
+                     *             "content_digest": "sha256:remote-fixture-58"
+                     *           }
+                     *         },
+                     *         "rebuild": {
+                     *           "required": true,
+                     *           "plan_endpoint": "/api/v1/drafts/production:plan",
+                     *           "reason_code": "remote_etag_changed"
+                     *         }
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["RemoteETagMismatchResponse"];
+                };
+            };
+        };
+    };
+    getRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release audit record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "release_id": "rel_01JEXAMPLE",
+                     *         "environment_id": "production",
+                     *         "kind": "publish",
+                     *         "outcome": "succeeded",
+                     *         "created_at": "2026-07-11T10:00:08Z",
+                     *         "completed_at": "2026-07-11T10:00:08Z",
+                     *         "plan_id": "plan_01JEXAMPLE",
+                     *         "source_digest": "sha256:source-fixture-1",
+                     *         "plan_digest": "sha256:plan-fixture-1",
+                     *         "remote_before": {
+                     *           "remote_etag": "etag-remote-57",
+                     *           "version": "57",
+                     *           "observed_at": "2026-07-11T10:00:02Z",
+                     *           "summary": {
+                     *             "parameter_count": 42,
+                     *             "managed_parameter_count": 18,
+                     *             "condition_count": 0,
+                     *             "content_digest": "sha256:remote-fixture-57"
+                     *           }
+                     *         },
+                     *         "remote_after": {
+                     *           "remote_etag": "etag-remote-58",
+                     *           "version": "58",
+                     *           "observed_at": "2026-07-11T10:00:08Z",
+                     *           "summary": {
+                     *             "parameter_count": 42,
+                     *             "managed_parameter_count": 18,
+                     *             "condition_count": 0,
+                     *             "content_digest": "sha256:remote-fixture-58"
+                     *           }
+                     *         },
+                     *         "semantic_summary": "5 direct changes, 10 affected entities",
+                     *         "risk_summary": "high",
+                     *         "operation_id": "op_publish_01JEXAMPLE",
+                     *         "remote_state": "changed"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ReleaseResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRollbackPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rollback preview Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_rollback_preview_01JEXAMPLE",
+                     *         "operation_type": "rollback_preview",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:00:00Z",
+                     *         "updated_at": "2026-07-11T10:00:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getRollbackPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rollback preview read model */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "rollback_preview_id": "rbp_01JEXAMPLE",
+                     *         "environment_id": "production",
+                     *         "target_release_id": "rel_01JEXAMPLE",
+                     *         "target_remote_version": "57",
+                     *         "status": "ready",
+                     *         "expected_remote_etag": "etag-remote-58",
+                     *         "created_at": "2026-07-11T10:03:00Z",
+                     *         "expires_at": "2026-07-11T10:18:00Z",
+                     *         "current_remote": {
+                     *           "remote_etag": "etag-remote-58",
+                     *           "version": "58",
+                     *           "observed_at": "2026-07-11T10:03:00Z",
+                     *           "summary": {
+                     *             "parameter_count": 42,
+                     *             "managed_parameter_count": 18,
+                     *             "condition_count": 0,
+                     *             "content_digest": "sha256:remote-fixture-58"
+                     *           }
+                     *         },
+                     *         "semantic_changes": [],
+                     *         "remote_parameter_changes": [],
+                     *         "severity": "medium",
+                     *         "risk_items": [],
+                     *         "blocking_reasons": [],
+                     *         "confirmation_requirements": {
+                     *           "requires_acknowledgement": true,
+                     *           "environment_id_requirement": "required",
+                     *           "required_risk_item_ids": [],
+                     *           "policy_source": "project.release_confirmation_policy"
+                     *         }
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["RollbackPreviewResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    rollbackRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated opaque key unique for this environment and action during the retention window. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                release_id: components["parameters"]["ReleaseID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollbackInput"];
+            };
+        };
+        responses: {
+            /** @description Rollback Operation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "operation_id": "op_rollback_01JEXAMPLE",
+                     *         "operation_type": "rollback",
+                     *         "status": "pending",
+                     *         "stage": "queued",
+                     *         "remote_state": "unchanged",
+                     *         "created_at": "2026-07-11T10:04:00Z",
+                     *         "updated_at": "2026-07-11T10:04:00Z"
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 1
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["OperationResponse"];
+                };
+            };
+            409: components["responses"]["StateConflict"];
+            412: components["responses"]["RemoteETagMismatch"];
         };
     };
 }
