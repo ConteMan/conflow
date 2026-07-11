@@ -9,6 +9,7 @@ import (
 
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/gitreview"
 	"github.com/ConteMan/conflow/internal/operation"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
@@ -154,6 +155,10 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/source:inspect", a.inspectSource)
 	mux.HandleFunc("POST /api/v1/source:import", a.importSource)
 	mux.HandleFunc("POST /api/v1/source:preview-save", a.previewSourceSave)
+	mux.HandleFunc("GET /api/v1/git/status", a.gitStatus)
+	mux.HandleFunc("POST /api/v1/git:prepare", a.gitPrepare)
+	mux.HandleFunc("POST /api/v1/git:create-branch", a.gitCreateBranch)
+	mux.HandleFunc("POST /api/v1/git:commit", a.gitCommit)
 	mux.HandleFunc("GET /api/v1/project", a.getProject)
 	mux.HandleFunc("PUT /api/v1/project", a.updateProject)
 	mux.HandleFunc("GET /api/v1/environments", a.listEnvironments)
@@ -197,6 +202,57 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("/api/v1/packs/{pack_name}/versions/{pack_version}/schema", methodNotAllowed)
 	mux.HandleFunc("/api/", routeNotFound)
 	return apiMiddleware(mux)
+}
+
+func (a *api) gitStatus(writer http.ResponseWriter, request *http.Request) {
+	status, err := a.service.GitStatus(request.Context())
+	if err != nil {
+		a.writeGitError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, status, 1)
+}
+
+func (a *api) gitPrepare(writer http.ResponseWriter, request *http.Request) {
+	var input gitPrepareInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	result, err := a.service.GitPrepare(request.Context(), app.GitPrepareInput{EnvironmentID: input.EnvironmentID, Slug: input.Slug, PlanID: input.PlanID})
+	if err != nil {
+		a.writeGitError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, result, 1)
+}
+
+func (a *api) gitCreateBranch(writer http.ResponseWriter, request *http.Request) {
+	var input gitCreateBranchInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	result, err := a.service.GitCreateBranch(request.Context(), input.Branch, request.Header.Get("Idempotency-Key"))
+	if err != nil {
+		a.writeGitError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, result, 1)
+}
+
+func (a *api) gitCommit(writer http.ResponseWriter, request *http.Request) {
+	var input gitCommitInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	result, err := a.service.GitCommit(request.Context(), input.Files, input.Message, request.Header.Get("Idempotency-Key"))
+	if err != nil {
+		a.writeGitError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, result, 1)
 }
 
 func methodNotAllowed(writer http.ResponseWriter, request *http.Request) {
@@ -823,6 +879,27 @@ func (a *api) writeSourceError(writer http.ResponseWriter, request *http.Request
 		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
 	default:
 		writeAPIError(writer, request, http.StatusUnprocessableEntity, "source_operation_failed", "源适配器操作失败", 0)
+	}
+}
+
+func (a *api) writeGitError(writer http.ResponseWriter, request *http.Request, err error) {
+	switch {
+	case errors.Is(err, gitreview.ErrNotGitRepository):
+		writeAPIError(writer, request, http.StatusBadRequest, "git_not_repository", "当前工作区不是 Git 仓库", 0)
+	case errors.Is(err, gitreview.ErrBranchExists):
+		writeAPIError(writer, request, http.StatusConflict, "git_branch_exists", "目标分支已存在", 0)
+	case errors.Is(err, gitreview.ErrIdempotencyKeyRequired):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "Idempotency-Key 是必填项", 0)
+	case errors.Is(err, gitreview.ErrIdempotencyConflict):
+		writeAPIError(writer, request, http.StatusConflict, "idempotency_conflict", "相同幂等键不能用于不同请求", 0)
+	case errors.Is(err, gitreview.ErrInvalidManagedFile), errors.Is(err, gitreview.ErrNoManagedFiles):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "提交文件必须是 Conflow 声明的受管理文件", 0)
+	case errors.Is(err, project.ErrNotFound), errors.Is(err, draft.ErrEnvironmentNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
+	case errors.Is(err, plan.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "plan_not_found", "计划不存在", 0)
+	default:
+		writeAPIError(writer, request, http.StatusConflict, "git_operation_failed", "Git 操作失败；工作树状态保持可人工继续", 0)
 	}
 }
 

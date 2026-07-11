@@ -16,6 +16,27 @@ type healthResponse struct {
 	ProjectID string `json:"project_id"`
 }
 
+type gitPrepareInput struct {
+	EnvironmentID string `json:"environment_id"`
+	Slug          string `json:"slug"`
+	PlanID        string `json:"plan_id"`
+}
+
+func (input gitPrepareInput) valid() bool { return input.EnvironmentID != "" }
+
+type gitCreateBranchInput struct {
+	Branch string `json:"branch"`
+}
+
+func (input gitCreateBranchInput) valid() bool { return input.Branch != "" }
+
+type gitCommitInput struct {
+	Files   []string `json:"files"`
+	Message string   `json:"message"`
+}
+
+func (input gitCommitInput) valid() bool { return len(input.Files) > 0 && input.Message != "" }
+
 type responseEnvelope struct {
 	Data any          `json:"data"`
 	Meta responseMeta `json:"meta"`

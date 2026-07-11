@@ -1,0 +1,29 @@
+# Git Review
+
+Branch: `main`
+
+## Managed files
+
+- `config/managed.json`
+
+## File diff summary
+
+```text
+config/managed.json | 2 +-
+```
+
+## Semantic diff
+
+No Plan is available; semantic diff and risk assessment are unavailable.
+
+## Validation
+
+No validation result is available.
+
+## Plan digest
+
+No Plan is available.
+
+## Risks
+
+Risk list unavailable because no Plan is available.
