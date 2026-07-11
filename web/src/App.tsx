@@ -16,6 +16,7 @@ import {
   type UpdateEnvironmentInput,
   type UpdateProjectInput,
 } from "./api/client";
+import { ConfigurationEditor } from "./components/domain/ConfigurationEditor";
 import { AppTopBar, type Page } from "./components/domain/AppTopBar";
 import { ConflictDialog, type LocalConflictValue } from "./components/domain/ConflictDialog";
 import { EnvironmentManager } from "./components/domain/EnvironmentManager";
@@ -36,6 +37,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState<{ code: string; requestId?: string } | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
+  const [draftDirty, setDraftDirty] = useState(false);
   const environmentSelectRef = useRef<HTMLSelectElement>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -116,14 +118,16 @@ export default function App() {
     { resource: "environment", title: environment.id, name: environment.name, providerProjectId: environment.provider.project_id },
     () => { setData((current) => current ? { ...current, environments: current.environments.filter((item) => item.id !== environment.id) } : current); if (selectedEnvironmentId === environment.id) setSelectedEnvironmentId(data.environments.find((item) => item.id !== environment.id)?.id ?? ""); },
   );
+  const updateDraftState = (nextRevision: number, dirty: boolean) => { setRevision(nextRevision); setDraftDirty(dirty); };
 
   return (
     <div className="app-shell">
-      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
+      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={draftDirty} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
       {requestError ? <div className="error-container"><RequestError {...requestError} onDismiss={() => setRequestError(null)} /></div> : null}
       {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} environments={data.environments} pack={pack} onManageEnvironments={(environmentId) => { if (environmentId) setSelectedEnvironmentId(environmentId); selectPage("environments"); }} onManageProject={() => selectPage("project")} onSwitchEnvironment={() => environmentSelectRef.current?.focus()} /> : null}
       {page === "environments" ? <EnvironmentManager environments={data.environments} selectedEnvironmentId={selectedEnvironment.id} busy={busy} readOnly={!data.capabilities.environment_manage} onSelect={setSelectedEnvironmentId} onSubmit={saveEnvironment} onDelete={removeEnvironment} /> : null}
       {page === "project" ? <ProjectSettings project={data.project} busy={busy} readOnly={!data.capabilities.project_edit} onManageEnvironments={() => selectPage("environments")} onSave={saveProject} /> : null}
+      {page === "configuration" ? <ConfigurationEditor environment={selectedEnvironment} environments={data.environments} revision={revision} packRef={data.project.pack_ref} onRevision={updateDraftState} /> : null}
       <ConflictDialog open={conflict !== null} state={conflict?.state} revision={conflict?.revision} local={conflict?.local ?? null} onClose={() => setConflict(null)} onReload={() => { if (conflict?.state && conflict.revision) { setData((current) => current ? { ...current, ...conflict.state } : current); setRevision(conflict.revision); } setConflict(null); }} />
     </div>
   );
@@ -131,7 +135,7 @@ export default function App() {
 
 function pageFromHash(): Page {
   const value = window.location.hash.replace(/^#\/?/, "");
-  return value === "environments" || value === "project" ? value : "overview";
+  return value === "configuration" || value === "environments" || value === "project" ? value : "overview";
 }
 
 function isAbortError(error: unknown) {
@@ -140,11 +144,15 @@ function isAbortError(error: unknown) {
 
 function handleError(error: unknown, setRequestError: (value: { code: string; requestId?: string } | null) => void, setConflict: (value: Conflict | null) => void, local: LocalConflictValue | null) {
   if (error instanceof ConflowAPIError) {
-    if (error.code === "revision_mismatch") setConflict({ state: error.currentState, revision: error.currentRevision, local });
+    if (error.code === "revision_mismatch" && isManifestState(error.currentState)) setConflict({ state: error.currentState, revision: error.currentRevision, local });
     else setRequestError({ code: error.code, requestId: error.requestId });
   } else if (error instanceof ConflowNetworkError) {
     setRequestError({ code: "network_unavailable" });
   } else {
     setRequestError({ code: "internal_error" });
   }
+}
+
+function isManifestState(value: unknown): value is ManifestState {
+  return Boolean(value && typeof value === "object" && "project" in value && "environments" in value);
 }
