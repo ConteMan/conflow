@@ -10,15 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ExitError preserves the Spec 007 validation exit status through Cobra.
-type ExitError struct{ Code int }
-
-func (e *ExitError) Error() string { return "validation failed" }
-
 func newValidateCommand() *cobra.Command {
 	var workspace string
 	var environment string
-	var jsonOutput bool
 	command := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a Conflow project manifest",
@@ -34,6 +28,9 @@ func newValidateCommand() *cobra.Command {
 			// Preserve the manifest-only validation behavior for callers that have
 			// not selected an environment. Complete validation is environment scoped.
 			if environment == "" {
+				if jsonMode(command) {
+					return json.NewEncoder(command.OutOrStdout()).Encode(map[string]any{"project_id": snapshot.Manifest.Project.ID, "environment_count": len(snapshot.Manifest.Environments)})
+				}
 				fmt.Fprintf(command.OutOrStdout(), "validated %s with %d environments\n", snapshot.Manifest.Project.ID, len(snapshot.Manifest.Environments))
 				return nil
 			}
@@ -41,7 +38,7 @@ func newValidateCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if jsonOutput {
+			if jsonMode(command) {
 				encoder := json.NewEncoder(command.OutOrStdout())
 				if err := encoder.Encode(result); err != nil {
 					return err
@@ -53,13 +50,12 @@ func newValidateCommand() *cobra.Command {
 				}
 			}
 			if code := validation.ExitCodeFor(result.Diagnostics); code != 0 {
-				return &ExitError{Code: code}
+				return &ExitError{Code: code, ErrorCode: "validation_failed", Message: "validation failed"}
 			}
 			return nil
 		},
 	}
 	command.Flags().StringVar(&workspace, "workspace", ".", "project workspace")
 	command.Flags().StringVar(&environment, "environment", "", "environment ID for complete validation")
-	command.Flags().BoolVar(&jsonOutput, "json", false, "write complete validation result as JSON")
 	return command
 }

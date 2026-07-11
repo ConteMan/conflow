@@ -60,7 +60,7 @@ func newPlanCommand() *cobra.Command {
 				}
 			}
 		}
-		if format == "json" {
+		if format == "json" || jsonMode(command) {
 			return json.NewEncoder(command.OutOrStdout()).Encode(p)
 		}
 		_, err = fmt.Fprintf(command.OutOrStdout(), "plan %s: %s (%d semantic changes, %s risk)\n", p.PlanID, p.Status, len(p.SemanticChanges), p.Severity)
@@ -72,7 +72,7 @@ func newPlanCommand() *cobra.Command {
 	command.Flags().StringVar(&output, "output", "", "directory for plan artifacts")
 	command.PreRunE = func(_ *cobra.Command, _ []string) error {
 		if format != "text" && format != "json" {
-			return fmt.Errorf("--format must be text or json")
+			return usageError("usage_error", "--format must be text or json")
 		}
 		return nil
 	}

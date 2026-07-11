@@ -5,14 +5,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/entities"
+	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/provider"
+	"github.com/ConteMan/conflow/internal/server"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func TestValidateListenAddress(t *testing.T) {
@@ -43,14 +52,16 @@ func TestValidateEnvironmentJSONUsesCompleteValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var result struct {
-		EnvironmentID string `json:"environment_id"`
-		Readiness     string `json:"readiness"`
-		Diagnostics   []any  `json:"diagnostics"`
+		Data struct {
+			EnvironmentID string `json:"environment_id"`
+			Readiness     string `json:"readiness"`
+			Diagnostics   []any  `json:"diagnostics"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.EnvironmentID != "production" || result.Readiness != "ready" || result.Diagnostics == nil {
+	if result.Data.EnvironmentID != "production" || result.Data.Readiness != "ready" || result.Data.Diagnostics == nil {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -95,13 +106,15 @@ func TestValidateCompleteValidationReturnsSeverityExitCode(t *testing.T) {
 		t.Fatalf("validate error = %#v, want exit code 1", err)
 	}
 	var result struct {
-		Readiness string `json:"readiness"`
+		Data struct {
+			Readiness string `json:"readiness"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Readiness != "blocked" {
-		t.Fatalf("readiness = %q, want blocked", result.Readiness)
+	if result.Data.Readiness != "blocked" {
+		t.Fatalf("readiness = %q, want blocked", result.Data.Readiness)
 	}
 }
 
@@ -277,4 +290,363 @@ func cliRunGit(t *testing.T, workspace string, args ...string) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}
+}
+
+func TestProjectAndEnvironmentCommandsUseManifestRevisions(t *testing.T) {
+	workspace := t.TempDir()
+	init := New("test")
+	init.SetArgs([]string{"init", "--dir", workspace})
+	if err := init.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	projectOutput := executeCLI(t, "project", "get", "--workspace", workspace, "--json")
+	var gotProject struct {
+		Data project.Project `json:"data"`
+	}
+	if err := json.Unmarshal(projectOutput, &gotProject); err != nil {
+		t.Fatal(err)
+	}
+	if gotProject.Data.ID != "photo-editor" {
+		t.Fatalf("project get = %#v", gotProject)
+	}
+
+	updated := executeCLI(t, "project", "update", "--workspace", workspace, "--id", "photo-editor", "--name", "Updated Photo Editor", "--json")
+	if !bytes.Contains(updated, []byte(`"name":"Updated Photo Editor"`)) {
+		t.Fatalf("project update = %s", updated)
+	}
+	created := executeCLI(t, "environment", "create", "--workspace", workspace, "--id", "staging", "--name", "Staging", "--kind", "staging", "--provider-project-id", "photo-editor-staging", "--json")
+	if !bytes.Contains(created, []byte(`"id":"staging"`)) {
+		t.Fatalf("environment create = %s", created)
+	}
+	list := executeCLI(t, "environment", "list", "--workspace", workspace, "--json")
+	if !bytes.Contains(list, []byte(`"id":"staging"`)) {
+		t.Fatalf("environment list = %s", list)
+	}
+}
+
+func TestJSONUsageErrorsForNonInteractivePublishAndRollback(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		code string
+	}{
+		{"publish confirmation", []string{"publish", "--json"}, "confirmation_required"},
+		{"publish idempotency", []string{"publish", "--json", "--confirm"}, "idempotency_key_required"},
+		{"rollback confirmation", []string{"rollback", "--json"}, "confirmation_required"},
+		{"rollback idempotency", []string{"rollback", "--json", "--confirm"}, "idempotency_key_required"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			output := &bytes.Buffer{}
+			command := New("test")
+			command.SetOut(output)
+			command.SetArgs(test.args)
+			err := command.Execute()
+			var exit *ExitError
+			if !errors.As(err, &exit) || exit.Code != ExitUsage {
+				t.Fatalf("error = %#v, want usage exit", err)
+			}
+			var envelope struct {
+				Error jsonErrorBody `json:"error"`
+			}
+			if err := json.Unmarshal(output.Bytes(), &envelope); err != nil {
+				t.Fatalf("output is not JSON: %s", output.String())
+			}
+			if envelope.Error.Code != test.code {
+				t.Fatalf("error code = %q, want %q", envelope.Error.Code, test.code)
+			}
+		})
+	}
+}
+
+func TestJSONErrorsCoverArgumentAndPreRunValidation(t *testing.T) {
+	tests := [][]string{
+		{"release", "show", "--json", "--environment", "production"},
+		{"plan", "--json", "--environment", "production", "--format", "yaml"},
+	}
+	for _, args := range tests {
+		output := &bytes.Buffer{}
+		command := New("test")
+		command.SetOut(output)
+		command.SetArgs(args)
+		err := command.Execute()
+		var exit *ExitError
+		if !errors.As(err, &exit) || exit.Code != ExitUsage || !exit.JSON {
+			t.Fatalf("conflow %s error = %#v", strings.Join(args, " "), err)
+		}
+		var envelope struct {
+			Error jsonErrorBody `json:"error"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &envelope); err != nil || envelope.Error.Code != "usage_error" {
+			t.Fatalf("conflow %s output = %s, error = %v", strings.Join(args, " "), output, err)
+		}
+	}
+}
+
+func TestExitCodeContract(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"validation", &ExitError{Code: ExitValidation, ErrorCode: "validation_failed"}, ExitValidation},
+		{"blocking", &ExitError{Code: ExitBlocking, ErrorCode: "validation_failed"}, ExitBlocking},
+		{"conflict", project.ErrAlreadyExists, ExitConflict},
+		{"provider", provider.ErrNotConfigured, ExitProvider},
+		{"usage", usageError("usage_error", "invalid input"), ExitUsage},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, got := classifyError(test.err)
+			if got != test.want {
+				t.Fatalf("exit code = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestCLIRejectsPlaintextCredentialFlags(t *testing.T) {
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	command.SetArgs([]string{"pull", "--json", "--environment", "production", "--token", "top-secret"})
+	err := command.Execute()
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitUsage {
+		t.Fatalf("error = %#v, want usage error", err)
+	}
+	if strings.Contains(output.String(), "top-secret") {
+		t.Fatalf("plaintext token leaked in output: %s", output.String())
+	}
+	if !json.Valid(output.Bytes()) {
+		t.Fatalf("output is not JSON: %s", output.String())
+	}
+	forEachCommand(New("test"), func(command *cobra.Command) {
+		command.Flags().VisitAll(func(flag *pflag.Flag) {
+			if regexp.MustCompile(`(?i)(token|secret|credential)`).MatchString(flag.Name) {
+				t.Errorf("command %q accepts sensitive flag --%s", command.CommandPath(), flag.Name)
+			}
+		})
+	})
+}
+
+func TestAllCommandHelpIncludesAnExample(t *testing.T) {
+	forEachCommand(New("test"), func(expected *cobra.Command) {
+		output := &bytes.Buffer{}
+		command := New("test")
+		command.SetOut(output)
+		path := strings.Fields(strings.TrimPrefix(expected.CommandPath(), "conflow"))
+		command.SetArgs(append(path, "--help"))
+		if err := command.Execute(); err != nil {
+			t.Fatalf("%s help: %v", expected.CommandPath(), err)
+		}
+		if !strings.Contains(output.String(), "Examples:") {
+			t.Fatalf("%s help is missing an example: %s", expected.CommandPath(), output.String())
+		}
+	})
+}
+
+func TestValidationJSONMatchesAPIGoldenFixture(t *testing.T) {
+	workspace := t.TempDir()
+	init := New("test")
+	init.SetArgs([]string{"init", "--dir", workspace})
+	if err := init.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	service, err := app.Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := loadCLIGoldenFixture(t)
+	configureCLIGoldenDraft(t, service, fixture)
+
+	handler := server.New(service)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/drafts/production:validate", nil)
+	request.Host = "127.0.0.1:9010"
+	request.Header.Set("Origin", "http://127.0.0.1:9010")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("API validation = %d: %s", response.Code, response.Body.String())
+	}
+	var apiResult struct {
+		Data validationResult `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &apiResult); err != nil {
+		t.Fatal(err)
+	}
+
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	command.SetArgs([]string{"validate", "--workspace", workspace, "--environment", "production", "--json"})
+	err = command.Execute()
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitBlocking {
+		t.Fatalf("CLI validation error = %#v, want blocking exit", err)
+	}
+	var cliResult struct {
+		Data validationResult `json:"data"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &cliResult); err != nil {
+		t.Fatal(err)
+	}
+	if cliResult.Data.Readiness != apiResult.Data.Readiness {
+		t.Fatalf("readiness CLI=%q API=%q", cliResult.Data.Readiness, apiResult.Data.Readiness)
+	}
+	if len(cliResult.Data.Diagnostics) != len(apiResult.Data.Diagnostics) {
+		t.Fatalf("diagnostics CLI=%d API=%d", len(cliResult.Data.Diagnostics), len(apiResult.Data.Diagnostics))
+	}
+	for index := range cliResult.Data.Diagnostics {
+		if cliResult.Data.Diagnostics[index] != apiResult.Data.Diagnostics[index] {
+			t.Fatalf("diagnostic %d CLI=%#v API=%#v", index, cliResult.Data.Diagnostics[index], apiResult.Data.Diagnostics[index])
+		}
+	}
+}
+
+func executeCLI(t *testing.T, args ...string) []byte {
+	t.Helper()
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	command.SetArgs(args)
+	if err := command.Execute(); err != nil {
+		t.Fatalf("conflow %s: %v", strings.Join(args, " "), err)
+	}
+	if !json.Valid(output.Bytes()) {
+		t.Fatalf("conflow %s did not produce JSON: %s", strings.Join(args, " "), output.String())
+	}
+	return output.Bytes()
+}
+
+func forEachCommand(command *cobra.Command, visit func(*cobra.Command)) {
+	visit(command)
+	for _, child := range command.Commands() {
+		forEachCommand(child, visit)
+	}
+}
+
+type validationDiagnostic struct {
+	Code     string `json:"code"`
+	Path     string `json:"path"`
+	Severity string `json:"severity"`
+}
+
+type validationResult struct {
+	Readiness   string                 `json:"readiness"`
+	Diagnostics []validationDiagnostic `json:"diagnostics"`
+}
+
+type cliGoldenFixture struct {
+	Placements        []any
+	FrequencyPolicies []any
+	FeatureSwitches   []any
+	Bindings          []any
+	Replacements      []cliGoldenReplacement
+}
+
+type cliGoldenReplacement struct {
+	EntityType string         `json:"entity_type"`
+	EntityID   string         `json:"entity_id"`
+	Fields     map[string]any `json:"fields"`
+}
+
+func loadCLIGoldenFixture(t *testing.T) cliGoldenFixture {
+	t.Helper()
+	root := filepath.Join("..", "..", "testdata", "contracts", "mobile-ad-monetization", "v1")
+	entitiesContent, err := os.ReadFile(filepath.Join(root, "entities.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlaysContent, err := os.ReadFile(filepath.Join(root, "validation-overlays.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entitiesFixture struct {
+		Entities struct {
+			Placements        []any `json:"placements"`
+			FrequencyPolicies []any `json:"frequency_policies"`
+			FeatureSwitches   []any `json:"feature_switches"`
+		} `json:"entities"`
+		UnitBindingMatrix struct {
+			Rows []struct {
+				PlacementID string         `json:"placement_id"`
+				Production  map[string]any `json:"production"`
+			} `json:"rows"`
+		} `json:"unit_binding_matrix"`
+	}
+	if err := json.Unmarshal(entitiesContent, &entitiesFixture); err != nil {
+		t.Fatal(err)
+	}
+	var overlays struct {
+		Scenarios []struct {
+			ID      string `json:"id"`
+			Overlay struct {
+				EntityReplacements []cliGoldenReplacement `json:"entity_replacements"`
+			} `json:"overlay"`
+		} `json:"scenarios"`
+	}
+	if err := json.Unmarshal(overlaysContent, &overlays); err != nil {
+		t.Fatal(err)
+	}
+	fixture := cliGoldenFixture{Placements: entitiesFixture.Entities.Placements, FrequencyPolicies: entitiesFixture.Entities.FrequencyPolicies, FeatureSwitches: entitiesFixture.Entities.FeatureSwitches}
+	for _, scenario := range overlays.Scenarios {
+		if scenario.ID == "nine-human-fixture-diagnostics" {
+			fixture.Replacements = scenario.Overlay.EntityReplacements
+			break
+		}
+	}
+	if fixture.Replacements == nil {
+		t.Fatal("nine-human-fixture-diagnostics scenario is missing")
+	}
+	for _, row := range entitiesFixture.UnitBindingMatrix.Rows {
+		for _, platform := range []string{"ios", "android"} {
+			fixture.Bindings = append(fixture.Bindings, map[string]any{
+				"id": "ub_production_" + platform + "_" + row.PlacementID, "placement_id": row.PlacementID,
+				"environment_id": "production", "platform": platform, "unit_id_ref": row.Production[platform], "status": "configured",
+			})
+		}
+	}
+	return fixture
+}
+
+func configureCLIGoldenDraft(t *testing.T, service *app.Service, fixture cliGoldenFixture) {
+	t.Helper()
+	collections := map[string][]any{"placement": fixture.Placements, "frequency_policy": fixture.FrequencyPolicies, "feature_switch": fixture.FeatureSwitches}
+	for _, replacement := range fixture.Replacements {
+		for _, value := range collections[replacement.EntityType] {
+			record, ok := value.(map[string]any)
+			if !ok {
+				continue
+			}
+			if record["id"] == replacement.EntityID {
+				for field, value := range replacement.Fields {
+					record[field] = value
+				}
+			}
+		}
+	}
+	view, revision, err := service.GetDraft(context.Background(), "production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := entities.AdaptFlatFixture(map[string]any{"placements": fixture.Placements, "frequency_policies": fixture.FrequencyPolicies, "feature_switches": fixture.FeatureSwitches})
+	_, revision, err = service.MutateDraft(context.Background(), "production", draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: draft.ScopeBaseline, Action: "put", Configuration: marshalFixtureConfiguration(t, baseline)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = service.MutateDraft(context.Background(), "production", draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: draft.ScopeEnvironmentOverride, Action: "put", Configuration: marshalFixtureConfiguration(t, entities.AdaptFlatFixture(map[string]any{"unit_bindings": fixture.Bindings}))})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func marshalFixtureConfiguration(t *testing.T, configuration any) json.RawMessage {
+	t.Helper()
+	encoded, err := json.Marshal(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }

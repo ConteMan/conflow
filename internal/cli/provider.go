@@ -48,7 +48,10 @@ func newPullCommand() *cobra.Command {
 			return err
 		}
 		if final.Status != "succeeded" {
-			return fmt.Errorf("pull failed: %s", final.Failure.Code)
+			if final.Failure != nil {
+				return &providerOperationError{Code: final.Failure.Code}
+			}
+			return &providerOperationError{Code: "unknown"}
 		}
 		return json.NewEncoder(command.OutOrStdout()).Encode(final)
 	}}
@@ -75,7 +78,10 @@ func newRemoteCommand() *cobra.Command {
 			return err
 		}
 		if final.Status != "succeeded" {
-			return fmt.Errorf("remote validation failed: %s", final.Failure.Code)
+			if final.Failure != nil {
+				return &providerOperationError{Code: final.Failure.Code}
+			}
+			return &providerOperationError{Code: "unknown"}
 		}
 		return json.NewEncoder(command.OutOrStdout()).Encode(final)
 	}}

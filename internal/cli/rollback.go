@@ -16,10 +16,10 @@ func newRollbackCommand() *cobra.Command {
 	var confirm bool
 	command := &cobra.Command{Use: "rollback", Short: "Create a rollback preview and restore a release", RunE: func(command *cobra.Command, _ []string) error {
 		if !confirm {
-			return fmt.Errorf("--confirm is required for rollback")
+			return usageError("confirmation_required", "--confirm is required for rollback")
 		}
 		if idempotencyKey == "" {
-			return fmt.Errorf("--idempotency-key is required for non-interactive rollback")
+			return usageError("idempotency_key_required", "--idempotency-key is required for non-interactive rollback")
 		}
 		service, err := app.Open(workspace)
 		if err != nil {
@@ -61,7 +61,5 @@ func newRollbackCommand() *cobra.Command {
 	command.Flags().StringVar(&releaseID, "release", "", "successful release ID to restore")
 	command.Flags().BoolVar(&confirm, "confirm", false, "acknowledge the server-calculated rollback requirements")
 	command.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "client-generated idempotency key")
-	_ = command.MarkFlagRequired("environment")
-	_ = command.MarkFlagRequired("release")
 	return command
 }
