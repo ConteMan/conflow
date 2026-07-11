@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ConteMan/conflow/internal/draft"
+	"github.com/ConteMan/conflow/internal/gitreview"
 	"github.com/ConteMan/conflow/internal/operation"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
@@ -53,6 +54,7 @@ type Service struct {
 	plans        *plan.Store
 	remote       remote.Store
 	releases     *release.Store
+	gitReview    *gitreview.Manager
 	releaseMu    sync.Mutex
 	workspace    string
 	providerFor  func(project.Environment) (provider.Adapter, error)
@@ -122,6 +124,17 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 	if err != nil {
 		return nil, err
 	}
+	var review *gitreview.Manager
+	if gitSource, ok := adapter.(*source.GitJSON); ok {
+		workspace, paths, statusErr := gitSource.ReviewWorkspace()
+		if statusErr != nil {
+			return nil, statusErr
+		}
+		review, err = gitreview.Open(workspace.Root, paths, source.DefaultGitExecutor)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if factory == nil {
 		factory = func(environment project.Environment) (provider.Adapter, error) {
 			credentialPath, configErr := provider.LoadCredentialReference(workspace, environment.ID)
@@ -131,7 +144,7 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 			return provider.NewFirebase(provider.FirebaseConfig{ProjectID: environment.Provider.ProjectID, CredentialsPath: credentialPath}), nil
 		}
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: adapter, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, workspace: workspace, providerFor: factory}, nil
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: adapter, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, gitReview: review, workspace: workspace, providerFor: factory}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -397,6 +410,67 @@ func (s *Service) Diagnostics(ctx context.Context, environmentID string) (valida
 	}
 	result, err := s.validations.Get(environmentID, revision)
 	return result, revision, err
+}
+
+// GitStatus is available only to Git JSON projects. It intentionally exposes
+// workspace-relative paths and commit metadata, never Git credentials.
+func (s *Service) GitStatus(ctx context.Context) (gitreview.Status, error) {
+	if s.gitReview == nil {
+		return gitreview.Status{}, errors.New("git review is only available for git-json")
+	}
+	return s.gitReview.Status(ctx)
+}
+
+type GitPrepareInput struct {
+	EnvironmentID string
+	Slug          string
+	PlanID        string
+}
+
+func (s *Service) GitPrepare(ctx context.Context, input GitPrepareInput) (gitreview.PrepareResult, error) {
+	if s.gitReview == nil {
+		return gitreview.PrepareResult{}, errors.New("git review is only available for git-json")
+	}
+	if _, _, err := s.GetEnvironment(ctx, input.EnvironmentID); err != nil {
+		return gitreview.PrepareResult{}, err
+	}
+	var currentPlan *plan.Plan
+	if input.PlanID != "" {
+		value, err := s.plans.Get(input.PlanID)
+		if err != nil {
+			return gitreview.PrepareResult{}, err
+		}
+		if value.EnvironmentID != input.EnvironmentID {
+			return gitreview.PrepareResult{}, errors.New("plan environment does not match git review environment")
+		}
+		currentPlan = &value
+	}
+	_, revision, err := s.GetDraft(ctx, input.EnvironmentID)
+	if err != nil {
+		return gitreview.PrepareResult{}, err
+	}
+	result, validationErr := s.validations.Get(input.EnvironmentID, revision)
+	var latestValidation *validation.Result
+	if validationErr == nil {
+		latestValidation = &result
+	} else if !errors.Is(validationErr, validation.ErrNotFound) {
+		return gitreview.PrepareResult{}, validationErr
+	}
+	return s.gitReview.Prepare(ctx, gitreview.PrepareInput{EnvironmentID: input.EnvironmentID, Slug: input.Slug, Plan: currentPlan, Validation: latestValidation})
+}
+
+func (s *Service) GitCreateBranch(ctx context.Context, branch, idempotencyKey string) (gitreview.BranchResult, error) {
+	if s.gitReview == nil {
+		return gitreview.BranchResult{}, errors.New("git review is only available for git-json")
+	}
+	return s.gitReview.CreateBranch(ctx, gitreview.CreateBranchInput{Branch: branch, IdempotencyKey: idempotencyKey})
+}
+
+func (s *Service) GitCommit(ctx context.Context, files []string, message, idempotencyKey string) (gitreview.CommitResult, error) {
+	if s.gitReview == nil {
+		return gitreview.CommitResult{}, errors.New("git review is only available for git-json")
+	}
+	return s.gitReview.Commit(ctx, gitreview.CommitInput{Files: files, Message: message, IdempotencyKey: idempotencyKey})
 }
 
 func (s *Service) validationContext(environmentID string) (draft.View, uint64, project.Environment, error) {

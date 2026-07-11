@@ -165,6 +165,86 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /git/status:
+    get:
+      operationId: getGitReviewStatus
+      summary: Get local Git review status and declared managed files
+      responses:
+        "200":
+          description: Current local Git review status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitReviewStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /git:prepare:
+    post:
+      operationId: prepareGitReview
+      summary: Generate a read-only Git review artifact and suggestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitPrepareInput"
+      responses:
+        "200":
+          description: Read-only Git review artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitPrepareResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /git:create-branch:
+    post:
+      operationId: createGitReviewBranch
+      summary: Create one explicitly named local Git branch
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitCreateBranchInput"
+      responses:
+        "200":
+          description: Created or idempotently replayed branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitCreateBranchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/StateConflict"
+  /git:commit:
+    post:
+      operationId: commitGitReviewFiles
+      summary: Stage and commit explicitly listed declared managed files
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitCommitInput"
+      responses:
+        "200":
+          description: Created or idempotently replayed local commit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitCommitResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/StateConflict"
   /project:
     get:
       operationId: getProject
@@ -1872,6 +1952,137 @@ components:
           type: string
         dirty:
           type: boolean
+    GitReviewStatus:
+      type: object
+      additionalProperties: false
+      required: [root, branch, head, dirty, managed_files, changed_files, unrelated_files]
+      properties:
+        root:
+          type: string
+        branch:
+          type: string
+        head:
+          type: string
+        dirty:
+          type: boolean
+        managed_files:
+          type: array
+          items:
+            type: string
+        changed_files:
+          type: array
+          items:
+            type: string
+        unrelated_files:
+          type: array
+          items:
+            type: string
+    GitReviewStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/GitReviewStatus"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    GitPrepareInput:
+      type: object
+      additionalProperties: false
+      required: [environment_id]
+      properties:
+        environment_id:
+          type: string
+        slug:
+          type: string
+          maxLength: 120
+        plan_id:
+          type: string
+    GitPrepareData:
+      type: object
+      additionalProperties: false
+      required: [status, suggested_branch, commit_message, review_markdown]
+      properties:
+        status:
+          $ref: "#/components/schemas/GitReviewStatus"
+        suggested_branch:
+          type: string
+        commit_message:
+          type: string
+        review_markdown:
+          type: string
+    GitPrepareResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/GitPrepareData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    GitCreateBranchInput:
+      type: object
+      additionalProperties: false
+      required: [branch]
+      properties:
+        branch:
+          type: string
+          minLength: 1
+          maxLength: 255
+    GitCreateBranchData:
+      type: object
+      additionalProperties: false
+      required: [branch]
+      properties:
+        branch:
+          type: string
+        replayed:
+          type: boolean
+    GitCreateBranchResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/GitCreateBranchData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+    GitCommitInput:
+      type: object
+      additionalProperties: false
+      required: [files, message]
+      properties:
+        files:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    GitCommitData:
+      type: object
+      additionalProperties: false
+      required: [commit, files]
+      properties:
+        commit:
+          type: string
+        files:
+          type: array
+          items:
+            type: string
+        replayed:
+          type: boolean
+    GitCommitResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/GitCommitData"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
     SourceDiagnostic:
       type: object
       additionalProperties: false

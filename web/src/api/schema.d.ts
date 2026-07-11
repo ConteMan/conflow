@@ -123,6 +123,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/git/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get local Git review status and declared managed files */
+        get: operations["getGitReviewStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/git:prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a read-only Git review artifact and suggestions */
+        post: operations["prepareGitReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/git:create-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create one explicitly named local Git branch */
+        post: operations["createGitReviewBranch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/git:commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stage and commit explicitly listed declared managed files */
+        post: operations["commitGitReviewFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/project": {
         parameters: {
             query?: never;
@@ -758,6 +826,58 @@ export interface components {
             root: string;
             branch: string;
             dirty: boolean;
+        };
+        GitReviewStatus: {
+            root: string;
+            branch: string;
+            head: string;
+            dirty: boolean;
+            managed_files: string[];
+            changed_files: string[];
+            unrelated_files: string[];
+        };
+        GitReviewStatusResponse: {
+            data: components["schemas"]["GitReviewStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        GitPrepareInput: {
+            environment_id: string;
+            slug?: string;
+            plan_id?: string;
+        };
+        GitPrepareData: {
+            status: components["schemas"]["GitReviewStatus"];
+            suggested_branch: string;
+            commit_message: string;
+            review_markdown: string;
+        };
+        GitPrepareResponse: {
+            data: components["schemas"]["GitPrepareData"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        GitCreateBranchInput: {
+            branch: string;
+        };
+        GitCreateBranchData: {
+            branch: string;
+            replayed?: boolean;
+        };
+        GitCreateBranchResponse: {
+            data: components["schemas"]["GitCreateBranchData"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        GitCommitInput: {
+            files: string[];
+            message: string;
+        };
+        GitCommitData: {
+            commit: string;
+            files: string[];
+            replayed?: boolean;
+        };
+        GitCommitResponse: {
+            data: components["schemas"]["GitCommitData"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         SourceDiagnostic: {
             /** @enum {string} */
@@ -2204,6 +2324,111 @@ export interface operations {
             404: components["responses"]["NotFound"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getGitReviewStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current local Git review status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitReviewStatusResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    prepareGitReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitPrepareInput"];
+            };
+        };
+        responses: {
+            /** @description Read-only Git review artifact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitPrepareResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createGitReviewBranch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated opaque key unique for this environment and action during the retention window. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitCreateBranchInput"];
+            };
+        };
+        responses: {
+            /** @description Created or idempotently replayed branch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCreateBranchResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["StateConflict"];
+        };
+    };
+    commitGitReviewFiles: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated opaque key unique for this environment and action during the retention window. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitCommitInput"];
+            };
+        };
+        responses: {
+            /** @description Created or idempotently replayed local commit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCommitResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["StateConflict"];
         };
     };
     getProject: {

@@ -2,11 +2,11 @@ package source
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -159,6 +159,24 @@ func (g *GitJSON) Inspect() (InspectResult, error) {
 		}
 	}
 	return InspectResult{Workspace: workspace, ProfilePath: g.profilePath, Matched: loadErr == nil && len(diagnostics) == 0, Diagnostics: diagnostics}, nil
+}
+
+// ReviewWorkspace returns only the Git repository and declarative managed
+// paths. Unlike Status, it does not read mapped documents, so a blocked
+// round-trip can still be inspected and reported to the user.
+func (g *GitJSON) ReviewWorkspace() (GitWorkspace, []string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	workspace, err := gitWorkspace(g.workspace)
+	if err != nil {
+		return GitWorkspace{}, nil, err
+	}
+	paths := make([]string, 0, len(g.profile.Files))
+	for _, file := range g.profile.Files {
+		paths = append(paths, filepath.ToSlash(normalizePath(file.Path)))
+	}
+	sort.Strings(paths)
+	return workspace, paths, nil
 }
 
 func (g *GitJSON) Preview(input SaveInput) (Preview, error) {
@@ -526,8 +544,7 @@ func gitWorkspace(workspace string) (GitWorkspace, error) {
 }
 
 func gitOutput(workspace string, args ...string) (string, error) {
-	command := exec.Command("git", append([]string{"-C", workspace}, args...)...)
-	output, err := command.Output()
+	output, err := DefaultGitExecutor.Output(context.Background(), workspace, args...)
 	if err != nil {
 		return "", err
 	}

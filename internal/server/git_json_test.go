@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/ConteMan/conflow/internal/app"
+	"github.com/ConteMan/conflow/internal/gitreview"
 )
 
 func TestGitJSONSourceHandlersAndErrorMapping(t *testing.T) {
@@ -51,6 +54,60 @@ func TestGitJSONImportHandlerBlocksConditionalValues(t *testing.T) {
 	handler := New(service)
 	response := executeRequest(t, handler, "POST", "/api/v1/source:import", `"1"`, []byte(`{"environment_id":"development","expected_source_revision":"src-any"}`))
 	assertDraftError(t, response, 422, "round_trip_blocked")
+}
+
+func TestGitReviewHandlersMapBranchAndCommitFailures(t *testing.T) {
+	workspace := gitJSONServerWorkspace(t, false)
+	service, err := app.Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(service)
+	first := newAPIRequest(t, http.MethodPost, "/api/v1/git:create-branch", []byte(`{"branch":"conflow/review"}`))
+	first.Header.Set("Idempotency-Key", "branch-key-0000001")
+	firstRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(firstRecorder, first)
+	if firstRecorder.Code != http.StatusOK {
+		t.Fatalf("create branch = %d: %s", firstRecorder.Code, firstRecorder.Body.String())
+	}
+	exists := newAPIRequest(t, http.MethodPost, "/api/v1/git:create-branch", []byte(`{"branch":"conflow/review"}`))
+	exists.Header.Set("Idempotency-Key", "branch-key-0000002")
+	existsRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(existsRecorder, exists)
+	assertGitError(t, existsRecorder, http.StatusConflict, "git_branch_exists")
+	if err := os.WriteFile(filepath.Join(workspace, "config", "ads.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".git", "hooks", "pre-commit"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commit := newAPIRequest(t, http.MethodPost, "/api/v1/git:commit", []byte(`{"files":["config/ads.json"],"message":"feat(development): update config"}`))
+	commit.Header.Set("Idempotency-Key", "commit-key-0000001")
+	commitRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(commitRecorder, commit)
+	assertGitError(t, commitRecorder, http.StatusConflict, "git_operation_failed")
+	if status := serverGitOutput(t, workspace, "status", "--porcelain"); !strings.Contains(status, "M  config/ads.json") {
+		t.Fatalf("managed file must remain visibly staged after failed commit: %q", status)
+	}
+}
+
+func TestGitReviewMapsNonRepositoryError(t *testing.T) {
+	request := newAPIRequest(t, http.MethodGet, "/api/v1/git/status", nil)
+	recorder := httptest.NewRecorder()
+	newAPI(nil).writeGitError(recorder, request, gitreview.ErrNotGitRepository)
+	assertGitError(t, recorder, http.StatusBadRequest, "git_not_repository")
+}
+
+func assertGitError(t *testing.T, recorder *httptest.ResponseRecorder, status int, code string) {
+	t.Helper()
+	if recorder.Code != status {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, status, recorder.Body.String())
+	}
+	var response errorEnvelope
+	decodeResponse(t, recorder, &response)
+	if response.Error.Code != code {
+		t.Fatalf("error code = %q, want %q", response.Error.Code, code)
+	}
 }
 
 func gitJSONServerWorkspace(t *testing.T, conditional bool) string {
@@ -108,4 +165,14 @@ func serverRunGit(t *testing.T, workspace string, args ...string) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
 	}
+}
+
+func serverGitOutput(t *testing.T, workspace string, args ...string) string {
+	t.Helper()
+	command := exec.CommandContext(context.Background(), "git", append([]string{"-C", workspace}, args...)...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, output)
+	}
+	return string(output)
 }
