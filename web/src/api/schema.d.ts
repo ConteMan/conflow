@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the active source adapter and its capabilities */
+        get: operations["getSource"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/source/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the active source digest and managed file status */
+        get: operations["getSourceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/project": {
         parameters: {
             query?: never;
@@ -213,6 +247,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drafts/{environment_id}:save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save the current visible draft replacements to the source */
+        post: operations["saveDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/drafts/{environment_id}/entities": {
         parameters: {
             query?: never;
@@ -332,6 +385,33 @@ export interface components {
             project: components["schemas"]["Project"];
             environments: components["schemas"]["Environment"][];
             capabilities: components["schemas"]["Capabilities"];
+        };
+        SourceResponse: {
+            data: components["schemas"]["Source"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        SourceStatusResponse: {
+            data: components["schemas"]["SourceStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        Source: {
+            /** @enum {string} */
+            type: "managed-file";
+            capabilities: components["schemas"]["SourceCapabilities"];
+        };
+        SourceCapabilities: {
+            load: boolean;
+            save: boolean;
+        };
+        SourceStatus: {
+            /** @enum {string} */
+            type: "managed-file";
+            /** @description Opaque digest derived from canonical source bytes. */
+            digest: string;
+            /** @description Whether the current digest differs from the last successful source load. */
+            external_modified: boolean;
+            /** @description Non-null workspace-relative managed file paths. No credentials are included. */
+            paths: string[];
         };
         ManifestState: {
             project: components["schemas"]["Project"];
@@ -677,8 +757,43 @@ export interface components {
             expected_source_revision: string;
             write_scope: components["schemas"]["DraftWriteScope"];
         };
+        SaveDraftInput: {
+            /** @description The source revision observed with the current draft. It is independent of If-Match. */
+            expected_source_revision: string;
+        };
         DraftRevisionMismatchResponse: {
             error: components["schemas"]["DraftRevisionMismatchError"] | components["schemas"]["SourceRevisionMismatchError"];
+        };
+        DraftSaveRevisionMismatchResponse: {
+            error: components["schemas"]["DraftSaveRevisionMismatchError"] | components["schemas"]["DraftSaveSourceRevisionMismatchError"];
+        };
+        DraftSaveRevisionMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "revision_mismatch";
+            message: string;
+            request_id: string;
+            current_revision: number;
+            current_source_revision: string;
+            /** @constant */
+            conflict_scope: "source";
+            current_state: components["schemas"]["DraftView"];
+        };
+        DraftSaveSourceRevisionMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "source_revision_mismatch";
+            message: string;
+            request_id: string;
+            current_revision: number;
+            current_source_revision: string;
+            /** @constant */
+            conflict_scope: "source";
+            current_state: components["schemas"]["DraftView"];
         };
         DraftRevisionMismatchError: {
             /**
@@ -913,6 +1028,18 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["DraftRevisionMismatchResponse"];
+            };
+        };
+        /** @description The project-level draft revision or source revision changed while saving to the source. The ETag and complete current state come from the same atomic snapshot. */
+        DraftSaveRevisionMismatch: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["DraftSaveRevisionMismatchResponse"];
             };
         };
         /** @description The replacement violates the Pack structural schema, nullability, or environment override permissions. */
@@ -1190,6 +1317,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BootstrapResponse"];
+                };
+            };
+        };
+    };
+    getSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active source adapter */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceResponse"];
+                };
+            };
+            /** @description Source is temporarily unavailable */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSourceStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source status without credentials */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceStatusResponse"];
+                };
+            };
+            /** @description Source is temporarily unavailable */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1597,6 +1786,44 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    saveDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Source was updated and the visible draft replacements were cleared */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftSaveRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
             428: components["responses"]["PreconditionRequired"];
         };

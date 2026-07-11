@@ -127,3 +127,39 @@ func TestInitAndValidateCommands(t *testing.T) {
 		t.Fatalf("validate output = %q", got)
 	}
 }
+
+func TestSourceStatusAndSaveCommands(t *testing.T) {
+	workspace := t.TempDir()
+	init := New("test")
+	init.SetArgs([]string{"init", "--dir", workspace})
+	if err := init.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	statusOutput := &bytes.Buffer{}
+	status := New("test")
+	status.SetOut(statusOutput)
+	status.SetArgs([]string{"source", "status", "--workspace", workspace})
+	if err := status.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Type   string `json:"type"`
+		Digest string `json:"digest"`
+	}
+	if err := json.Unmarshal(statusOutput.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Type != "managed-file" || result.Digest == "" {
+		t.Fatalf("source status = %#v", result)
+	}
+	saveOutput := &bytes.Buffer{}
+	save := New("test")
+	save.SetOut(saveOutput)
+	save.SetArgs([]string{"save", "--workspace", workspace, "--environment", "development"})
+	if err := save.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(saveOutput.String(), "saved development") {
+		t.Fatalf("save output = %q", saveOutput.String())
+	}
+}

@@ -170,7 +170,15 @@ effective = Pack defaults < resolved baseline < resolved environment override
 
 草稿写入的错误优先级固定为：Origin / Content-Type → 解析并校验 `If-Match` → 解码请求与拒绝未知字段 → 资源存在性 → 捕获原子快照 → draft revision → source revision → structural validation → 提交。尤其不能先解码一个无 ETag 请求，再根据请求内容返回其他错误。
 
-### 7.2 Pack-neutral 实体资源
+### 7.2 Managed File 源保存
+
+`GET /source` 返回当前 Source Adapter 的类型与 `load` / `save` capabilities；`GET /source/status` 返回 opaque canonical digest、外部修改标记和 workspace-relative 文件路径。两者均不得返回凭据、token 或绝对本机路径。
+
+`POST /drafts/{environment_id}:save` 使用 draft ETag 作为 `If-Match`，并在 body 中携带独立的 `expected_source_revision`。服务端在同一 draft 锁和源快照边界内比较这两个前置条件；成功时把当前视角的 baseline replacement 和该环境 override replacement 写回 Source Adapter，清除这两个草稿 replacement，并递增项目级 draft revision。其他环境的 override 草稿保持不变。
+
+Managed File 使用 `.conflow/data/base.yaml` 与 `.conflow/data/environments/<environment_id>.yaml`，写入采用同目录临时文件、fsync 和 rename。source digest 由 canonical 内容字节计算。任何外部修改使保存前的 source revision 比较失败时，返回 `412 source_revision_mismatch`，不得静默覆盖。
+
+### 7.3 Pack-neutral 实体资源
 
 Spec 006 的 Pack-neutral 实体资源位于 `/drafts/{environment_id}/entities`，因为实体是目标 Draft layer 的业务表达，而非独立于 baseline / environment override 的第四份配置。实体 CRUD 的 `write_scope`、`expected_source_revision`、项目级 draft ETag 与 `412` 顺序完全复用 7.1；`environment_id` 仍只是读取和写入视角。
 
@@ -180,7 +188,7 @@ Spec 006 的 Pack-neutral 实体资源位于 `/drafts/{environment_id}/entities`
 - `GET .../referenced-by` 返回当前环境有效图中的 `referenced_by[]`，每项包含稳定 `entity_ref`、`entity_type`、`entity_id` 与引用者内 RFC 6901 `path`。
 - Pack `deletion_policy=restrict` 的删除若仍有有效引用，返回 `409 entity_referenced`，其中 `error.current_revision` 与 ETag 来自同一快照，且非空 `error.references[]` 是唯一供 UI 决策的引用清单。不得要求前端解析 `message`；不得用 `force=true` 绕过。
 
-### 7.3 完整校验结果
+### 7.4 完整校验结果
 
 Spec 007 的 `POST /drafts/{environment_id}:validate` 对一次捕获的 DraftView 运行完整校验并存储 `ValidationResult`；`GET /drafts/{environment_id}/diagnostics` 返回该环境最近一次结果，尚无结果时返回 `404 validation_not_found`。
 
