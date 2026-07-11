@@ -25,6 +25,8 @@ import { EnvironmentManager } from "./components/domain/EnvironmentManager";
 import { Overview } from "./components/domain/Overview";
 import { ProjectSettings } from "./components/domain/ProjectSettings";
 import { ReleasePlan } from "./components/domain/ReleasePlan";
+import { ReleaseFlow, RollbackFlow } from "./components/domain/ReleaseFlow";
+import { ReleaseHistory } from "./components/domain/ReleaseHistory";
 import { ValidationCenter } from "./components/domain/ValidationCenter";
 import { EmptyState, LoadingState, RequestError, ServiceUnavailable } from "./components/ui/StateViews";
 
@@ -36,6 +38,8 @@ export default function App() {
   const [pack, setPack] = useState<PackMetadata | null>(null);
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState("");
   const [page, setPage] = useState<Page>(pageFromHash());
+  const [hashVersion, setHashVersion] = useState(0);
+  void hashVersion;
   const [loading, setLoading] = useState(true);
   const [networkDown, setNetworkDown] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -80,7 +84,10 @@ export default function App() {
     return () => controller.abort();
   }, [load]);
   useEffect(() => {
-    const onHashChange = () => setPage(pageFromHash());
+    const onHashChange = () => {
+      setPage(pageFromHash());
+      setHashVersion((value) => value + 1);
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -146,7 +153,10 @@ export default function App() {
       {page === "project" ? <ProjectSettings project={data.project} busy={busy} readOnly={!data.capabilities.project_edit} onManageEnvironments={() => selectPage("environments")} onSave={saveProject} /> : null}
       {page === "configuration" ? <ConfigurationEditor environment={selectedEnvironment} environments={data.environments} revision={revision} packRef={data.project.pack_ref} focusEntityRef={entityRefFromHash()} onRevision={updateDraftState} onValidation={setValidation} /> : null}
       {page === "validation" ? <ValidationCenter environment={selectedEnvironment} draftDirty={draftDirty} onValidation={setValidation} onOpenEntity={(entityRef) => { window.location.hash = `configuration?entity_ref=${encodeURIComponent(entityRef)}`; setPage("configuration"); }} onOpenPlan={() => selectPage("plan")} /> : null}
-      {page === "plan" ? <ReleasePlan environment={selectedEnvironment} onOpenConfiguration={() => selectPage("configuration")} /> : null}
+      {page === "plan" ? <ReleasePlan environment={selectedEnvironment} onOpenConfiguration={() => selectPage("configuration")} onOpenRelease={(planID) => { window.location.hash = `release/${encodeURIComponent(planID)}`; setPage("release"); }} /> : null}
+      {page === "release" ? <ReleaseFlow environment={selectedEnvironment} planID={releasePlanIDFromHash() ?? ""} onOpenPlan={() => { window.location.hash = "plan?rebuild=1"; setPage("plan"); }} onOpenHistory={(releaseID) => { window.location.hash = releaseID ? `releases/${encodeURIComponent(releaseID)}` : "releases"; setPage("releases"); }} onOpenRollback={(releaseID) => { window.location.hash = `rollback/${encodeURIComponent(releaseID)}`; setPage("rollback"); }} /> : null}
+      {page === "releases" ? <ReleaseHistory environment={selectedEnvironment} releaseID={releaseIDFromHash()} onOpenRollback={(releaseID) => { window.location.hash = `rollback/${encodeURIComponent(releaseID)}`; setPage("rollback"); }} /> : null}
+      {page === "rollback" ? <RollbackFlow environment={selectedEnvironment} releaseID={releaseIDFromHash() ?? ""} onOpenHistory={() => { window.location.hash = "releases"; setPage("releases"); }} onOpenRecord={(releaseID) => { window.location.hash = `releases/${encodeURIComponent(releaseID)}`; setPage("releases"); }} /> : null}
       <ConflictDialog open={conflict !== null} state={conflict?.state} revision={conflict?.revision} local={conflict?.local ?? null} onClose={() => setConflict(null)} onReload={() => { if (conflict?.state && conflict.revision) { setData((current) => current ? { ...current, ...conflict.state } : current); setRevision(conflict.revision); } setConflict(null); }} />
     </div>
   );
@@ -155,12 +165,23 @@ export default function App() {
 function pageFromHash(): Page {
   const value = window.location.hash.replace(/^#\/?/, "");
   const page = value.split("?")[0];
-  return page === "configuration" || page === "environments" || page === "project" || page === "validation" || page === "plan" ? page : "overview";
+  const root = page.split("/")[0];
+  return root === "configuration" || root === "environments" || root === "project" || root === "validation" || root === "plan" || root === "release" || root === "releases" || root === "rollback" ? root : "overview";
 }
 
 function entityRefFromHash() {
   const query = window.location.hash.split("?")[1];
   return new URLSearchParams(query).get("entity_ref") ?? undefined;
+}
+
+function releasePlanIDFromHash() {
+  const value = window.location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
+  return value[0] === "release" && value[1] ? decodeURIComponent(value[1]) : undefined;
+}
+
+function releaseIDFromHash() {
+  const value = window.location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
+  return (value[0] === "releases" || value[0] === "rollback") && value[1] ? decodeURIComponent(value[1]) : undefined;
 }
 
 function isAbortError(error: unknown) {

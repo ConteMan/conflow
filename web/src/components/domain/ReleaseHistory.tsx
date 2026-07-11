@@ -1,0 +1,32 @@
+import { ChevronRight, Download, LoaderCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { defaultsURL, getRelease, listReleases, type Environment, type Release, type ReleaseSummary } from "../../api/client";
+import { Button } from "../ui/Button";
+
+export function ReleaseHistory({ environment, releaseID, onOpenRollback }: { environment: Environment; releaseID?: string; onOpenRollback: (releaseID: string) => void }) {
+  const [records, setRecords] = useState<ReleaseSummary[] | null>(null);
+  const [detail, setDetail] = useState<Release | null>(null);
+  const [error, setError] = useState(false);
+  const load = () => { setError(false); void listReleases(environment.id).then((response) => setRecords(response.data)).catch(() => setError(true)); };
+  useEffect(() => { load(); }, [environment.id]);
+  useEffect(() => {
+    if (!releaseID) { setDetail(null); return; }
+    const controller = new AbortController();
+    void getRelease(environment.id, releaseID, controller.signal).then((response) => setDetail(response.data)).catch(() => setError(true));
+    return () => controller.abort();
+  }, [environment.id, releaseID]);
+  const newestFirst = records?.slice().sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+  return <main className="page-container releases-page"><header className="page-heading"><div><h1>发布记录</h1><p>{environment.name} · 版本、审计与回滚入口</p></div><Button onClick={load} icon={<RefreshCw size={16} />}>刷新</Button></header><section className="defaults-bar"><div><strong>下载默认值</strong><span>从受保护的当前线上快照导出客户端默认值。</span></div><div>{(["xml", "json", "plist"] as const).map((format) => <a href={defaultsURL(environment.id, format)} download key={format}><Download size={15} />{format.toUpperCase()}</a>)}</div></section>{error ? <section className="history-empty panel"><h2>无法读取发布记录</h2><Button onClick={load}>重试</Button></section> : null}{records === null && !error ? <section className="history-empty panel"><LoaderCircle className="spin" /><p>正在读取发布记录。</p></section> : null}{records?.length === 0 ? <section className="history-empty panel"><h2>此环境还没有发布记录</h2><p>完成发布后，版本、远端状态和审计摘要会显示在这里。</p></section> : null}{newestFirst?.length ? <section className="table-panel release-table"><table><thead><tr><th>时间</th><th>类型</th><th>变更摘要</th><th>Firebase</th><th>结果</th><th><span className="sr-only">查看详情</span></th></tr></thead><tbody>{newestFirst.map((record) => <tr key={record.release_id}><td><button className="row-select-button" onClick={() => { window.location.hash = `releases/${encodeURIComponent(record.release_id)}`; }}>{dateTime(record.created_at)}</button></td><td><ReleaseKind record={record} /></td><td>{record.semantic_summary}</td><td>{record.remote_state === "unknown" ? "待核验" : record.operation_id}</td><td><Outcome record={record} /></td><td><button className="icon-button" aria-label={`查看 ${record.release_id}`} onClick={() => { window.location.hash = `releases/${encodeURIComponent(record.release_id)}`; }}><ChevronRight size={17} /></button></td></tr>)}</tbody></table></section> : null}{releaseID ? <ReleaseDetail detail={detail} onOpenRollback={onOpenRollback} /> : null}</main>;
+}
+
+function ReleaseDetail({ detail, onOpenRollback }: { detail: Release | null; onOpenRollback: (releaseID: string) => void }) {
+  if (!detail) return <section className="history-detail panel"><LoaderCircle className="spin" /><p>正在读取审计详情。</p></section>;
+  return <section className="history-detail panel"><header><div><h2>发布详情</h2><p><code>{detail.release_id}</code> · Operation <code>{detail.operation_id}</code></p></div><Outcome record={detail} /></header><div className="release-detail-grid"><AuditList detail={detail} /><div className="remote-audit-grid"><RemoteAudit title="发布前" remote={detail.remote_before} /><RemoteAudit title="发布后" remote={detail.remote_after} /></div></div>{detail.failure ? <section className="release-failure-detail"><strong>失败信息</strong><p>{detail.failure.message}</p><code>{detail.failure.code} · {detail.failure.stage}</code><p>线上状态：{remoteState(detail.remote_state)}</p></section> : null}<div className="history-detail-actions">{detail.outcome === "succeeded" ? <Button variant="danger" onClick={() => onOpenRollback(detail.release_id)} icon={<RotateCcw size={16} />}>预览回滚</Button> : null}</div></section>;
+}
+
+function AuditList({ detail }: { detail: Release }) { return <dl className="audit-list"><div><dt>类型</dt><dd>{detail.kind === "rollback" ? "回滚" : "发布"}</dd></div><div><dt>结果</dt><dd>{detail.outcome === "succeeded" ? "成功" : "失败"}</dd></div><div><dt>线上状态</dt><dd>{remoteState(detail.remote_state)}</dd></div><div><dt>计划</dt><dd><code>{detail.plan_id ?? "-"}</code></dd></div>{detail.rollback_of_release_id ? <div><dt>回滚目标</dt><dd><a href={`#releases/${encodeURIComponent(detail.rollback_of_release_id)}`}><code>{detail.rollback_of_release_id}</code></a></dd></div> : null}<div><dt>来源摘要</dt><dd><code>{detail.source_digest ?? "-"}</code></dd></div><div><dt>计划摘要</dt><dd><code>{detail.plan_digest ?? "-"}</code></dd></div></dl>; }
+function RemoteAudit({ title, remote }: { title: string; remote?: Release["remote_before"] }) { return <section><h3>{title}</h3>{remote ? <dl><div><dt>版本</dt><dd>{remote.version}</dd></div><div><dt>参数</dt><dd>{remote.summary.parameter_count}</dd></div><div><dt>受管参数</dt><dd>{remote.summary.managed_parameter_count}</dd></div><div><dt>条件</dt><dd>{remote.summary.condition_count}</dd></div><div><dt>观察时间</dt><dd>{dateTime(remote.observed_at)}</dd></div></dl> : <p>没有可公开的远端快照。</p>}</section>; }
+function ReleaseKind({ record }: { record: ReleaseSummary }) { return <span className={record.kind === "rollback" ? "release-kind release-kind--rollback" : "release-kind"}>{record.kind === "rollback" ? "回滚" : "发布"}</span>; }
+function Outcome({ record }: { record: Pick<ReleaseSummary, "outcome"> }) { return <span className={record.outcome === "succeeded" ? "release-outcome release-outcome--success" : "release-outcome release-outcome--failure"}><i />{record.outcome === "succeeded" ? "成功" : "失败"}</span>; }
+function remoteState(state: Release["remote_state"]) { return ({ unchanged: "线上未变化", changed: "线上已变化", unknown: "线上状态未知，必须核验" } as Record<string, string>)[state]; }
+function dateTime(value: string) { try { return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); } catch { return value; } }

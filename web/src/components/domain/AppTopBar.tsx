@@ -2,9 +2,7 @@ import { ChevronDown, Layers3, Menu, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { Environment, Project, ValidationResult } from "../../api/client";
 
-export type Page = "overview" | "configuration" | "environments" | "project" | "validation" | "plan";
-
-const disabledNavigation = ["发布记录"];
+export type Page = "overview" | "configuration" | "environments" | "project" | "validation" | "plan" | "release" | "releases" | "rollback";
 
 export function AppTopBar({ project, environments, selectedEnvironment, page, draftDirty, validation, environmentSelectRef, onEnvironmentChange, onPageChange }: {
   project: Project;
@@ -38,7 +36,7 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
         <NavButton label="配置" page="configuration" active={page === "configuration"} onClick={onPageChange} />
         <NavButton label="校验" page="validation" active={page === "validation"} onClick={onPageChange} />
         <NavButton label="发布计划" page="plan" active={page === "plan"} onClick={onPageChange} />
-        {disabledNavigation.map((label) => <span key={label} className="nav-disabled" aria-disabled="true" title="后续 Spec 接入">{label}</span>)}
+        <NavButton label="发布记录" page="releases" active={page === "releases" || page === "rollback"} onClick={onPageChange} />
       </nav>
       <div className="topbar-statuses">
         {validation ? <button className={`validation-global-badge validation-global-badge--${validation.readiness} validation-global-badge--${validation.status}`} onClick={() => onPageChange("validation")} aria-label="查看校验结果">{validation.status === "stale" ? "校验结果可能过期" : validation.readiness === "ready" ? "校验通过" : `${validation.diagnostics.length} 项校验问题`}</button> : null}
@@ -52,7 +50,7 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
         <NavButton label="配置" page="configuration" active={page === "configuration"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
         <NavButton label="校验" page="validation" active={page === "validation"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
         <NavButton label="发布计划" page="plan" active={page === "plan"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
-        {disabledNavigation.map((label) => <span key={label} className="nav-disabled" aria-disabled="true" title="后续 Spec 接入">{label}</span>)}
+        <NavButton label="发布记录" page="releases" active={page === "releases" || page === "rollback"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
       </nav> : null}
     </header>
   );
