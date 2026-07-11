@@ -74,7 +74,14 @@ func Load(workspace string) (Manifest, error) {
 	if err := yaml.Unmarshal(content, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("parse project manifest %s: %w", path, err)
 	}
+	normalize(&manifest)
 	return manifest, nil
+}
+
+func normalize(manifest *Manifest) {
+	if manifest.Project.ReleaseConfirmationPolicy.ProductionLowRiskMode == "" {
+		manifest.Project.ReleaseConfirmationPolicy.ProductionLowRiskMode = "environment_id"
+	}
 }
 
 func Validate(manifest Manifest) error {

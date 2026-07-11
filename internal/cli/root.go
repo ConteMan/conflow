@@ -23,6 +23,7 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newProviderCommand())
 	root.AddCommand(newPullCommand())
 	root.AddCommand(newRemoteCommand())
+	root.AddCommand(newPublishCommand())
 	root.SetHelpFunc(func(command *cobra.Command, args []string) {
 		fmt.Fprint(command.OutOrStdout(), command.UsageString())
 	})

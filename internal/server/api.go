@@ -13,6 +13,8 @@ import (
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/provider"
+	"github.com/ConteMan/conflow/internal/release"
 	"github.com/ConteMan/conflow/internal/validation"
 )
 
@@ -176,6 +178,9 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/environments/{environment_id}/remote:pull", a.pullRemote)
 	mux.HandleFunc("POST /api/v1/environments/{environment_id}/remote:validate", a.validateRemote)
 	mux.HandleFunc("GET /api/v1/environments/{environment_id}/remote/projection", a.getRemoteProjection)
+	mux.HandleFunc("POST /api/v1/environments/{environment_id}/releases", a.createRelease)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/releases", a.listReleases)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/releases/{release_id}", a.getRelease)
 	mux.HandleFunc("GET /api/v1/events", a.events)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
@@ -543,6 +548,40 @@ func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 	routeNotFound(writer, request)
 }
 
+func (a *api) createRelease(writer http.ResponseWriter, request *http.Request) {
+	var input createReleaseInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	op, err := a.service.StartRelease(request.Context(), request.PathValue("environment_id"), request.Header.Get("Idempotency-Key"), app.ReleaseRequest{
+		PlanID: input.PlanID, ExpectedDraftRevision: input.ExpectedDraftRevision, ExpectedRemoteETag: input.ExpectedRemoteETag,
+		Confirmation: app.ReleaseConfirmation{Acknowledged: *input.Confirmation.Acknowledged, EnvironmentID: input.Confirmation.EnvironmentID, AcknowledgedRiskItemIDs: input.Confirmation.AcknowledgedRiskItemIDs},
+	})
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+
+func (a *api) listReleases(writer http.ResponseWriter, request *http.Request) {
+	if _, _, err := a.service.GetEnvironment(request.Context(), request.PathValue("environment_id")); err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, a.service.Releases(request.Context(), request.PathValue("environment_id")), 1)
+}
+
+func (a *api) getRelease(writer http.ResponseWriter, request *http.Request) {
+	value, ok := a.service.Release(request.Context(), request.PathValue("release_id"))
+	if !ok || value.EnvironmentID != request.PathValue("environment_id") {
+		writeAPIError(writer, request, http.StatusNotFound, "release_not_found", "发布记录不存在", 0)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, value, 1)
+}
+
 func (a *api) saveDraft(writer http.ResponseWriter, request *http.Request, environmentID string) {
 	revision, ok := requireRevision(writer, request)
 	if !ok {
@@ -626,6 +665,29 @@ func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err 
 		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
 	default:
 		writeAPIError(writer, request, http.StatusInternalServerError, "internal_error", "操作失败", 0)
+	}
+}
+
+func (a *api) writeReleaseError(writer http.ResponseWriter, request *http.Request, err error) {
+	var mismatch *app.RemoteETagMismatchError
+	var invalidated *app.PlanInvalidatedError
+	switch {
+	case errors.As(err, &mismatch):
+		writeRemoteETagMismatch(writer, request, mismatch)
+	case errors.Is(err, app.ErrIdempotencyRequired):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "Idempotency-Key 是必填项", 0)
+	case errors.Is(err, plan.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "plan_not_found", "计划不存在", 0)
+	case errors.Is(err, release.ErrIdempotencyConflict):
+		writeAPIError(writer, request, http.StatusConflict, "idempotency_conflict", "相同幂等键不能用于不同请求", 0)
+	case errors.As(err, &invalidated):
+		writeAPIError(writer, request, http.StatusConflict, "plan_invalidated", "计划已失效或不满足发布条件", 0)
+	case errors.Is(err, app.ErrConfirmationInvalid):
+		writeAPIError(writer, request, http.StatusConflict, "confirmation_invalid", "发布确认不满足计划要求", 0)
+	case errors.Is(err, provider.ErrNotConfigured):
+		writeAPIError(writer, request, http.StatusServiceUnavailable, "provider_unavailable", "发布 Provider 不可用", 0)
+	default:
+		a.writeError(writer, request, err)
 	}
 }
 

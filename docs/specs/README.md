@@ -15,7 +15,7 @@
 | [007](007-validation-engine.md) | 校验、引用完整性与发布就绪度 | 006 | 已实现 |
 | [008](008-plan-semantic-diff.md) | 构建计划、语义 Diff 与风险分析 | 005、007 | 已实现 |
 | [009](009-firebase-read-validate.md) | Firebase 认证、拉取与预校验 | 002、005、008 | 已实现 |
-| [010](010-firebase-publish.md) | Firebase 发布与并发保护 | 008、009 | 待实现 |
+| [010](010-firebase-publish.md) | Firebase 发布与并发保护 | 008、009 | 已实现 |
 | [011](011-release-audit-rollback.md) | 发布审计、默认值下载与回滚 | 010 | 待实现 |
 | [012](012-ui-design-prototype.md) | UI 设计探索与设计基线 | 002、003、006 | 已实现 |
 | [013](013-ui-project-shell.md) | Web 应用壳、项目与环境管理 UI | 002、003、012 | 已实现 |

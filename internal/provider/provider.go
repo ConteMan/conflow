@@ -14,6 +14,7 @@ var (
 	ErrUnauthorized  = errors.New("provider unauthorized")
 	ErrUnavailable   = errors.New("provider unavailable")
 	ErrValidation    = errors.New("provider validation failed")
+	ErrETagMismatch  = errors.New("provider etag mismatch")
 )
 
 type Capabilities struct {
@@ -45,6 +46,13 @@ type Adapter interface {
 	Capabilities() Capabilities
 }
 
+// Publisher is deliberately separate from Adapter so read-only test doubles
+// and future providers do not accidentally advertise a destructive capability.
+type Publisher interface {
+	Adapter
+	Publish(context.Context, []byte, string) (Template, error)
+}
+
 func SafeError(err error) error {
 	if err == nil {
 		return nil
@@ -53,7 +61,7 @@ func SafeError(err error) error {
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return err
-	case errors.Is(err, ErrNotConfigured), errors.Is(err, ErrUnauthorized), errors.Is(err, ErrUnavailable), errors.Is(err, ErrValidation):
+	case errors.Is(err, ErrNotConfigured), errors.Is(err, ErrUnauthorized), errors.Is(err, ErrUnavailable), errors.Is(err, ErrValidation), errors.Is(err, ErrETagMismatch):
 		return err
 	case strings.Contains(text, "unauthorized"), strings.Contains(text, "forbidden"):
 		return ErrUnauthorized

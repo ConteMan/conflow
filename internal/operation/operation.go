@@ -25,6 +25,7 @@ var AllowedStages = map[string]map[string]bool{
 	"remote_pull":     {"queued": true, "reading_remote": true, "snapshotting": true, "completed": true},
 	"remote_validate": {"queued": true, "validating_remote": true, "completed": true},
 	"plan":            {"queued": true, "reading_remote": true, "compiling": true, "analyzing": true, "completed": true},
+	"release":         {"queued": true, "validating_remote": true, "submitting": true, "verifying": true, "recording_audit": true, "completed": true},
 }
 
 type Failure struct {
