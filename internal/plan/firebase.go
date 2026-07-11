@@ -3,6 +3,8 @@ package plan
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/ConteMan/conflow/internal/entities"
 )
 
 // MergeFirebaseTemplate changes only managed default values selected by the
@@ -45,16 +47,9 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 func desiredParameterValues(desired map[string]any) map[string]any {
 	values := map[string]any{}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {
-		for _, raw := range asSlice(desired[collection]) {
-			record, ok := raw.(map[string]any)
-			if !ok {
-				continue
-			}
-			id, _ := record["id"].(string)
-			for field, value := range record {
-				if field != "id" {
-					values[parameterKey(entityType, id, field)] = value
-				}
+		for _, record := range entities.Records(desired, collection) {
+			for field, value := range record.Fields {
+				values[parameterKey(entityType, record.ID, field)] = value
 			}
 		}
 	}

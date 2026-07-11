@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ConteMan/conflow/internal/entities"
 )
 
 type overlayFixture struct {
@@ -88,6 +90,9 @@ func TestValidationOverlaysGolden(t *testing.T) {
 	for _, replacement := range scenario.Overlay.EntityReplacements {
 		replaceFixtureEntity(effective, replacement.EntityType, replacement.EntityID, replacement.Fields)
 	}
+	// Contract fixtures use their legacy flat entity form; validation receives
+	// the nested record form that Draft entity CRUD persists at runtime.
+	effective = entities.AdaptFlatFixture(effective)
 	deletes := make([]RestrictedDelete, 0, len(scenario.Overlay.DeleteAttempts))
 	for _, reference := range scenario.Overlay.DeleteAttempts {
 		parts := strings.Split(reference, ":")

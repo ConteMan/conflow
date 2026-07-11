@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 	"sort"
+
+	"github.com/ConteMan/conflow/internal/entities"
 )
 
 // Input is the captured DraftView data needed for a complete validation run.
@@ -36,40 +38,40 @@ func Validate(input Input) []Diagnostic {
 	diagnostics := make([]Diagnostic, 0)
 
 	for _, placement := range placements {
-		ref := entityRef(input.PackRef, "placement", placement.id)
-		path := "/placements/" + placement.id
-		if timeout, ok := integer(placement.fields["load_timeout_ms"]); !ok || timeout < 1000 || timeout > 60000 {
+		ref := entityRef(input.PackRef, "placement", placement.ID)
+		path := "/placements/" + placement.ID
+		if timeout, ok := integer(placement.Fields["load_timeout_ms"]); !ok || timeout < 1000 || timeout > 60000 {
 			diagnostics = append(diagnostics, diagnostic("load_timeout_out_of_range", path+"/load_timeout_ms", SeverityError, ref, "广告加载超时必须在 1000 至 60000 毫秒之间", "将加载超时调整到 1000 至 60000 毫秒之间。"))
 		}
-		if !allowedString(placement.fields["ad_type"], "app_open", "interstitial", "native") {
+		if !allowedString(placement.Fields["ad_type"], "app_open", "interstitial", "native") {
 			diagnostics = append(diagnostics, diagnostic("ad_type_not_allowed", path+"/ad_type", SeverityError, ref, "广告类型不受当前配置包支持", "选择 app_open、interstitial 或 native。"))
 		}
-		if !allowedString(placement.fields["network_mode"], "hybrid", "bidding", "waterfall") {
+		if !allowedString(placement.Fields["network_mode"], "hybrid", "bidding", "waterfall") {
 			diagnostics = append(diagnostics, diagnostic("network_mode_not_allowed", path+"/network_mode", SeverityError, ref, "广告网络模式不受当前配置包支持", "选择 hybrid、bidding 或 waterfall。"))
 		}
-		policyID, ok := placement.fields["frequency_policy_id"].(string)
+		policyID, ok := placement.Fields["frequency_policy_id"].(string)
 		if !ok || !policyIDs[policyID] {
 			diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/frequency_policy_id", SeverityError, ref, "广告位引用的频控策略不存在", "选择一个存在的频控策略，或先创建该策略。"))
 		}
 	}
 
 	for _, featureSwitch := range switches {
-		if _, ok := featureSwitch.fields["default_value"].(bool); !ok {
-			ref := entityRef(input.PackRef, "feature_switch", featureSwitch.id)
-			diagnostics = append(diagnostics, diagnostic("feature_switch_default_not_boolean", "/feature_switches/"+featureSwitch.id+"/default_value", SeverityError, ref, "功能开关默认值必须是布尔值", "将默认值设置为 true 或 false。"))
+		if _, ok := featureSwitch.Fields["default_value"].(bool); !ok {
+			ref := entityRef(input.PackRef, "feature_switch", featureSwitch.ID)
+			diagnostics = append(diagnostics, diagnostic("feature_switch_default_not_boolean", "/feature_switches/"+featureSwitch.ID+"/default_value", SeverityError, ref, "功能开关默认值必须是布尔值", "将默认值设置为 true 或 false。"))
 		}
 	}
 
 	policyUsage := make(map[string]int, len(policies))
 	for _, placement := range placements {
-		if policyID, ok := placement.fields["frequency_policy_id"].(string); ok && policyIDs[policyID] {
+		if policyID, ok := placement.Fields["frequency_policy_id"].(string); ok && policyIDs[policyID] {
 			policyUsage[policyID]++
 		}
 	}
 	for _, policy := range policies {
-		if policyUsage[policy.id] == 0 {
-			ref := entityRef(input.PackRef, "frequency_policy", policy.id)
-			diagnostics = append(diagnostics, diagnostic("frequency_policy_unused", "/frequency_policies/"+policy.id, SeverityWarning, ref, "频控策略未被任何广告位使用", "关联至少一个广告位，或删除不再需要的频控策略。"))
+		if policyUsage[policy.ID] == 0 {
+			ref := entityRef(input.PackRef, "frequency_policy", policy.ID)
+			diagnostics = append(diagnostics, diagnostic("frequency_policy_unused", "/frequency_policies/"+policy.ID, SeverityWarning, ref, "频控策略未被任何广告位使用", "关联至少一个广告位，或删除不再需要的频控策略。"))
 		}
 	}
 
@@ -78,7 +80,7 @@ func Validate(input Input) []Diagnostic {
 			continue
 		}
 		for _, placement := range placements {
-			if placement.fields["frequency_policy_id"] == deletion.EntityID {
+			if placement.Fields["frequency_policy_id"] == deletion.EntityID {
 				ref := entityRef(input.PackRef, "frequency_policy", deletion.EntityID)
 				diagnostics = append(diagnostics, diagnostic("frequency_policy_still_referenced", "/frequency_policies/"+deletion.EntityID, SeverityError, ref, "频控策略仍被广告位引用，不能删除", "先迁移所有引用该策略的广告位，再删除策略。"))
 				break
@@ -87,13 +89,13 @@ func Validate(input Input) []Diagnostic {
 	}
 
 	for _, binding := range bindings {
-		ref := entityRef(input.PackRef, "unit_binding", binding.id)
-		path := "/unit_bindings/" + binding.id
-		placementID, ok := binding.fields["placement_id"].(string)
+		ref := entityRef(input.PackRef, "unit_binding", binding.ID)
+		path := "/unit_bindings/" + binding.ID
+		placementID, ok := binding.Fields["placement_id"].(string)
 		if !ok || !placementIDs[placementID] {
 			diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/placement_id", SeverityError, ref, "广告单元绑定引用的广告位不存在", "选择一个存在的广告位。"))
 		}
-		if binding.fields["environment_id"] != input.EnvironmentID {
+		if binding.Fields["environment_id"] != input.EnvironmentID {
 			diagnostics = append(diagnostics, diagnostic("unit_binding_environment_mismatch", path+"/environment_id", SeverityError, ref, "广告单元绑定属于其他环境", "将绑定写入与其 environment_id 一致的环境覆盖。"))
 		}
 	}
@@ -118,39 +120,18 @@ func Validate(input Input) []Diagnostic {
 	return diagnostics
 }
 
-type record struct {
-	id     string
-	fields map[string]any
-}
+type record = entities.Record
 
 func records(configuration map[string]any, collection string) []record {
-	values, _ := configuration[collection].([]any)
-	result := make([]record, 0, len(values))
-	for _, value := range values {
-		object, ok := value.(map[string]any)
-		if !ok {
-			continue
-		}
-		id, _ := object["id"].(string)
-		if id == "" {
-			continue
-		}
-		fields := make(map[string]any, len(object)-1)
-		for key, field := range object {
-			if key != "id" {
-				fields[key] = field
-			}
-		}
-		result = append(result, record{id: id, fields: fields})
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].id < result[j].id })
+	result := entities.Records(configuration, collection)
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
 }
 
 func ids(values []record) map[string]bool {
 	result := make(map[string]bool, len(values))
 	for _, value := range values {
-		result[value.id] = true
+		result[value.ID] = true
 	}
 	return result
 }
@@ -197,24 +178,24 @@ type missingBinding struct {
 func productionMissingBindings(input Input, placements []record, bindings []record) []missingBinding {
 	bindingByPlacementPlatform := make(map[string]record, len(bindings))
 	for _, binding := range bindings {
-		placementID, _ := binding.fields["placement_id"].(string)
-		platform, _ := binding.fields["platform"].(string)
+		placementID, _ := binding.Fields["placement_id"].(string)
+		platform, _ := binding.Fields["platform"].(string)
 		bindingByPlacementPlatform[placementID+"\x00"+platform] = binding
 	}
 	missing := make([]missingBinding, 0)
 	for _, placement := range placements {
-		if enabled, _ := placement.fields["enabled"].(bool); !enabled {
+		if enabled, _ := placement.Fields["enabled"].(bool); !enabled {
 			continue
 		}
 		for _, platform := range []string{"ios", "android"} {
-			binding, found := bindingByPlacementPlatform[placement.id+"\x00"+platform]
+			binding, found := bindingByPlacementPlatform[placement.ID+"\x00"+platform]
 			if !found {
-				missing = append(missing, missingBinding{id: "ub_" + input.EnvironmentID + "_" + platform + "_" + placement.id, platform: platform})
+				missing = append(missing, missingBinding{id: "ub_" + input.EnvironmentID + "_" + platform + "_" + placement.ID, platform: platform})
 				continue
 			}
-			unitID, configured := binding.fields["unit_id_ref"].(string)
-			if !configured || unitID == "" || binding.fields["status"] == "missing" {
-				missing = append(missing, missingBinding{id: binding.id, platform: platform})
+			unitID, configured := binding.Fields["unit_id_ref"].(string)
+			if !configured || unitID == "" || binding.Fields["status"] == "missing" {
+				missing = append(missing, missingBinding{id: binding.ID, platform: platform})
 			}
 		}
 	}

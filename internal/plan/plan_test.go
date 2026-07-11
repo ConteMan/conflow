@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ConteMan/conflow/internal/entities"
 	"github.com/ConteMan/conflow/internal/remote"
 )
 
@@ -153,6 +154,33 @@ func TestRiskRules(t *testing.T) {
 	}
 }
 
+func TestRuntimeEntityShapeReadsSemanticDiffFields(t *testing.T) {
+	baseline := configuration("frequency_policies", record("inter_global_cap", "cooldown_ms", 30000))
+	desired := clone(t, baseline)
+	setField(desired, "frequency_policies", "inter_global_cap", "cooldown_ms", 120000)
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v1", Baseline: baseline, Desired: desired,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-1", Summary: &remote.Summary{}}, ValidationReady: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cooldown *SemanticChange
+	for index := range built.Plan.SemanticChanges {
+		change := &built.Plan.SemanticChanges[index]
+		if change.DirectEntityRef == "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap" && change.FieldPath == "/cooldown_ms" {
+			cooldown = change
+			break
+		}
+	}
+	if cooldown == nil || cooldown.BeforeSummary != "30 seconds" || cooldown.AfterSummary != "120 seconds" {
+		t.Fatalf("cooldown semantic diff = %#v", cooldown)
+	}
+	if !hasRisk(built.Plan, "shared_frequency_policy_relaxed") {
+		t.Fatalf("runtime shape did not produce shared frequency risk: %#v", built.Plan.RiskItems)
+	}
+}
+
 func TestSnapshotTokenIsOpaqueAndBoundToSnapshotState(t *testing.T) {
 	input := Input{EnvironmentID: "development", PackRef: "pack/v1", DraftRevision: 17, SourceDigest: "sha256:source-secret", Baseline: map[string]any{}, Desired: map[string]any{"key": "desired-value"}, ValidationReady: true, Now: time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC), RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-secret", Summary: &remote.Summary{}}}
 	first, err := Build(input)
@@ -210,7 +238,7 @@ func configuration(collection string, records ...map[string]any) map[string]any 
 }
 
 func record(id, field string, value any) map[string]any {
-	return map[string]any{"id": id, field: value}
+	return map[string]any{"id": id, "fields": map[string]any{field: value}}
 }
 
 func TestArtifactsRedactCredentialLikeValues(t *testing.T) {
@@ -240,7 +268,9 @@ func loadEntities(t *testing.T) map[string]any {
 	if err := json.Unmarshal(content, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	return fixture.Entities
+	// Contract fixtures remain flat for compatibility; the Plan engine only
+	// receives the nested runtime shape persisted by Draft entity CRUD.
+	return entities.AdaptFlatFixture(fixture.Entities)
 }
 
 type fixtureReplacement struct {
@@ -316,7 +346,7 @@ func setField(configuration map[string]any, collection, id, field string, value 
 	for _, raw := range configuration[collection].([]any) {
 		record := raw.(map[string]any)
 		if record["id"] == id {
-			record[field] = value
+			record["fields"].(map[string]any)[field] = value
 			return
 		}
 	}

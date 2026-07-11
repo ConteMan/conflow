@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
+
+	"github.com/ConteMan/conflow/internal/entities"
 )
 
 func TestValidationHandlersStoreAndMarkResultsStale(t *testing.T) {
@@ -46,6 +49,38 @@ func TestValidationHandlerUnknownEnvironment(t *testing.T) {
 	handler, _ := newTestHandler(t)
 	response := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/missing:validate", "", nil)
 	assertDraftError(t, response, http.StatusNotFound, "environment_not_found")
+}
+
+func TestValidationHandlerAcceptsCompleteRuntimeEntities(t *testing.T) {
+	handler, _ := newTestHandler(t)
+	sourceRevision := getDraftForTest(t, handler, "production").SourceRevision
+	createdEntities := []struct {
+		scope, entityType, id string
+		fields                map[string]any
+	}{
+		{"baseline", "frequency_policy", "inter_global_cap", map[string]any{"cooldown_ms": 30000, "interval_ms": 300000, "max_count": 3, "shift_count": 1, "positions": []any{"open_document"}}},
+		{"baseline", "feature_switch", "ads_enabled", map[string]any{"key": "ads_enabled", "default_value": true, "risk_level": "low", "rollback_method": "disable"}},
+		{"baseline", "placement", "ad_interstitial_001", map[string]any{"key": "interstitial_open_document", "ad_type": "interstitial", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "open_document"}},
+		{"environment_override", "unit_binding", "ub_production_ios_ad_interstitial_001", map[string]any{"placement_id": "ad_interstitial_001", "environment_id": "production", "platform": "ios", "unit_id_ref": "ios_prod_001", "status": "configured"}},
+		{"environment_override", "unit_binding", "ub_production_android_ad_interstitial_001", map[string]any{"placement_id": "ad_interstitial_001", "environment_id": "production", "platform": "android", "unit_id_ref": "android_prod_001", "status": "configured"}},
+	}
+	for index, entity := range createdEntities {
+		response := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/production/entities", `"`+strconv.Itoa(index+1)+`"`, entityBody(sourceRevision, entity.scope, entity.entityType, entity.id, entity.fields))
+		if response.Code != http.StatusCreated {
+			t.Fatalf("create %s = %d %s", entity.entityType, response.Code, response.Body.String())
+		}
+	}
+	response := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/production:validate", "", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("validate = %d %s", response.Code, response.Body.String())
+	}
+	var result struct {
+		Data validationResultDTO `json:"data"`
+	}
+	decodeResponse(t, response, &result)
+	if result.Data.Readiness != "ready" || len(result.Data.Diagnostics) != 0 {
+		t.Fatalf("complete runtime validation = %#v", result.Data)
+	}
 }
 
 func TestValidationHandlerMatchesOrderedFixtureDiagnostics(t *testing.T) {
@@ -188,12 +223,15 @@ func configureFixtureDraft(t *testing.T, handler http.Handler, fixture validatio
 		}
 	}
 	sourceRevision := getDraftForTest(t, handler, "production").SourceRevision
+	// Shared contract fixtures use {id, field...}; entity CRUD writes the
+	// runtime {id, fields:{field...}} records that this handler must validate.
+	baselineConfiguration := entities.AdaptFlatFixture(map[string]any{
+		"placements": fixture.Placements, "frequency_policies": fixture.FrequencyPolicies, "feature_switches": fixture.FeatureSwitches,
+	})
 	baseline := map[string]any{
 		"expected_source_revision": sourceRevision,
 		"write_scope":              "baseline",
-		"configuration": map[string]any{
-			"placements": fixture.Placements, "frequency_policies": fixture.FrequencyPolicies, "feature_switches": fixture.FeatureSwitches,
-		},
+		"configuration":            baselineConfiguration,
 	}
 	body, err := json.Marshal(baseline)
 	if err != nil {
@@ -206,7 +244,7 @@ func configureFixtureDraft(t *testing.T, handler http.Handler, fixture validatio
 	override := map[string]any{
 		"expected_source_revision": sourceRevision,
 		"write_scope":              "environment_override",
-		"configuration":            map[string]any{"unit_bindings": fixture.Bindings},
+		"configuration":            entities.AdaptFlatFixture(map[string]any{"unit_bindings": fixture.Bindings}),
 	}
 	body, err = json.Marshal(override)
 	if err != nil {

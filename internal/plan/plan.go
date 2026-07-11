@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ConteMan/conflow/internal/entities"
 	"github.com/ConteMan/conflow/internal/remote"
 )
 
@@ -200,19 +201,15 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 		for _, entityID := range ordered {
 			before, after := oldRecords[entityID], newRecords[entityID]
 			fields := map[string]bool{}
-			for k := range before {
-				if k != "id" {
-					fields[k] = true
-				}
+			for k := range before.Fields {
+				fields[k] = true
 			}
-			for k := range after {
-				if k != "id" {
-					fields[k] = true
-				}
+			for k := range after.Fields {
+				fields[k] = true
 			}
 			for _, field := range keys(fields) {
-				bv, bok := before[field]
-				av, aok := after[field]
+				bv, bok := before.Fields[field]
+				av, aok := after.Fields[field]
 				if bok == aok && equal(bv, av) {
 					continue
 				}
@@ -362,27 +359,17 @@ func rank(v string) int {
 		return 1
 	}
 }
-func records(v any) map[string]map[string]any {
-	out := map[string]map[string]any{}
-	for _, v := range asSlice(v) {
-		if m, ok := v.(map[string]any); ok {
-			if id, ok := m["id"].(string); ok {
-				out[id] = m
-			}
-		}
+func records(v any) map[string]entities.Record {
+	out := map[string]entities.Record{}
+	for _, record := range entities.Records(map[string]any{"records": v}, "records") {
+		out[record.ID] = record
 	}
 	return out
-}
-func asSlice(v any) []any {
-	if x, ok := v.([]any); ok {
-		return x
-	}
-	return nil
 }
 func placementsUsing(desired map[string]any, policy string) []string {
 	out := []string{}
 	for id, r := range records(desired["placements"]) {
-		if r["frequency_policy_id"] == policy {
+		if r.Fields["frequency_policy_id"] == policy {
 			out = append(out, id)
 		}
 	}
