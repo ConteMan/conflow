@@ -43,14 +43,18 @@
 | `UI-API-012` | UI 使用“阻断 / 警告 / 建议”，并认为只有阻断影响 readiness（`flows/03-validation.md:23`）。 | 007 使用 `info/warning/error/blocking`，CLI 又规定 `error/blocking` 非零；“error 是否阻止 Plan”存在语义分歧。 | 在 007 中固定 severity、CLI exit 和 publish readiness 的映射；UI 文案只做稳定枚举的本地化。 | 007 / 014 / 015 |
 | `UI-API-013` | UI 列表、诊断、大 diff 与后端 golden tests 必须使用同一组实体 key 和场景。 | 当前 `fixtures.md` 是人工文档，不能直接作为 Go / E2E 测试输入；原型与主路径已出现命名、计数漂移。 | Spec 006 建立版本化结构化 fixture；场景 overlay 分别覆盖 validation、Plan、412 和 ETag 冲突；Go 与 E2E 读取同一文件并断言稳定业务结果。 | 006 / 007 / 008 / 014 |
 
-`UI-API-005`、`UI-API-006`、`UI-API-007` 的草稿合同已定义；`UI-API-010` 的 structural error 部分已定义。以上只是合同完成，Spec 004 Handler 与 UI 尚未实现。`UI-API-008`、`UI-API-010` 的完整校验部分以及 `UI-API-011` 到 `UI-API-013` 仍未关闭，因此 Spec 014 仍不能开工。
+`UI-API-005`、`UI-API-006`、`UI-API-007` 的草稿合同已定义；`UI-API-008`、`UI-API-010` 到 `UI-API-013` 的领域与校验合同现已定义。以上只是合同完成，Spec 004/006/007 的 Handler、CLI、Pack 与 UI 尚未实现。
 
 处理状态（2026-07-11）：
 
 - `UI-API-005`：合同已定义。`write_scope`、targeted replacement 与服务端计算的 `affected_environments` 已进入 OpenAPI。
 - `UI-API-006`：合同已定义。DraftView、layer/field presence、RFC 6901 path、origin 与 overrideability 已固定。
 - `UI-API-007`：合同已定义。两类 typed `412` 都携带原子 current state、revision 与 conflict scope。
-- `UI-API-010`：部分合同已定义。004 structural errors 已固定；007 diagnostics、实体引用与 readiness 尚待后续合同。
+- `UI-API-008`：合同已定义。Pack-neutral 实体 CRUD 挂在 draft 环境视角下，固定 `entity_ref`、`referenced_by` 查询与 `409 entity_referenced` 的 typed `references[]`。
+- `UI-API-010`：合同已定义。004 structural errors 与 007 完整 diagnostics 的边界已固定，二者共享 `code/path/entity_ref`；只有完整校验生成 readiness。
+- `UI-API-011`：合同已定义。ValidationResult 固定返回 validated draft revision、时间、fresh/stale、readiness 与稳定排序 diagnostics。
+- `UI-API-012`：合同已定义。severity、CLI exit code、readiness 和 UI“阻断/警告/建议”映射均为闭合合同。
+- `UI-API-013`：合同已定义。mobile-ad 的版本化实体 fixture 与 validation overlay 已成为 Go/API/UI E2E 的共同数据源。
 
 ## Spec 015 开工门槛
 
@@ -92,5 +96,5 @@
 ## 审计结论
 
 - Spec 013 的合同前置已满足，可以开始应用壳、Production 状态和 revision 冲突交互；最终 E2E 前仍须完成 API `0.4.0` 的 Go 运行时对齐。
-- Spec 014 仍必须等待 004、006、007 的 contract-only PR 全部合并；004 合同完成不代表 006/007 或 React 编辑器已实现。
+- Spec 014 的 004、006、007 合同前置已经具备；`UI-API-009` 的远端值投影仍未关闭，必须先完成该合同或在 014 明确降级。无论如何，不能把 OpenAPI、fixture 或 mock 视为 Handler / React 验收通过。
 - Spec 015 必须消费服务端权威的 readiness、Plan lifecycle、risk items、confirmation requirements 和 Operation state，不能在前端复制规则。

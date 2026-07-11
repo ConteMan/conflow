@@ -1,0 +1,86 @@
+{
+  "contract_version": 1,
+  "pack_ref": "mobile-ad-monetization/v1",
+  "description": "Canonical mobile-ad entities derived from docs/design/ui/prototypes/fixtures.md. Consumers must use these IDs and keys rather than Markdown or prototype screenshots.",
+  "entity_ref_format": "entity:{pack_ref}:{entity_type}:{entity_id}",
+  "environments": [
+    {"id": "development", "name": "Development", "kind": "development"},
+    {"id": "staging", "name": "Staging", "kind": "staging"},
+    {"id": "production", "name": "Production", "kind": "production"}
+  ],
+  "entities": {
+    "placements": [
+      {"id": "ad_app_open_001", "key": "app_open_cold_start", "ad_type": "app_open", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 4000, "cache_policy": "memory", "fallback_behavior": "enter_home"},
+      {"id": "ad_app_open_002", "key": "app_open_warm_resume", "ad_type": "app_open", "enabled": true, "network_mode": "bidding", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 3000, "cache_policy": "memory", "fallback_behavior": "resume_document"},
+      {"id": "ad_app_open_003", "key": "app_open_after_document_share", "ad_type": "app_open", "enabled": false, "network_mode": "waterfall", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 5000, "cache_policy": "none", "fallback_behavior": "return_share_complete"},
+      {"id": "ad_app_open_004", "key": "app_open_return_from_settings", "ad_type": "app_open", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 3500, "cache_policy": "memory", "fallback_behavior": "return_settings"},
+      {"id": "ad_app_open_005", "key": "app_open_new_user_onboarding", "ad_type": "app_open", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 4500, "cache_policy": "disk", "fallback_behavior": "continue_onboarding"},
+      {"id": "ad_app_open_006", "key": "app_open_background_return", "ad_type": "app_open", "enabled": false, "network_mode": "hybrid", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 3000, "cache_policy": "memory", "fallback_behavior": "resume_background_page"},
+      {"id": "ad_app_open_007", "key": "app_open_library_refresh", "ad_type": "app_open", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "app_open_session_gate", "load_timeout_ms": 4000, "cache_policy": "memory", "fallback_behavior": "refresh_library"},
+      {"id": "ad_interstitial_001", "key": "interstitial_open_document", "ad_type": "interstitial", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "open_document"},
+      {"id": "ad_interstitial_002", "key": "interstitial_close_document", "ad_type": "interstitial", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 4000, "cache_policy": "none", "fallback_behavior": "close_document"},
+      {"id": "ad_interstitial_003", "key": "interstitial_export_pdf", "ad_type": "interstitial", "enabled": true, "network_mode": "bidding", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 6000, "cache_policy": "disk", "fallback_behavior": "continue_export"},
+      {"id": "ad_interstitial_004", "key": "interstitial_print_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "show_print_complete"},
+      {"id": "ad_interstitial_005", "key": "interstitial_merge_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "open_merge_result"},
+      {"id": "ad_interstitial_006", "key": "interstitial_split_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "show_split_files"},
+      {"id": "ad_interstitial_007", "key": "interstitial_compress_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 6000, "cache_policy": "disk", "fallback_behavior": "show_compress_result"},
+      {"id": "ad_interstitial_008", "key": "compress_complete_interstitial_legacy_campaign", "ad_type": "interstitial", "enabled": false, "network_mode": "waterfall", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "none", "fallback_behavior": "preserve_legacy_result"},
+      {"id": "ad_interstitial_009", "key": "interstitial_scan_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "bidding", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5500, "cache_policy": "memory", "fallback_behavior": "open_scan_preview"},
+      {"id": "ad_interstitial_010", "key": "interstitial_sign_complete", "ad_type": "interstitial", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "inter_global_cap", "load_timeout_ms": 5000, "cache_policy": "memory", "fallback_behavior": "enter_sign_complete"},
+      {"id": "ad_native_001", "key": "native_home_feed_top", "ad_type": "native", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 2500, "cache_policy": "memory", "fallback_behavior": "collapse_slot"},
+      {"id": "ad_native_002", "key": "native_library_list_inline", "ad_type": "native", "enabled": true, "network_mode": "waterfall", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 2500, "cache_policy": "memory", "fallback_behavior": "continue_list"},
+      {"id": "ad_native_003", "key": "native_recent_documents", "ad_type": "native", "enabled": true, "network_mode": "bidding", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 3000, "cache_policy": "disk", "fallback_behavior": "show_recent_documents"},
+      {"id": "ad_native_004", "key": "native_search_result_inline", "ad_type": "native", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 2500, "cache_policy": "memory", "fallback_behavior": "preserve_search_scroll"},
+      {"id": "ad_native_005", "key": "native_document_tools_panel", "ad_type": "native", "enabled": false, "network_mode": "waterfall", "frequency_policy_id": "high_intent_tool_cap", "load_timeout_ms": 2000, "cache_policy": "none", "fallback_behavior": "hide_tools_slot"},
+      {"id": "ad_native_006", "key": "native_document_scan_result_recommendation", "ad_type": "native", "enabled": true, "network_mode": "hybrid", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 3000, "cache_policy": "memory", "fallback_behavior": "show_scan_recommendation"},
+      {"id": "ad_native_007", "key": "native_subscription_offer", "ad_type": "native", "enabled": true, "network_mode": "bidding", "frequency_policy_id": "native_scroll_gap", "load_timeout_ms": 3500, "cache_policy": "disk", "fallback_behavior": "show_subscription_offer"}
+    ],
+    "frequency_policies": [
+      {"id": "inter_global_cap", "cooldown_ms": 30000, "interval_ms": 300000, "max_count": 3, "shift_count": 1, "positions": ["open_document", "export_pdf", "complete_action"]},
+      {"id": "app_open_session_gate", "cooldown_ms": 30000, "interval_ms": 1800000, "max_count": 2, "shift_count": 0, "positions": ["cold_start", "warm_resume", "return_from_settings"]},
+      {"id": "native_scroll_gap", "cooldown_ms": 0, "interval_ms": 90000, "max_count": 4, "shift_count": 2, "positions": ["feed_top", "list_inline", "search_inline"]},
+      {"id": "legacy_campaign_cap", "cooldown_ms": 600000, "interval_ms": 3600000, "max_count": 1, "shift_count": 0, "positions": ["compress_complete"]},
+      {"id": "high_intent_tool_cap", "cooldown_ms": 180000, "interval_ms": 900000, "max_count": 2, "shift_count": 1, "positions": ["document_tools_panel"]}
+    ],
+    "feature_switches": [
+      {"id": "use_amazon_bidding", "key": "use_amazon_bidding", "default_value": false, "risk_level": "high", "rollback_method": "disable_and_regenerate_plan"},
+      {"id": "ads_enabled_legacy", "key": "ads_enabled_legacy", "default_value": false, "risk_level": "high", "rollback_method": "remove_legacy_override_and_confirm_production"},
+      {"id": "enable_native_preload", "key": "enable_native_preload", "default_value": true, "risk_level": "medium", "rollback_method": "disable_and_clear_memory_cache"},
+      {"id": "show_subscription_offer", "key": "show_subscription_offer", "default_value": true, "risk_level": "medium", "rollback_method": "disable_and_publish"},
+      {"id": "enable_ad_debug_overlay", "key": "enable_ad_debug_overlay", "default_value": false, "risk_level": "low", "rollback_method": "disable"},
+      {"id": "defer_app_open_until_consent", "key": "defer_app_open_until_consent", "default_value": true, "risk_level": "high", "rollback_method": "enable_and_publish"}
+    ]
+  },
+  "unit_binding_matrix": {
+    "entity_type": "unit_binding",
+    "id_template": "ub_{environment_id}_{platform}_{placement_id}",
+    "value_fields": ["id", "placement_id", "environment_id", "platform", "unit_id_ref", "status"],
+    "rows": [
+      {"placement_id": "ad_app_open_001", "development": {"ios": "ios_dev_001", "android": "android_dev_001"}, "staging": {"ios": "ios_stg_001", "android": "android_stg_001"}, "production": {"ios": "ios_prod_001", "android": "android_prod_001"}},
+      {"placement_id": "ad_app_open_002", "development": {"ios": "ios_dev_002", "android": "android_dev_002"}, "staging": {"ios": "ios_stg_002", "android": "android_stg_002"}, "production": {"ios": "ios_prod_002", "android": "android_prod_002"}},
+      {"placement_id": "ad_app_open_003", "development": {"ios": "ios_dev_003", "android": "android_dev_003"}, "staging": {"ios": "ios_stg_003", "android": "android_stg_003"}, "production": {"ios": "ios_prod_003", "android": "android_prod_003"}},
+      {"placement_id": "ad_app_open_004", "development": {"ios": "ios_dev_004", "android": "android_dev_004"}, "staging": {"ios": "ios_stg_004", "android": "android_stg_004"}, "production": {"ios": "ios_prod_004", "android": "android_prod_004"}},
+      {"placement_id": "ad_app_open_005", "development": {"ios": "ios_dev_005", "android": "android_dev_005"}, "staging": {"ios": "ios_stg_005", "android": "android_stg_005"}, "production": {"ios": "ios_prod_005", "android": "android_prod_005"}},
+      {"placement_id": "ad_app_open_006", "development": {"ios": "ios_dev_006", "android": "android_dev_006"}, "staging": {"ios": "ios_stg_006", "android": "android_stg_006"}, "production": {"ios": "ios_prod_006", "android": "android_prod_006"}},
+      {"placement_id": "ad_app_open_007", "development": {"ios": "ios_dev_007", "android": "android_dev_007"}, "staging": {"ios": "ios_stg_007", "android": "android_stg_007"}, "production": {"ios": "ios_prod_007", "android": "android_prod_007"}},
+      {"placement_id": "ad_interstitial_001", "development": {"ios": "ios_dev_008", "android": "android_dev_008"}, "staging": {"ios": "ios_stg_008", "android": "android_stg_008"}, "production": {"ios": "ios_prod_008", "android": "android_prod_008"}},
+      {"placement_id": "ad_interstitial_002", "development": {"ios": "ios_dev_009", "android": "android_dev_009"}, "staging": {"ios": "ios_stg_009", "android": "android_stg_009"}, "production": {"ios": "ios_prod_009", "android": "android_prod_009"}},
+      {"placement_id": "ad_interstitial_003", "development": {"ios": "ios_dev_010", "android": "android_dev_010"}, "staging": {"ios": "ios_stg_010", "android": "android_stg_010"}, "production": {"ios": "ios_prod_010", "android": "android_prod_010"}},
+      {"placement_id": "ad_interstitial_004", "development": {"ios": "ios_dev_011", "android": "android_dev_011"}, "staging": {"ios": "ios_stg_011", "android": "android_stg_011"}, "production": {"ios": "ios_prod_011", "android": "android_prod_011"}},
+      {"placement_id": "ad_interstitial_005", "development": {"ios": "ios_dev_012", "android": "android_dev_012"}, "staging": {"ios": "ios_stg_012", "android": "android_stg_012"}, "production": {"ios": "ios_prod_012", "android": "android_prod_012"}},
+      {"placement_id": "ad_interstitial_006", "development": {"ios": "ios_dev_013", "android": "android_dev_013"}, "staging": {"ios": "ios_stg_013", "android": "android_stg_013"}, "production": {"ios": "ios_prod_013", "android": "android_prod_013"}},
+      {"placement_id": "ad_interstitial_007", "development": {"ios": "ios_dev_014", "android": "android_dev_014"}, "staging": {"ios": "ios_stg_014", "android": "android_stg_014"}, "production": {"ios": "ios_prod_014", "android": "android_prod_014"}},
+      {"placement_id": "ad_interstitial_008", "development": {"ios": "ios_dev_015", "android": "android_dev_015"}, "staging": {"ios": "ios_stg_015", "android": "android_stg_015"}, "production": {"ios": "ios_prod_015", "android": "android_prod_015"}},
+      {"placement_id": "ad_interstitial_009", "development": {"ios": "ios_dev_016", "android": "android_dev_016"}, "staging": {"ios": "ios_stg_016", "android": "android_stg_016"}, "production": {"ios": "ios_prod_016", "android": "android_prod_016"}},
+      {"placement_id": "ad_interstitial_010", "development": {"ios": "ios_dev_017", "android": "android_dev_017"}, "staging": {"ios": "ios_stg_017", "android": "android_stg_017"}, "production": {"ios": "ios_prod_017", "android": "android_prod_017"}},
+      {"placement_id": "ad_native_001", "development": {"ios": "ios_dev_018", "android": "android_dev_018"}, "staging": {"ios": "ios_stg_018", "android": "android_stg_018"}, "production": {"ios": "ios_prod_018", "android": "android_prod_018"}},
+      {"placement_id": "ad_native_002", "development": {"ios": "ios_dev_019", "android": "android_dev_019"}, "staging": {"ios": "ios_stg_019", "android": "android_stg_019"}, "production": {"ios": "ios_prod_019", "android": "android_prod_019"}},
+      {"placement_id": "ad_native_003", "development": {"ios": "ios_dev_020", "android": "android_dev_020"}, "staging": {"ios": "ios_stg_020", "android": "android_stg_020"}, "production": {"ios": "ios_prod_020", "android": "android_prod_020"}},
+      {"placement_id": "ad_native_004", "development": {"ios": "ios_dev_021", "android": "android_dev_021"}, "staging": {"ios": "ios_stg_021", "android": "android_stg_021"}, "production": {"ios": "ios_prod_021", "android": "android_prod_021"}},
+      {"placement_id": "ad_native_005", "development": {"ios": "ios_dev_022", "android": "android_dev_022"}, "staging": {"ios": "ios_stg_022", "android": "android_stg_022"}, "production": {"ios": "ios_prod_022", "android": "android_prod_022"}},
+      {"placement_id": "ad_native_006", "development": {"ios": "ios_dev_023", "android": "android_dev_023"}, "staging": {"ios": "ios_stg_023", "android": "android_stg_023"}, "production": {"ios": null, "android": null}},
+      {"placement_id": "ad_native_007", "development": {"ios": "ios_dev_024", "android": "android_dev_024"}, "staging": {"ios": "ios_stg_024", "android": "android_stg_024"}, "production": {"ios": null, "android": null}}
+    ]
+  },
+  "expected_counts": {"placements": 24, "frequency_policies": 5, "feature_switches": 6, "unit_bindings": 144, "configured_unit_bindings": 140, "missing_production_unit_bindings": 4}
+}

@@ -213,6 +213,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drafts/{environment_id}/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** List effective Pack entities for an environment draft view */
+        get: operations["listDraftEntities"];
+        put?: never;
+        /** Create one entity in a targeted draft scope */
+        post: operations["createDraftEntity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}/entities/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        /** Get one effective Pack entity for an environment draft view */
+        get: operations["getDraftEntity"];
+        /** Replace one entity in a targeted draft scope */
+        put: operations["replaceDraftEntity"];
+        post?: never;
+        /** Delete one entity from a targeted draft scope */
+        delete: operations["deleteDraftEntity"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}/entities/{entity_type}/{entity_id}/referenced-by": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        /** List effective entities that reference one entity */
+        get: operations["getDraftEntityReferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}:validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run and store a complete validation result for the current draft snapshot */
+        post: operations["validateDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drafts/{environment_id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        /** Get the most recent complete validation result for an environment */
+        get: operations["getDraftDiagnostics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -367,6 +469,84 @@ export interface components {
             version: number;
             entities: components["schemas"]["EntitySchema"][];
             migrations: components["schemas"]["SchemaMigration"][];
+        };
+        /** @description Pack-declared entity type. Clients treat it as opaque outside schema-driven display. */
+        EntityType: string;
+        /** @description Stable opaque entity reference in entity:{pack_ref}:{entity_type}:{entity_id} format. */
+        EntityRef: string;
+        EntityRecord: {
+            /** @description Stable entity ID. It must match the entity_id path parameter for a replacement. */
+            id: string;
+            /** @description Complete Pack-declared entity field object. Concrete fields come from the Pack schema. */
+            fields: {
+                [key: string]: unknown;
+            };
+        };
+        EntityPresence: components["schemas"]["MissingEntity"] | components["schemas"]["PresentEntity"];
+        MissingEntity: {
+            /** @constant */
+            present: false;
+        };
+        PresentEntity: {
+            /** @constant */
+            present: true;
+            value: components["schemas"]["EntityRecord"];
+        };
+        /**
+         * @description Layer that supplies the entity effective value.
+         * @enum {string}
+         */
+        EntityOrigin: "pack_default" | "baseline" | "draft_baseline" | "environment_override" | "draft_environment_override";
+        EntityView: {
+            entity_ref: components["schemas"]["EntityRef"];
+            entity_type: components["schemas"]["EntityType"];
+            entity_id: string;
+            source: components["schemas"]["EntityPresence"];
+            draft: components["schemas"]["EntityPresence"];
+            resolved: components["schemas"]["EntityPresence"];
+            effective: components["schemas"]["PresentEntity"];
+            origin: components["schemas"]["EntityOrigin"];
+            source_revision: string;
+        };
+        EntityReference: {
+            entity_ref: components["schemas"]["EntityRef"];
+            entity_type: components["schemas"]["EntityType"];
+            entity_id: string;
+            /** @description RFC 6901 JSON Pointer inside the referencing entity. */
+            path: string;
+        };
+        EntitiesResponse: {
+            /** @description Non-null entity views sorted by entity_type and entity_id. */
+            data: components["schemas"]["EntityView"][];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EntityResponse: {
+            data: components["schemas"]["EntityView"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EntityReferencesData: {
+            entity_ref: components["schemas"]["EntityRef"];
+            /** @description Non-null referenced_by entries sorted by entity_ref. */
+            referenced_by: components["schemas"]["EntityReference"][];
+        };
+        EntityReferencesResponse: {
+            data: components["schemas"]["EntityReferencesData"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CreateEntityInput: {
+            expected_source_revision: string;
+            write_scope: components["schemas"]["DraftWriteScope"];
+            entity_type: components["schemas"]["EntityType"];
+            entity: components["schemas"]["EntityRecord"];
+        };
+        EntityMutationInput: {
+            expected_source_revision: string;
+            write_scope: components["schemas"]["DraftWriteScope"];
+            entity: components["schemas"]["EntityRecord"];
+        };
+        EntityDeleteInput: {
+            expected_source_revision: string;
+            write_scope: components["schemas"]["DraftWriteScope"];
         };
         EntitySchema: {
             name: string;
@@ -544,8 +724,63 @@ export interface components {
             code: "invalid_config_shape" | "field_type_mismatch" | "required_field_missing" | "value_not_allowed" | "explicit_null_forbidden" | "environment_override_forbidden";
             /** @description RFC 6901 JSON Pointer to the invalid configuration field. */
             path: string;
+            /** @description Present when the structural field belongs to one identifiable Pack entity; omitted for Pack-neutral or root-level errors. */
+            entity_ref?: components["schemas"]["EntityRef"];
             scope: components["schemas"]["DraftWriteScope"];
             message: string;
+        };
+        /**
+         * @description Freshness of a stored result relative to the current project-level draft revision.
+         * @enum {string}
+         */
+        ValidationStatus: "fresh" | "stale";
+        /**
+         * @description Complete-validation readiness before later Plan and Provider preconditions are applied.
+         * @enum {string}
+         */
+        ValidationReadiness: "ready" | "blocked";
+        /**
+         * @description Closed severity enum. UI maps info to suggestion, warning to warning, and error or blocking to blocking.
+         * @enum {string}
+         */
+        DiagnosticSeverity: "info" | "warning" | "error" | "blocking";
+        Diagnostic: {
+            code: string;
+            /** @description RFC 6901 JSON Pointer to the invalid field or entity location. */
+            path: string;
+            severity: components["schemas"]["DiagnosticSeverity"];
+            /** @description Human-readable message. Clients must not parse it for behavior. */
+            message: string;
+            entity_ref?: components["schemas"]["EntityRef"];
+            fix_suggestion: string;
+            /** Format: uri */
+            documentation_url?: string;
+        };
+        ValidationResult: {
+            environment_id: string;
+            validated_draft_revision: number;
+            /** Format: date-time */
+            validated_at: string;
+            status: components["schemas"]["ValidationStatus"];
+            readiness: components["schemas"]["ValidationReadiness"];
+            /** @description Non-null diagnostics sorted by severity rank, entity_ref, path, then code. */
+            diagnostics: components["schemas"]["Diagnostic"][];
+        };
+        ValidationResponse: {
+            data: components["schemas"]["ValidationResult"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EntityReferencedErrorResponse: {
+            error: components["schemas"]["EntityReferencedError"];
+        };
+        EntityReferencedError: {
+            /** @constant */
+            code: "entity_referenced";
+            message: string;
+            request_id: string;
+            current_revision: number;
+            /** @description Effective references sorted by entity_ref. */
+            references: components["schemas"]["EntityReference"][];
         };
         ErrorResponse: {
             error: components["schemas"]["Error"];
@@ -691,6 +926,156 @@ export interface components {
                 "application/json": components["schemas"]["DraftValidationErrorResponse"];
             };
         };
+        /** @description The targeted entity was created and the project-level draft revision advanced. */
+        EntityMutationCreated: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "data": {
+                 *         "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:launch_cap",
+                 *         "entity_type": "frequency_policy",
+                 *         "entity_id": "launch_cap",
+                 *         "source": {
+                 *           "present": false
+                 *         },
+                 *         "draft": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "launch_cap",
+                 *             "fields": {
+                 *               "cooldown_ms": 30000
+                 *             }
+                 *           }
+                 *         },
+                 *         "resolved": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "launch_cap",
+                 *             "fields": {
+                 *               "cooldown_ms": 30000
+                 *             }
+                 *           }
+                 *         },
+                 *         "effective": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "launch_cap",
+                 *             "fields": {
+                 *               "cooldown_ms": 30000
+                 *             }
+                 *           }
+                 *         },
+                 *         "origin": "draft_baseline",
+                 *         "source_revision": "src_01JEXAMPLE"
+                 *       },
+                 *       "meta": {
+                 *         "request_id": "req_01JEXAMPLE",
+                 *         "revision": 13
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["EntityResponse"];
+            };
+        };
+        /** @description The targeted entity mutation was accepted and the project-level draft revision advanced. */
+        EntityMutationSucceeded: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "data": {
+                 *         "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_interstitial_001",
+                 *         "entity_type": "placement",
+                 *         "entity_id": "ad_interstitial_001",
+                 *         "source": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "ad_interstitial_001",
+                 *             "fields": {
+                 *               "frequency_policy_id": "inter_global_cap"
+                 *             }
+                 *           }
+                 *         },
+                 *         "draft": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "ad_interstitial_001",
+                 *             "fields": {
+                 *               "frequency_policy_id": "app_open_session_gate"
+                 *             }
+                 *           }
+                 *         },
+                 *         "resolved": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "ad_interstitial_001",
+                 *             "fields": {
+                 *               "frequency_policy_id": "app_open_session_gate"
+                 *             }
+                 *           }
+                 *         },
+                 *         "effective": {
+                 *           "present": true,
+                 *           "value": {
+                 *             "id": "ad_interstitial_001",
+                 *             "fields": {
+                 *               "frequency_policy_id": "app_open_session_gate"
+                 *             }
+                 *           }
+                 *         },
+                 *         "origin": "draft_baseline",
+                 *         "source_revision": "src_01JEXAMPLE"
+                 *       },
+                 *       "meta": {
+                 *         "request_id": "req_01JEXAMPLE",
+                 *         "revision": 14
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["EntityResponse"];
+            };
+        };
+        /** @description A restrict-deletion entity still has effective references. The typed references list is non-empty and must be used instead of parsing the message. */
+        EntityReferenced: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["DraftETag"];
+                "X-Request-ID": components["headers"]["RequestID"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "entity_referenced",
+                 *         "message": "The frequency policy is still referenced by 10 placements.",
+                 *         "request_id": "req_01JEXAMPLE",
+                 *         "current_revision": 12,
+                 *         "references": [
+                 *           {
+                 *             "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_interstitial_001",
+                 *             "entity_type": "placement",
+                 *             "entity_id": "ad_interstitial_001",
+                 *             "path": "/frequency_policy_id"
+                 *           }
+                 *         ]
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["EntityReferencedErrorResponse"];
+            };
+        };
         /** @description Request is structurally valid but violates project rules. */
         ValidationFailed: {
             headers: {
@@ -736,6 +1121,10 @@ export interface components {
         PackVersion: string;
         /** @description Exact schema version understood by the client. Omit to retrieve the current schema. */
         SchemaVersion: number;
+        /** @description Optional Pack entity type filter. Omit to return every effective entity type. */
+        EntityTypeQuery: components["schemas"]["EntityType"];
+        EntityType: components["schemas"]["EntityType"];
+        EntityID: string;
     };
     requestBodies: never;
     headers: {
@@ -1210,6 +1599,284 @@ export interface operations {
             412: components["responses"]["DraftRevisionMismatch"];
             415: components["responses"]["UnsupportedMediaType"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listDraftEntities: {
+        parameters: {
+            query?: {
+                /** @description Optional Pack entity type filter. Omit to return every effective entity type. */
+                entity_type?: components["parameters"]["EntityTypeQuery"];
+            };
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective entities and their source, draft, and resolved presence states */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntitiesResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createDraftEntity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEntityInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["EntityMutationCreated"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["DraftValidationFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDraftEntity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entity and its source, draft, and resolved presence states */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceDraftEntity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityMutationInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["EntityMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["DraftValidationFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    deleteDraftEntity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Quoted local resource revision returned by the same endpoint family. Manifest and draft revisions are distinct domains. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityDeleteInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["EntityMutationSucceeded"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["EntityReferenced"];
+            412: components["responses"]["DraftRevisionMismatch"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["DraftValidationFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDraftEntityReferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+                entity_type: components["parameters"]["EntityType"];
+                entity_id: components["parameters"]["EntityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stable referenced_by entries for the requested effective entity, sorted by entity_ref */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap",
+                     *         "referenced_by": [
+                     *           {
+                     *             "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_interstitial_001",
+                     *             "entity_type": "placement",
+                     *             "entity_id": "ad_interstitial_001",
+                     *             "path": "/frequency_policy_id"
+                     *           }
+                     *         ]
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 12
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["EntityReferencesResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    validateDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Complete validation result bound to the captured project-level draft revision */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "environment_id": "production",
+                     *         "validated_draft_revision": 12,
+                     *         "validated_at": "2026-07-11T09:30:00Z",
+                     *         "status": "fresh",
+                     *         "readiness": "blocked",
+                     *         "diagnostics": [
+                     *           {
+                     *             "code": "production_unit_binding_missing",
+                     *             "path": "/unit_bindings/ub_production_ios_ad_native_006",
+                     *             "severity": "warning",
+                     *             "message": "Production is missing the iOS unit ID for native_document_scan_result_recommendation.",
+                     *             "entity_ref": "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_native_006",
+                     *             "fix_suggestion": "Configure a production iOS unit ID or disable the placement."
+                     *           }
+                     *         ]
+                     *       },
+                     *       "meta": {
+                     *         "request_id": "req_01JEXAMPLE",
+                     *         "revision": 12
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDraftDiagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                environment_id: components["parameters"]["EnvironmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Most recent result; status is stale when the project-level draft revision has advanced */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["DraftETag"];
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationResponse"];
+                };
+            };
+            /** @description No complete validation result has been stored for this environment. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
 }
