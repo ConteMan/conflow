@@ -191,7 +191,7 @@ func validatedCopy(definition Definition) (Definition, error) {
 			if !identifierPattern.MatchString(field.Name) || !validFieldType(field.Type) || field.Default == nil || !json.Valid(field.Default) {
 				return Definition{}, fmt.Errorf("%w: field %q", ErrInvalidDefinition, field.Name)
 			}
-			if !matchesFieldType(field.Default, field.Type) {
+			if !matchesFieldType(field.Default, field.Type) && !(field.Nullable && string(field.Default) == "null") {
 				return Definition{}, fmt.Errorf("%w: field default type %q", ErrInvalidDefinition, field.Name)
 			}
 			if field.Sensitivity != SensitivityPublic && field.Sensitivity != SensitivitySensitive {
@@ -205,7 +205,7 @@ func validatedCopy(definition Definition) (Definition, error) {
 			}
 			fields[field.Name] = struct{}{}
 			for _, value := range field.Validation.Enum {
-				if !json.Valid(value) || !matchesFieldType(value, field.Type) {
+				if !json.Valid(value) || (!matchesFieldType(value, field.Type) && !(field.Nullable && string(value) == "null")) {
 					return Definition{}, fmt.Errorf("%w: field enum %q", ErrInvalidDefinition, field.Name)
 				}
 			}

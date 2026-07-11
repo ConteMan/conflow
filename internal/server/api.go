@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ConteMan/conflow/internal/app"
+	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 )
@@ -32,6 +34,9 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/packs", a.listPacks)
 	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}", a.getPack)
 	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}/schema", a.getPackSchema)
+	mux.HandleFunc("GET /api/v1/drafts/{environment_id}", a.getDraft)
+	mux.HandleFunc("PUT /api/v1/drafts/{environment_id}", a.replaceDraft)
+	mux.HandleFunc("POST /api/v1/drafts/", a.draftAction)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments/{environment_id}", methodNotAllowed)
@@ -213,6 +218,74 @@ func (a *api) getPackSchema(writer http.ResponseWriter, request *http.Request) {
 	writeSuccess(writer, request, http.StatusOK, packSchemaDTOFrom(schema), revision)
 }
 
+func (a *api) getDraft(writer http.ResponseWriter, request *http.Request) {
+	view, revision, err := a.service.GetDraft(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), revision)
+}
+
+func (a *api) replaceDraft(writer http.ResponseWriter, request *http.Request) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input replaceDraftInput
+	if err := decodeJSON(writer, request, &input); err != nil {
+		writeRequestError(writer, request, err)
+		return
+	}
+	if !input.valid() {
+		writeRequestError(writer, request, errors.New("missing draft request field"))
+		return
+	}
+	a.mutateDraft(writer, request, request.PathValue("environment_id"), revision, *input.ExpectedSourceRevision, input.WriteScope, "put", input.Configuration)
+}
+
+func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
+	path := strings.TrimPrefix(request.URL.Path, "/api/v1/drafts/")
+	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard"} {
+		if strings.HasSuffix(path, suffix) {
+			environmentID := strings.TrimSuffix(path, suffix)
+			if environmentID == "" || strings.Contains(environmentID, "/") {
+				routeNotFound(writer, request)
+				return
+			}
+			a.mutateDraftAction(writer, request, environmentID, action)
+			return
+		}
+	}
+	routeNotFound(writer, request)
+}
+
+func (a *api) mutateDraftAction(writer http.ResponseWriter, request *http.Request, environmentID, action string) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input draftScopeMutationInput
+	if err := decodeJSON(writer, request, &input); err != nil {
+		writeRequestError(writer, request, err)
+		return
+	}
+	if !input.valid() {
+		writeRequestError(writer, request, errors.New("missing draft request field"))
+		return
+	}
+	a.mutateDraft(writer, request, environmentID, revision, *input.ExpectedSourceRevision, input.WriteScope, action, nil)
+}
+
+func (a *api) mutateDraft(writer http.ResponseWriter, request *http.Request, environmentID string, revision uint64, expectedSourceRevision, scope, action string, configuration []byte) {
+	view, nextRevision, err := a.service.MutateDraft(request.Context(), environmentID, draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: expectedSourceRevision, Scope: scope, Action: action, Configuration: configuration})
+	if err != nil {
+		a.writeDraftError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), nextRevision)
+}
+
 func schemaVersionFrom(request *http.Request) (*uint64, error) {
 	values, exists := request.URL.Query()["schema_version"]
 	if !exists {
@@ -248,7 +321,24 @@ func (a *api) writeError(writer http.ResponseWriter, request *http.Request, err 
 		writeAPIError(writer, request, http.StatusUnprocessableEntity, "schema_incompatible", "配置包 schema 版本不兼容", 0)
 	case errors.Is(err, project.ErrInvalidManifest):
 		writeAPIError(writer, request, http.StatusUnprocessableEntity, "validation_failed", "项目配置不合法", 0)
+	case errors.Is(err, draft.ErrEnvironmentNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "environment_not_found", "环境不存在", 0)
 	default:
 		writeAPIError(writer, request, http.StatusInternalServerError, "internal_error", "操作失败", 0)
+	}
+}
+
+func (a *api) writeDraftError(writer http.ResponseWriter, request *http.Request, err error) {
+	var conflict *draft.ConflictError
+	var validation *draft.ValidationError
+	switch {
+	case errors.As(err, &conflict):
+		writeDraftConflict(writer, request, conflict)
+	case errors.As(err, &validation):
+		writeDraftValidationError(writer, request, validation.Details)
+	case errors.Is(err, draft.ErrInvalidScope):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "write_scope 不合法", 0)
+	default:
+		a.writeError(writer, request, err)
 	}
 }

@@ -65,6 +65,7 @@ type FieldSchema struct {
 	Name        string          `json:"name"`
 	Type        FieldType       `json:"type"`
 	Required    bool            `json:"required"`
+	Nullable    bool            `json:"nullable"`
 	Default     json.RawMessage `json:"default"`
 	Sensitivity Sensitivity     `json:"sensitivity"`
 	UI          FieldUI         `json:"ui"`

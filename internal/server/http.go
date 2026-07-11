@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/project"
 )
 
@@ -163,6 +164,15 @@ func writeManifestRevisionMismatch(writer http.ResponseWriter, request *http.Req
 			Environments: environmentsDTOFrom(snapshot.Manifest.Environments),
 		},
 	}})
+}
+
+func writeDraftConflict(writer http.ResponseWriter, request *http.Request, conflict *draft.ConflictError) {
+	writer.Header().Set("ETag", strconv.Quote(strconv.FormatUint(conflict.CurrentRevision, 10)))
+	writeJSON(writer, http.StatusPreconditionFailed, draftConflictEnvelope{Error: draftConflictDTO{Code: conflict.Code, Message: "草稿或源配置已变化，请重新加载", RequestID: requestID(request), CurrentRevision: conflict.CurrentRevision, CurrentSourceRevision: conflict.CurrentSourceRevision, ConflictScope: conflict.ConflictScope, CurrentState: draftViewDTOFrom(conflict.CurrentState)}})
+}
+
+func writeDraftValidationError(writer http.ResponseWriter, request *http.Request, details []draft.StructuralError) {
+	writeJSON(writer, http.StatusUnprocessableEntity, draftValidationEnvelope{Error: draftValidationDTO{Code: "validation_failed", Message: "草稿 replacement 不符合 Pack schema", RequestID: requestID(request), Details: details}})
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {
