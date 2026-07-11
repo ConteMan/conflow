@@ -96,8 +96,8 @@ UI flows 或原型依赖服务端行为时，必须先登记并关闭 [`ui/contr
 |---|---|---|
 | `400` | `invalid_request`、`malformed_json` | 请求结构无法解析 |
 | `403` | `invalid_origin` | 浏览器来源不允许 |
-| `404` | `project_not_found`、`entity_not_found`、`pack_not_found`、`pack_version_not_found` | 资源不存在 |
-| `409` | `state_conflict`、`operation_in_progress` | 当前状态不允许操作 |
+| `404` | `project_not_found`、`entity_not_found`、`validation_not_found`、`pack_not_found`、`pack_version_not_found` | 资源不存在 |
+| `409` | `state_conflict`、`entity_referenced`、`operation_in_progress` | 当前状态不允许操作；`entity_referenced` 必须携带 typed references[] |
 | `412` | `revision_mismatch`、`source_revision_mismatch`、`remote_etag_mismatch` | 本地 revision、源 revision 或远端 ETag 已变化 |
 | `415` | `unsupported_media_type` | 修改请求未使用 JSON Content-Type |
 | `422` | `validation_failed`、`rule_violation`、`schema_incompatible` | 请求结构有效，但配置结构、业务规则不通过或客户端不能消费所请求 schema |
@@ -170,6 +170,25 @@ effective = Pack defaults < resolved baseline < resolved environment override
 
 草稿写入的错误优先级固定为：Origin / Content-Type → 解析并校验 `If-Match` → 解码请求与拒绝未知字段 → 资源存在性 → 捕获原子快照 → draft revision → source revision → structural validation → 提交。尤其不能先解码一个无 ETag 请求，再根据请求内容返回其他错误。
 
+### 7.2 Pack-neutral 实体资源
+
+Spec 006 的 Pack-neutral 实体资源位于 `/drafts/{environment_id}/entities`，因为实体是目标 Draft layer 的业务表达，而非独立于 baseline / environment override 的第四份配置。实体 CRUD 的 `write_scope`、`expected_source_revision`、项目级 draft ETag 与 `412` 顺序完全复用 7.1；`environment_id` 仍只是读取和写入视角。
+
+- 实体引用固定为不透明的 `entity:<pack_ref>:<entity_type>:<entity_id>` 字符串。前端不得拆分它来推断类型或名称。
+- `GET /drafts/{environment_id}/entities` 与单实体 `GET` 返回 `source`、`draft`、`resolved`、`effective` 的 presence state；列表按 `(entity_type, entity_id)` 排序。
+- `POST`、`PUT` 与 `DELETE` 都要求 `If-Match`、`expected_source_revision` 和 `write_scope`。服务端在指定目标层的完整实体 collection replacement 内执行单实体变更；数组整体替换规则保持不变。
+- `GET .../referenced-by` 返回当前环境有效图中的 `referenced_by[]`，每项包含稳定 `entity_ref`、`entity_type`、`entity_id` 与引用者内 RFC 6901 `path`。
+- Pack `deletion_policy=restrict` 的删除若仍有有效引用，返回 `409 entity_referenced`，其中 `error.current_revision` 与 ETag 来自同一快照，且非空 `error.references[]` 是唯一供 UI 决策的引用清单。不得要求前端解析 `message`；不得用 `force=true` 绕过。
+
+### 7.3 完整校验结果
+
+Spec 007 的 `POST /drafts/{environment_id}:validate` 对一次捕获的 DraftView 运行完整校验并存储 `ValidationResult`；`GET /drafts/{environment_id}/diagnostics` 返回该环境最近一次结果，尚无结果时返回 `404 validation_not_found`。
+
+- `ValidationResult` 固定包含 `validated_draft_revision`、`validated_at`、`status`（`fresh|stale`）、`readiness`（`ready|blocked`）与按稳定顺序返回的非 null `diagnostics[]`。
+- 任意项目级 draft revision 变化会使旧结果为 `stale`，但旧结果仍可读；stale 结果不能授权后续发布。
+- `Diagnostic` 与 structural error 共享 `code`、RFC 6901 `path` 和可选 `entity_ref`。structural error 另有 `scope`，只覆盖 schema / nullable / overrideability；完整诊断才表达引用、领域、环境和 readiness。
+- severity 是闭合枚举：`info` 映射 UI“建议”，`warning` 映射“警告”，`error` 与 `blocking` 均映射“阻断”。任一 `error` 或 `blocking` 使 readiness 为 `blocked`；CLI 分别返回 1 或 2，存在 blocking 时优先 2。
+
 ## 8. 幂等与发布
 
 以下请求必须带 `Idempotency-Key`：
@@ -219,7 +238,7 @@ effective = Pack defaults < resolved baseline < resolved environment override
 | `/health`、`/bootstrap` | 运行状态、GUI 启动上下文、能力发现 | 001、002 |
 | `/project`、`/environments` | 项目和环境 CRUD | 002 |
 | `/packs` | Pack 列表、版本 metadata 与声明式表单 schema；schema 查询可带客户端支持的 `schema_version` | 003 |
-| `/drafts/{environment_id}` | 草稿、实体 CRUD、环境覆盖 | 004、005、006 |
+| `/drafts/{environment_id}`、`/drafts/{environment_id}/entities` | 草稿、分层实体 CRUD、引用查询、环境覆盖 | 004、005、006 |
 | `/drafts/{environment_id}:validate` | 完整校验 | 007 |
 | `/drafts/{environment_id}:plan` | 构建、语义 diff、风险和影响范围 | 008 |
 | `/environments/{environment_id}/remote:*` | Provider 连接、拉取和验证 | 009 |
