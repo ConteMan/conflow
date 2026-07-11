@@ -24,6 +24,9 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newPullCommand())
 	root.AddCommand(newRemoteCommand())
 	root.AddCommand(newPublishCommand())
+	root.AddCommand(newReleaseCommand())
+	root.AddCommand(newRollbackCommand())
+	root.AddCommand(newDefaultsCommand())
 	root.SetHelpFunc(func(command *cobra.Command, args []string) {
 		fmt.Fprint(command.OutOrStdout(), command.UsageString())
 	})

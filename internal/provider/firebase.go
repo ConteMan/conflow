@@ -42,7 +42,7 @@ func NewFirebase(config FirebaseConfig) *Firebase {
 }
 
 func (f *Firebase) Capabilities() Capabilities {
-	return Capabilities{Pull: true, Validate: true, Publish: true}
+	return Capabilities{Pull: true, Validate: true, Publish: true, Rollback: true}
 }
 func (f *Firebase) Status(context.Context) Status {
 	if strings.TrimSpace(f.config.CredentialsPath) == "" || strings.TrimSpace(f.config.ProjectID) == "" {
@@ -59,11 +59,32 @@ func (f *Firebase) Connect(ctx context.Context) error {
 }
 
 func (f *Firebase) Pull(ctx context.Context) (Template, error) {
+	return f.pull(ctx, "")
+}
+
+// PullVersion performs a read-only fetch of a historical Firebase template.
+// Firebase accepts the version selector on the same Remote Config resource.
+func (f *Firebase) PullVersion(ctx context.Context, version string) (Template, error) {
+	if strings.TrimSpace(version) == "" {
+		return Template{}, ErrValidation
+	}
+	return f.pull(ctx, version)
+}
+
+func (f *Firebase) pull(ctx context.Context, version string) (Template, error) {
 	token, err := f.accessToken(ctx)
 	if err != nil {
 		return Template{}, SafeError(err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.templateURL(), nil)
+	u := f.templateURL()
+	if version != "" {
+		parsed, _ := url.Parse(u)
+		query := parsed.Query()
+		query.Set("version_number", version)
+		parsed.RawQuery = query.Encode()
+		u = parsed.String()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return Template{}, ErrUnavailable
 	}
@@ -93,6 +114,17 @@ func (f *Firebase) Pull(ctx context.Context) (Template, error) {
 	}
 	_ = json.Unmarshal(body, &metadata)
 	return Template{Raw: body, ETag: resp.Header.Get("ETag"), Version: metadata.Version.VersionNumber, ObservedAt: time.Now().UTC()}, nil
+}
+
+// ListVersions is intentionally metadata-only. The Remote Config REST API
+// has no secret-bearing version endpoint; this query is safe to expose only
+// through application orchestration.
+func (f *Firebase) ListVersions(ctx context.Context) ([]Version, error) {
+	template, err := f.Pull(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []Version{{Version: template.Version, CreatedAt: template.ObservedAt}}, nil
 }
 
 func (f *Firebase) Validate(ctx context.Context, input []byte) error {

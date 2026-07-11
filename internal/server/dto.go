@@ -64,6 +64,11 @@ type createReleaseInput struct {
 	ExpectedRemoteETag    string                 `json:"expected_remote_etag"`
 	Confirmation          releaseConfirmationDTO `json:"confirmation"`
 }
+type rollbackInput struct {
+	RollbackPreviewID  string                 `json:"rollback_preview_id"`
+	ExpectedRemoteETag string                 `json:"expected_remote_etag"`
+	Confirmation       releaseConfirmationDTO `json:"confirmation"`
+}
 type releaseConfirmationDTO struct {
 	Acknowledged            *bool    `json:"acknowledged"`
 	EnvironmentID           string   `json:"environment_id"`
@@ -72,6 +77,9 @@ type releaseConfirmationDTO struct {
 
 func (input createReleaseInput) valid() bool {
 	return input.PlanID != "" && input.ExpectedDraftRevision > 0 && input.ExpectedRemoteETag != "" && input.Confirmation.Acknowledged != nil && input.Confirmation.AcknowledgedRiskItemIDs != nil
+}
+func (input rollbackInput) valid() bool {
+	return input.RollbackPreviewID != "" && input.ExpectedRemoteETag != "" && input.Confirmation.Acknowledged != nil && input.Confirmation.AcknowledgedRiskItemIDs != nil
 }
 
 type remoteETagMismatchEnvelope struct {

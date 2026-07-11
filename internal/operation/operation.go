@@ -22,10 +22,13 @@ var ErrInvalidStage = errors.New("operation stage is invalid for operation type"
 // types remain extensible for later Specs, while read workflows cannot be
 // accidentally routed through a publishing stage.
 var AllowedStages = map[string]map[string]bool{
-	"remote_pull":     {"queued": true, "reading_remote": true, "snapshotting": true, "completed": true},
-	"remote_validate": {"queued": true, "validating_remote": true, "completed": true},
-	"plan":            {"queued": true, "reading_remote": true, "compiling": true, "analyzing": true, "completed": true},
-	"release":         {"queued": true, "validating_remote": true, "submitting": true, "verifying": true, "recording_audit": true, "completed": true},
+	"remote_pull":      {"queued": true, "reading_remote": true, "snapshotting": true, "completed": true},
+	"remote_validate":  {"queued": true, "validating_remote": true, "completed": true},
+	"plan":             {"queued": true, "reading_remote": true, "compiling": true, "analyzing": true, "completed": true},
+	"release":          {"queued": true, "validating_remote": true, "submitting": true, "verifying": true, "recording_audit": true, "completed": true},
+	"publish":          {"queued": true, "validating_remote": true, "submitting": true, "verifying": true, "recording_audit": true, "completed": true},
+	"rollback_preview": {"queued": true, "reading_remote": true, "analyzing": true, "completed": true},
+	"rollback":         {"queued": true, "validating_remote": true, "submitting": true, "verifying": true, "recording_audit": true, "completed": true},
 }
 
 type Failure struct {
