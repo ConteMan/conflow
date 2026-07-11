@@ -45,7 +45,7 @@ func (f *fakeFirebase) Publish(_ context.Context, input []byte, expectedETag str
 	return f.template, nil
 }
 func (f *fakeFirebase) Capabilities() provider.Capabilities {
-	return provider.Capabilities{Pull: true, Validate: true, Publish: true}
+	return provider.Capabilities{Pull: true, Validate: true, Publish: true, Rollback: true}
 }
 
 func TestPullValidateAndConditionRiskUseProviderBoundary(t *testing.T) {

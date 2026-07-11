@@ -36,6 +36,14 @@ type Template struct {
 	ObservedAt time.Time
 }
 
+// Version is a metadata-only historical Firebase Remote Config version. It
+// deliberately contains no template values.
+type Version struct {
+	Version     string    `json:"version"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description,omitempty"`
+}
+
 // Adapter owns only provider protocol calls. Credentials are represented by a
 // local reference and are never returned by this interface.
 type Adapter interface {
@@ -51,6 +59,15 @@ type Adapter interface {
 type Publisher interface {
 	Adapter
 	Publish(context.Context, []byte, string) (Template, error)
+}
+
+// VersionReader is optional because rollback can use the protected release
+// snapshot, while provider implementations may additionally expose historical
+// platform versions without granting mutation authority.
+type VersionReader interface {
+	Adapter
+	ListVersions(context.Context) ([]Version, error)
+	PullVersion(context.Context, string) (Template, error)
 }
 
 func SafeError(err error) error {

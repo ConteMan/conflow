@@ -180,7 +180,10 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/environments/{environment_id}/remote/projection", a.getRemoteProjection)
 	mux.HandleFunc("POST /api/v1/environments/{environment_id}/releases", a.createRelease)
 	mux.HandleFunc("GET /api/v1/environments/{environment_id}/releases", a.listReleases)
+	mux.HandleFunc("POST /api/v1/environments/{environment_id}/releases/{release_id}", a.releaseAction)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/releases/{release_id}/rollback-preview", a.getRollbackPreview)
 	mux.HandleFunc("GET /api/v1/environments/{environment_id}/releases/{release_id}", a.getRelease)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/defaults", a.downloadDefaults)
 	mux.HandleFunc("GET /api/v1/events", a.events)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
@@ -570,16 +573,104 @@ func (a *api) listReleases(writer http.ResponseWriter, request *http.Request) {
 		a.writeError(writer, request, err)
 		return
 	}
-	writeSuccess(writer, request, http.StatusOK, a.service.Releases(request.Context(), request.PathValue("environment_id")), 1)
+	limit, err := releaseLimit(request)
+	if err != nil {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "分页参数不合法", 0)
+		return
+	}
+	fetchLimit := limit
+	if fetchLimit > 0 {
+		fetchLimit++
+	}
+	items, err := a.service.ReleasesPage(request.Context(), request.PathValue("environment_id"), fetchLimit, request.URL.Query().Get("cursor"))
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	if limit > 0 && len(items) > limit {
+		writer.Header().Set("X-Next-Cursor", items[limit-1].ReleaseID)
+		items = items[:limit]
+	}
+	writeSuccess(writer, request, http.StatusOK, items, 1)
 }
 
 func (a *api) getRelease(writer http.ResponseWriter, request *http.Request) {
-	value, ok := a.service.Release(request.Context(), request.PathValue("release_id"))
+	value, ok, err := a.service.ReleaseWithError(request.Context(), request.PathValue("release_id"))
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
 	if !ok || value.EnvironmentID != request.PathValue("environment_id") {
 		writeAPIError(writer, request, http.StatusNotFound, "release_not_found", "发布记录不存在", 0)
 		return
 	}
 	writeSuccess(writer, request, http.StatusOK, value, 1)
+}
+
+func releaseLimit(request *http.Request) (int, error) {
+	raw := request.URL.Query().Get("limit")
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 || value > 100 {
+		return 0, errors.New("invalid release limit")
+	}
+	return value, nil
+}
+
+func (a *api) createRollbackPreview(writer http.ResponseWriter, request *http.Request) {
+	op, err := a.service.CreateRollbackPreview(request.Context(), request.PathValue("environment_id"), request.PathValue("release_id"))
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+func (a *api) releaseAction(writer http.ResponseWriter, request *http.Request) {
+	releaseID := request.PathValue("release_id")
+	switch {
+	case strings.HasSuffix(releaseID, ":rollback-preview"):
+		request.SetPathValue("release_id", strings.TrimSuffix(releaseID, ":rollback-preview"))
+		a.createRollbackPreview(writer, request)
+	case strings.HasSuffix(releaseID, ":rollback"):
+		request.SetPathValue("release_id", strings.TrimSuffix(releaseID, ":rollback"))
+		a.rollbackRelease(writer, request)
+	default:
+		routeNotFound(writer, request)
+	}
+}
+func (a *api) getRollbackPreview(writer http.ResponseWriter, request *http.Request) {
+	preview, err := a.service.RollbackPreview(request.Context(), request.PathValue("environment_id"), request.PathValue("release_id"))
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, preview, 1)
+}
+func (a *api) rollbackRelease(writer http.ResponseWriter, request *http.Request) {
+	var input rollbackInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	op, err := a.service.StartRollback(request.Context(), request.PathValue("environment_id"), request.PathValue("release_id"), request.Header.Get("Idempotency-Key"), app.RollbackRequest{RollbackPreviewID: input.RollbackPreviewID, ExpectedRemoteETag: input.ExpectedRemoteETag, Confirmation: app.ReleaseConfirmation{Acknowledged: *input.Confirmation.Acknowledged, EnvironmentID: input.Confirmation.EnvironmentID, AcknowledgedRiskItemIDs: input.Confirmation.AcknowledgedRiskItemIDs}})
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+func (a *api) downloadDefaults(writer http.ResponseWriter, request *http.Request) {
+	content, filename, mediaType, err := a.service.Defaults(request.Context(), request.PathValue("environment_id"), request.URL.Query().Get("format"))
+	if err != nil {
+		a.writeReleaseError(writer, request, err)
+		return
+	}
+	writer.Header().Set("Content-Type", mediaType)
+	writer.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	writer.WriteHeader(http.StatusOK)
+	_, _ = writer.Write(content)
 }
 
 func (a *api) saveDraft(writer http.ResponseWriter, request *http.Request, environmentID string) {
@@ -686,6 +777,18 @@ func (a *api) writeReleaseError(writer http.ResponseWriter, request *http.Reques
 		writeAPIError(writer, request, http.StatusConflict, "confirmation_invalid", "发布确认不满足计划要求", 0)
 	case errors.Is(err, provider.ErrNotConfigured):
 		writeAPIError(writer, request, http.StatusServiceUnavailable, "provider_unavailable", "发布 Provider 不可用", 0)
+	case errors.Is(err, app.ErrReleaseNotFound), errors.Is(err, release.ErrNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "release_not_found", "发布记录不存在", 0)
+	case errors.Is(err, release.ErrPreviewNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "rollback_preview_not_found", "回滚预览不存在", 0)
+	case errors.Is(err, app.ErrRollbackPreviewInvalid):
+		writeAPIError(writer, request, http.StatusConflict, "rollback_preview_invalid", "回滚预览已失效、过期或不匹配", 0)
+	case errors.Is(err, app.ErrDefaultsFormat):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "defaults format 必须是 xml、json 或 plist", 0)
+	case errors.Is(err, app.ErrRemoteSnapshotUnavailable):
+		writeAPIError(writer, request, http.StatusNotFound, "remote_snapshot_not_found", "远端快照不可用", 0)
+	case errors.Is(err, release.ErrCorrupt):
+		writeAPIError(writer, request, http.StatusServiceUnavailable, "release_audit_corrupt", "发布审计存储已损坏", 0)
 	default:
 		a.writeError(writer, request, err)
 	}
