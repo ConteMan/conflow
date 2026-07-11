@@ -20,7 +20,7 @@
 | [012](012-ui-design-prototype.md) | UI 设计探索与设计基线 | 002、003、006 | 已实现 |
 | [013](013-ui-project-shell.md) | Web 应用壳、项目与环境管理 UI | 002、003、012 | 已实现 |
 | [014](014-ui-domain-editor.md) | 业务配置编辑器 | 004、006、007、012、013 | 已实现 |
-| [015](015-ui-plan-release.md) | 校验、Plan、发布与回滚 UI | 008–012、014 | 待实现 |
+| [015](015-ui-plan-release.md) | 校验、Plan、发布与回滚 UI | 008–012、014 | 已实现 |
 | [016](016-git-json-source.md) | Git JSON 源适配器与迁移 | 004、005、008 | 待实现 |
 | [017](017-git-review-workflow.md) | Git 评审工作流与审阅产物 | 008、016 | 待实现 |
 | [018](018-cli-automation.md) | CLI 能力对齐与自动化契约 | 007–011、016、017 | 待实现 |

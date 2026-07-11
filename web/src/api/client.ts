@@ -32,8 +32,13 @@ export type PlanResponse = components["schemas"]["PlanResponse"];
 export type AffectedEntity = components["schemas"]["AffectedEntity"];
 export type RemoteParameterChange = components["schemas"]["RemoteParameterChange"];
 export type SemanticChange = components["schemas"]["SemanticChange"];
+export type Release = components["schemas"]["Release"];
+export type ReleaseSummary = components["schemas"]["ReleaseSummary"];
+export type RollbackPreview = components["schemas"]["RollbackPreview"];
+export type ReleaseConfirmation = components["schemas"]["ReleaseConfirmation"];
+export type RemoteAuditState = components["schemas"]["RemoteAuditState"];
 
-type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"];
+type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"] | components["schemas"]["RemoteETagMismatchResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
 type ProjectResponse = components["schemas"]["ProjectResponse"];
 type EnvironmentResponse = components["schemas"]["EnvironmentResponse"];
@@ -48,6 +53,8 @@ export class ConflowAPIError extends Error {
   readonly currentState?: ManifestState | DraftView;
   readonly details?: DraftStructuralErrorDetail[];
   readonly references?: EntityReference[];
+  readonly currentRemote?: RemoteAuditState;
+  readonly rebuildRequired?: boolean;
 
   constructor(status: number, error: APIErrorResponse["error"] | ConflictResponse["error"]) {
     super(error.message);
@@ -61,6 +68,10 @@ export class ConflowAPIError extends Error {
     }
     if (error.code === "validation_failed" && "details" in error) this.details = error.details as DraftStructuralErrorDetail[];
     if (error.code === "entity_referenced" && "references" in error) this.references = error.references as EntityReference[];
+    if (error.code === "remote_etag_mismatch" && "current_remote" in error) {
+      this.currentRemote = error.current_remote as RemoteAuditState;
+      this.rebuildRequired = "rebuild" in error && error.rebuild.required;
+    }
   }
 }
 
@@ -189,4 +200,43 @@ export function getPlan(planID: string, signal?: AbortSignal): Promise<PlanRespo
 
 export function planArtifactURL(planID: string, artifactName: string) {
   return `/api/v1/plans/${encodeURIComponent(planID)}/artifacts/${encodeURIComponent(artifactName)}`;
+}
+
+export function createRelease(environmentID: string, input: components["schemas"]["CreateReleaseInput"], idempotencyKey: string): Promise<OperationResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export function listReleases(environmentID: string, signal?: AbortSignal): Promise<components["schemas"]["ReleasesResponse"]> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases`, { signal });
+}
+
+export function getRelease(environmentID: string, releaseID: string, signal?: AbortSignal): Promise<components["schemas"]["ReleaseResponse"]> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases/${encodeURIComponent(releaseID)}`, { signal });
+}
+
+export function createRollbackPreview(environmentID: string, releaseID: string): Promise<OperationResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases/${encodeURIComponent(releaseID)}:rollback-preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export function getRollbackPreview(environmentID: string, releaseID: string, signal?: AbortSignal): Promise<components["schemas"]["RollbackPreviewResponse"]> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases/${encodeURIComponent(releaseID)}/rollback-preview`, { signal });
+}
+
+export function rollbackRelease(environmentID: string, releaseID: string, input: components["schemas"]["RollbackInput"], idempotencyKey: string): Promise<OperationResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/releases/${encodeURIComponent(releaseID)}:rollback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export function defaultsURL(environmentID: string, format: "xml" | "json" | "plist") {
+  return `/api/v1/environments/${encodeURIComponent(environmentID)}/defaults?format=${format}`;
 }
