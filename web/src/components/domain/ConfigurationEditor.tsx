@@ -35,12 +35,14 @@ type BindingLoad = Record<string, EntityView[]>;
 type DeleteTarget = { entity: EntityView; entityType: "placement" | "frequency_policy" };
 type DiagnosticCategory = "blocking" | "warning" | "info";
 
-export function ConfigurationEditor({ environment, environments, revision, packRef, onRevision }: {
+export function ConfigurationEditor({ environment, environments, revision, packRef, focusEntityRef, onRevision, onValidation }: {
   environment: Environment;
   environments: Environment[];
   revision: number;
   packRef: string;
+  focusEntityRef?: string;
   onRevision: (revision: number, dirty: boolean) => void;
+  onValidation?: (result: ValidationResult | null) => void;
 }) {
   const [route, setRoute] = useState<EditorRoute>({ mode: "list" });
   const [schema, setSchema] = useState<PackSchema | null>(null);
@@ -75,20 +77,28 @@ export function ConfigurationEditor({ environment, environments, revision, packR
         Promise.all(environments.map(async (item) => [item.id, (await listDraftEntities(item.id, "unit_binding", signal)).data] as const)),
         diagnostics,
       ]);
-      setSchema(nextSchema.data); setPlacements(nextPlacements.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setDraft(nextDraft.data); setBindings(Object.fromEntries(nextBindings)); setValidation(nextDiagnostics?.data ?? null);
+      setSchema(nextSchema.data); setPlacements(nextPlacements.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setDraft(nextDraft.data); setBindings(Object.fromEntries(nextBindings)); setValidation(nextDiagnostics?.data ?? null); onValidation?.(nextDiagnostics?.data ?? null);
       onRevision(nextDraft.meta.revision, nextDraft.data.dirty);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       setError(toRequestError(cause));
     } finally { if (!signal?.aborted) setLoading(false); }
-  }, [environment.id, environments, onRevision, packRef]);
+  }, [environment.id, environments, onRevision, onValidation, packRef]);
 
   useEffect(() => { const controller = new AbortController(); void loadList(controller.signal); return () => controller.abort(); }, [loadList]);
   useEffect(() => { setRoute({ mode: "list" }); }, [environment.id]);
+  useEffect(() => {
+    if (!focusEntityRef) return;
+    const [, , entityType, entityID] = focusEntityRef.split(":");
+    if (entityType === "placement") setRoute({ mode: "detail", id: entityID });
+    else if (entityType === "frequency_policy") { setTab("frequency_policy"); setEditingPolicy(policies.find((item) => item.entity_id === entityID) ?? null); }
+    else if (entityType === "feature_switch") setTab("feature_switch");
+    else if (entityType === "unit_binding") setTab("unit_binding");
+  }, [focusEntityRef, policies]);
 
   const runValidation = async () => {
     setValidating(true); setValidationError(null);
-    try { setValidation((await validateDraft(environment.id)).data); }
+    try { const result = (await validateDraft(environment.id)).data; setValidation(result); onValidation?.(result); }
     catch (cause) { setValidationError(toRequestError(cause)); }
     finally { setValidating(false); }
   };

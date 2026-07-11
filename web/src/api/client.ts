@@ -25,6 +25,13 @@ export type EntityReferencesResponse = components["schemas"]["EntityReferencesRe
 export type Diagnostic = components["schemas"]["Diagnostic"];
 export type ValidationResult = components["schemas"]["ValidationResult"];
 export type ValidationResponse = components["schemas"]["ValidationResponse"];
+export type Operation = components["schemas"]["Operation"];
+export type OperationResponse = components["schemas"]["OperationResponse"];
+export type Plan = components["schemas"]["Plan"];
+export type PlanResponse = components["schemas"]["PlanResponse"];
+export type AffectedEntity = components["schemas"]["AffectedEntity"];
+export type RemoteParameterChange = components["schemas"]["RemoteParameterChange"];
+export type SemanticChange = components["schemas"]["SemanticChange"];
 
 type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
@@ -161,9 +168,25 @@ export function getDraftEntityReferences(environmentID: string, entityType: stri
 }
 
 export function validateDraft(environmentID: string): Promise<ValidationResponse> {
-  return request(`/drafts/${encodeURIComponent(environmentID)}:validate`, { method: "POST" });
+  return request(`/drafts/${encodeURIComponent(environmentID)}:validate`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
 
 export function getDraftDiagnostics(environmentID: string, signal?: AbortSignal): Promise<ValidationResponse> {
   return request(`/drafts/${encodeURIComponent(environmentID)}/diagnostics`, { signal });
+}
+
+export function createPlan(environmentID: string): Promise<OperationResponse> {
+  return request(`/drafts/${encodeURIComponent(environmentID)}:plan`, { method: "POST", headers: { "Content-Type": "application/json" } });
+}
+
+export function getOperation(operationID: string, signal?: AbortSignal): Promise<OperationResponse> {
+  return request(`/operations/${encodeURIComponent(operationID)}`, { signal });
+}
+
+export function getPlan(planID: string, signal?: AbortSignal): Promise<PlanResponse> {
+  return request(`/plans/${encodeURIComponent(planID)}`, { signal });
+}
+
+export function planArtifactURL(planID: string, artifactName: string) {
+  return `/api/v1/plans/${encodeURIComponent(planID)}/artifacts/${encodeURIComponent(artifactName)}`;
 }
