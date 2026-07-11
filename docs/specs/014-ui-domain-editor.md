@@ -18,6 +18,8 @@
 
 开工前关闭 [`UI-API-005` 至 `UI-API-013`](../design/ui/contract-gaps.md#spec-014-开工门槛)。草稿层级、字段来源、冲突恢复、实体引用、远端值投影、校验 freshness 与共享 fixture 必须先进入后端 Spec 和 OpenAPI；React 不自行定义这些 DTO 或规则。
 
+UI-API-009 于 2026-07-11 由维护者决策降级：014 首版编辑器的字段 caption 不含线上值，待 Spec 008/009 后补充。
+
 ## 范围
 
 - 实体列表、筛选、引用计数、风险状态和详情编辑。
