@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -70,6 +71,43 @@ func TestPlanHTTPReturnsOperationAndRecoversResult(t *testing.T) {
 	missing := executeRequest(t, handler, http.MethodGet, "/api/v1/plans/missing", "", nil)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing status = %d", missing.Code)
+	}
+}
+
+func TestSSEDisconnectCanRecoverTerminalOperationByPolling(t *testing.T) {
+	handler, _ := newTestHandler(t)
+	created := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/development:plan", "", nil)
+	var started struct {
+		Data struct {
+			OperationID string `json:"operation_id"`
+		} `json:"data"`
+	}
+	decodeResponse(t, created, &started)
+	// SSE is only a one-event enhancement. Discarding this recorder models a
+	// disconnected EventSource; GET Operation remains the durable authority.
+	events := executeRequest(t, handler, http.MethodGet, "/api/v1/events?operation_id="+started.Data.OperationID, "", nil)
+	if events.Code != http.StatusOK || !strings.Contains(events.Body.String(), "event: operation") {
+		t.Fatalf("events=%d %s", events.Code, events.Body.String())
+	}
+	for deadline := time.Now().Add(time.Second); ; {
+		result := executeRequest(t, handler, http.MethodGet, "/api/v1/operations/"+started.Data.OperationID, "", nil)
+		var op struct {
+			Data struct {
+				Status      string `json:"status"`
+				RemoteState string `json:"remote_state"`
+			} `json:"data"`
+		}
+		decodeResponse(t, result, &op)
+		if op.Data.Status == "succeeded" {
+			if op.Data.RemoteState != "unchanged" {
+				t.Fatalf("remote_state=%q", op.Data.RemoteState)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("poll did not recover terminal operation")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 

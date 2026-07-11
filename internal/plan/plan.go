@@ -42,6 +42,7 @@ type AffectedEntity struct {
 }
 type RemoteParameterChange struct {
 	NodeID                    string   `json:"node_id"`
+	ProjectionID              string   `json:"projection_id,omitempty"`
 	ParameterKey              string   `json:"parameter_key"`
 	ChangeKind                string   `json:"change_kind"`
 	BeforeSummary             string   `json:"before_summary,omitempty"`
@@ -239,7 +240,7 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 					if value, ok := in.RemoteSnapshot.Parameters[key]; ok {
 						remoteBefore = value
 					}
-					p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(av), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
+					p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(av), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
 					c.RemoteParameterNodeIDs = []string{remoteNode}
 				}
 				changes = append(changes, c)

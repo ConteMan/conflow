@@ -15,6 +15,7 @@ import (
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/ConteMan/conflow/internal/remote"
 	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
@@ -49,6 +50,8 @@ type Service struct {
 	operations   *operation.Store
 	plans        *plan.Store
 	remote       remote.Store
+	workspace    string
+	providerFor  func(project.Environment) (provider.Adapter, error)
 }
 
 func Initialize(workspace string) (string, error) {
@@ -60,6 +63,12 @@ func Open(workspace string) (*Service, error) {
 }
 
 func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error) {
+	return OpenWithPacksAndProviderFactory(workspace, registry, nil)
+}
+
+// OpenWithPacksAndProviderFactory keeps the application orchestration
+// testable without allowing provider protocol details into the app package.
+func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry, factory func(project.Environment) (provider.Adapter, error)) (*Service, error) {
 	if registry == nil {
 		return nil, ErrPackRegistryUnavailable
 	}
@@ -97,7 +106,16 @@ func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace)}, nil
+	if factory == nil {
+		factory = func(environment project.Environment) (provider.Adapter, error) {
+			credentialPath, configErr := provider.LoadCredentialReference(workspace, environment.ID)
+			if configErr != nil {
+				return nil, configErr
+			}
+			return provider.NewFirebase(provider.FirebaseConfig{ProjectID: environment.Provider.ProjectID, CredentialsPath: credentialPath}), nil
+		}
+	}
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), workspace: workspace, providerFor: factory}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -336,22 +354,155 @@ func (s *Service) Operation(_ context.Context, id string) (operation.Operation, 
 	return s.operations.Get(id)
 }
 
+type ProviderInfo struct {
+	EnvironmentID string                `json:"environment_id"`
+	ProviderType  string                `json:"provider_type"`
+	Status        string                `json:"status"`
+	Capabilities  provider.Capabilities `json:"capabilities"`
+}
+
+func (s *Service) ProviderStatus(ctx context.Context, environmentID string) (ProviderInfo, error) {
+	_, environment, err := s.GetEnvironment(ctx, environmentID)
+	if err != nil {
+		return ProviderInfo{}, err
+	}
+	adapter, err := s.providerFor(environment)
+	if err != nil || adapter == nil {
+		return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: "not_configured"}, nil
+	}
+	status := adapter.Status(ctx)
+	return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: status.Status, Capabilities: status.Capabilities}, nil
+}
+
+func (s *Service) StartProviderConnect(ctx context.Context, environmentID string) (operation.Operation, error) {
+	if _, _, err := s.GetEnvironment(ctx, environmentID); err != nil {
+		return operation.Operation{}, err
+	}
+	op, err := s.operations.Create("provider_connect")
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	go func() {
+		_, _ = s.operations.Update(op.OperationID, "running", "reading_remote", nil, nil, "unchanged")
+		_, environment, getErr := s.GetEnvironment(context.Background(), environmentID)
+		if getErr == nil {
+			var adapter provider.Adapter
+			adapter, getErr = s.providerFor(environment)
+			if getErr == nil {
+				getErr = adapter.Connect(context.Background())
+			}
+		}
+		if getErr != nil {
+			s.failProviderOperation(op.OperationID, "reading_remote", getErr)
+		} else {
+			_, _ = s.operations.Update(op.OperationID, "succeeded", "completed", nil, nil, "unchanged")
+		}
+	}()
+	return op, nil
+}
+
+func (s *Service) StartPull(ctx context.Context, environmentID string) (operation.Operation, error) {
+	if _, _, err := s.GetEnvironment(ctx, environmentID); err != nil {
+		return operation.Operation{}, err
+	}
+	op, err := s.operations.Create("remote_pull")
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	go s.pullRemote(op.OperationID, environmentID)
+	return op, nil
+}
+
+func (s *Service) pullRemote(operationID, environmentID string) {
+	_, _ = s.operations.Update(operationID, "running", "reading_remote", nil, nil, "unchanged")
+	_, environment, err := s.GetEnvironment(context.Background(), environmentID)
+	if err == nil {
+		var adapter provider.Adapter
+		adapter, err = s.providerFor(environment)
+		if err == nil {
+			var pulled provider.Template
+			pulled, err = adapter.Pull(context.Background())
+			if err == nil {
+				var snapshot remote.Snapshot
+				snapshot, err = remote.SnapshotFromTemplate(pulled.Raw, pulled.ETag, pulled.Version, pulled.ObservedAt)
+				if err == nil {
+					_, _ = s.operations.Update(operationID, "running", "snapshotting", nil, nil, "unchanged")
+					err = s.remote.(*remote.FileStore).Save(environmentID, snapshot)
+					if err == nil {
+						_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "remote_snapshot", ResourceID: environmentID, Href: "/api/v1/environments/" + environmentID + "/remote/projection"}, "unchanged")
+						return
+					}
+				}
+			}
+		}
+	}
+	s.failProviderOperation(operationID, "reading_remote", err)
+}
+
+func (s *Service) StartRemoteValidate(ctx context.Context, environmentID, planID string) (operation.Operation, error) {
+	_, environment, err := s.GetEnvironment(ctx, environmentID)
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	p, err := s.plans.Get(planID)
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	if p.EnvironmentID != environment.ID || p.Status != "ready" {
+		return operation.Operation{}, &PlanInvalidatedError{PlanID: planID, Reason: "validation_not_ready"}
+	}
+	op, err := s.operations.Create("remote_validate")
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	go func() {
+		_, _ = s.operations.Update(op.OperationID, "running", "validating_remote", nil, nil, "unchanged")
+		adapter, callErr := s.providerFor(environment)
+		if callErr == nil {
+			var input []byte
+			input, _, callErr = s.plans.Artifact(planID, "provider-input.json")
+			if callErr == nil {
+				callErr = adapter.Validate(context.Background(), input)
+			}
+		}
+		if callErr != nil {
+			s.failProviderOperation(op.OperationID, "validating_remote", callErr)
+			return
+		}
+		_, _ = s.operations.Update(op.OperationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "plan", ResourceID: planID, Href: "/api/v1/plans/" + planID}, "unchanged")
+	}()
+	return op, nil
+}
+
+func (s *Service) failProviderOperation(operationID, stage string, err error) {
+	safe := provider.SafeError(err)
+	code, retryable := "provider_unavailable", true
+	if errors.Is(safe, provider.ErrUnauthorized) {
+		code, retryable = "provider_unauthorized", false
+	} else if errors.Is(safe, provider.ErrNotConfigured) {
+		code, retryable = "provider_not_configured", false
+	} else if errors.Is(safe, provider.ErrValidation) {
+		code, retryable = "provider_validation_failed", false
+	} else if errors.Is(safe, context.Canceled) {
+		code, retryable = "operation_cancelled", false
+	}
+	// Never retain upstream error text: it can contain Authorization material.
+	_, _ = s.operations.Update(operationID, "failed", stage, &operation.Failure{Code: code, Message: "provider request failed", Retryable: retryable, Stage: stage}, nil, "unchanged")
+}
+
 func (s *Service) buildPlan(operationID, environmentID string) {
 	fail := func(stage string, err error) {
 		_, _ = s.operations.Update(operationID, "failed", stage, &operation.Failure{Code: "plan_build_failed", Message: err.Error(), Retryable: false, Stage: stage}, nil, "unchanged")
 	}
 	_, _ = s.operations.Update(operationID, "running", "reading_remote", nil, nil, "unchanged")
-	remoteSnapshot, err := s.remote.Current(environmentID)
-	if err != nil {
-		fail("reading_remote", err)
-		return
-	}
+	remoteSnapshot := s.planRemoteSnapshot(environmentID)
 	_, _ = s.operations.Update(operationID, "running", "compiling", nil, nil, "unchanged")
 	view, revision, environment, err := s.validationContext(environmentID)
 	if err != nil {
 		fail("compiling", err)
 		return
 	}
+	inspectRemote(&remoteSnapshot, view.Effective)
 	validationResult, _, err := s.ValidateDraft(context.Background(), environmentID)
 	if err != nil {
 		fail("compiling", err)
@@ -392,6 +543,44 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		return
 	}
 	_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "plan", ResourceID: built.Plan.PlanID, Href: "/api/v1/plans/" + built.Plan.PlanID}, "unchanged")
+}
+
+// planRemoteSnapshot owns the Plan read boundary. A configured provider is
+// read afresh; on any read failure it returns an unavailable fact rather than
+// allowing an older ETag to masquerade as current. Workspaces without a
+// credential reference may still use their protected local snapshot for the
+// offline/fixture workflow established by Spec 008.
+func (s *Service) planRemoteSnapshot(environmentID string) remote.Snapshot {
+	_, environment, err := s.GetEnvironment(context.Background(), environmentID)
+	if err != nil {
+		return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+	}
+	adapter, err := s.providerFor(environment)
+	if err != nil {
+		return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+	}
+	if adapter.Status(context.Background()).Status == "not_configured" {
+		snapshot, cacheErr := s.remote.Current(environmentID)
+		if cacheErr != nil {
+			return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+		}
+		return snapshot
+	}
+	pulled, err := adapter.Pull(context.Background())
+	if err != nil {
+		if errors.Is(provider.SafeError(err), provider.ErrUnauthorized) {
+			return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnauthorized}
+		}
+		return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+	}
+	snapshot, err := remote.SnapshotFromTemplate(pulled.Raw, pulled.ETag, pulled.Version, pulled.ObservedAt)
+	if err != nil {
+		return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+	}
+	if err := s.remote.(*remote.FileStore).Save(environmentID, snapshot); err != nil {
+		return remote.Snapshot{Status: "unavailable", UnavailableReason: remote.ProviderUnavailable}
+	}
+	return snapshot
 }
 
 func (s *Service) GetPlan(ctx context.Context, id string) (plan.Plan, error) {

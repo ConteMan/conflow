@@ -39,6 +39,56 @@ func (a *api) getOperation(writer http.ResponseWriter, request *http.Request) {
 	writeSuccess(writer, request, http.StatusOK, op, 1)
 }
 
+func (a *api) getProviderStatus(writer http.ResponseWriter, request *http.Request) {
+	info, err := a.service.ProviderStatus(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeProviderError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, info, 1)
+}
+
+func (a *api) connectProvider(writer http.ResponseWriter, request *http.Request) {
+	op, err := a.service.StartProviderConnect(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeProviderError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+
+func (a *api) pullRemote(writer http.ResponseWriter, request *http.Request) {
+	op, err := a.service.StartPull(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeProviderError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+
+func (a *api) validateRemote(writer http.ResponseWriter, request *http.Request) {
+	var input remoteValidateInput
+	if err := decodeJSON(writer, request, &input); err != nil || input.PlanID == "" {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "plan_id 是必填项", 0)
+		return
+	}
+	op, err := a.service.StartRemoteValidate(request.Context(), request.PathValue("environment_id"), input.PlanID)
+	if err != nil {
+		a.writeProviderError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusAccepted, op, 1)
+}
+
+func (a *api) getRemoteProjection(writer http.ResponseWriter, request *http.Request) {
+	projection, err := a.service.RemoteProjection(request.Context(), request.PathValue("environment_id"))
+	if err != nil {
+		a.writeProviderError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, projection, 1)
+}
+
 func (a *api) getPlan(writer http.ResponseWriter, request *http.Request) {
 	p, err := a.service.GetPlan(request.Context(), request.PathValue("plan_id"))
 	if err != nil {
@@ -121,6 +171,11 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/plans/{plan_id}", a.getPlan)
 	mux.HandleFunc("GET /api/v1/plans/{plan_id}/artifacts/{artifact_name}", a.getPlanArtifact)
 	mux.HandleFunc("GET /api/v1/operations/{operation_id}", a.getOperation)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/provider", a.getProviderStatus)
+	mux.HandleFunc("POST /api/v1/environments/{environment_id}/provider:connect", a.connectProvider)
+	mux.HandleFunc("POST /api/v1/environments/{environment_id}/remote:pull", a.pullRemote)
+	mux.HandleFunc("POST /api/v1/environments/{environment_id}/remote:validate", a.validateRemote)
+	mux.HandleFunc("GET /api/v1/environments/{environment_id}/remote/projection", a.getRemoteProjection)
 	mux.HandleFunc("GET /api/v1/events", a.events)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
@@ -619,5 +674,17 @@ func (a *api) writePlanError(writer http.ResponseWriter, request *http.Request, 
 		writeAPIError(writer, request, http.StatusNotFound, "plan_not_found", "计划不存在", 0)
 	default:
 		a.writeError(writer, request, err)
+	}
+}
+
+func (a *api) writeProviderError(writer http.ResponseWriter, request *http.Request, err error) {
+	var invalidated *app.PlanInvalidatedError
+	switch {
+	case errors.Is(err, app.ErrRemoteSnapshotUnavailable):
+		writeAPIError(writer, request, http.StatusNotFound, "remote_snapshot_not_found", "远端快照不可用", 0)
+	case errors.As(err, &invalidated):
+		writeAPIError(writer, request, http.StatusConflict, "plan_invalidated", "计划尚未就绪", 0)
+	default:
+		a.writePlanError(writer, request, err)
 	}
 }
