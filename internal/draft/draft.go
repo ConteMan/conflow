@@ -22,6 +22,9 @@ const (
 var (
 	ErrEnvironmentNotFound = errors.New("draft environment not found")
 	ErrInvalidScope        = errors.New("invalid draft write scope")
+	// ErrSourceRevisionChanged lets a source transaction request the typed
+	// source_revision_mismatch response without coupling draft to an adapter.
+	ErrSourceRevisionChanged = errors.New("source revision changed")
 )
 
 type Environment struct {

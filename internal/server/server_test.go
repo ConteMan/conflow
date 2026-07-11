@@ -79,6 +79,32 @@ func TestBootstrapReturnsRevisionAndRequestID(t *testing.T) {
 	}
 }
 
+func TestSourceEndpointsExposeManagedFileStatusWithoutAbsolutePaths(t *testing.T) {
+	handler, _ := newTestHandler(t)
+	source := executeRequest(t, handler, http.MethodGet, "/api/v1/source", "", nil)
+	if source.Code != http.StatusOK {
+		t.Fatalf("source status = %d: %s", source.Code, source.Body.String())
+	}
+	var sourceResponse struct {
+		Data sourceDTO `json:"data"`
+	}
+	decodeResponse(t, source, &sourceResponse)
+	if sourceResponse.Data.Type != "managed-file" || !sourceResponse.Data.Capabilities.Load || !sourceResponse.Data.Capabilities.Save {
+		t.Fatalf("source = %#v", sourceResponse.Data)
+	}
+	status := executeRequest(t, handler, http.MethodGet, "/api/v1/source/status", "", nil)
+	if status.Code != http.StatusOK {
+		t.Fatalf("source status = %d: %s", status.Code, status.Body.String())
+	}
+	var statusResponse struct {
+		Data sourceStatusDTO `json:"data"`
+	}
+	decodeResponse(t, status, &statusResponse)
+	if statusResponse.Data.Digest == "" || len(statusResponse.Data.Paths) != 1 || statusResponse.Data.Paths[0] != ".conflow/data/base.yaml" {
+		t.Fatalf("status = %#v", statusResponse.Data)
+	}
+}
+
 func TestProjectUpdateAndRevisionConflict(t *testing.T) {
 	handler, _ := newTestHandler(t)
 	body := `{"id":"photo-editor","name":"Updated Photo Editor"}`

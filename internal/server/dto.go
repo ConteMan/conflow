@@ -68,6 +68,14 @@ type draftScopeMutationInput struct {
 	WriteScope             string  `json:"write_scope"`
 }
 
+type saveDraftInput struct {
+	ExpectedSourceRevision *string `json:"expected_source_revision"`
+}
+
+func (input saveDraftInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != ""
+}
+
 type createEntityInput struct {
 	ExpectedSourceRevision *string           `json:"expected_source_revision"`
 	WriteScope             string            `json:"write_scope"`
@@ -154,6 +162,23 @@ type bootstrapData struct {
 type capabilitiesDTO struct {
 	ProjectEdit       bool `json:"project_edit"`
 	EnvironmentManage bool `json:"environment_manage"`
+}
+
+type sourceDTO struct {
+	Type         string                `json:"type"`
+	Capabilities sourceCapabilitiesDTO `json:"capabilities"`
+}
+
+type sourceCapabilitiesDTO struct {
+	Load bool `json:"load"`
+	Save bool `json:"save"`
+}
+
+type sourceStatusDTO struct {
+	Type             string   `json:"type"`
+	Digest           string   `json:"digest"`
+	ExternalModified bool     `json:"external_modified"`
+	Paths            []string `json:"paths"`
 }
 
 type projectDTO struct {
@@ -293,6 +318,14 @@ func projectDTOFrom(manifest project.Manifest) projectDTO {
 		PackRef:    manifest.Pack.ID,
 		SourceType: manifest.Source.Type,
 	}
+}
+
+func sourceDTOFrom(info app.SourceInfo) sourceDTO {
+	return sourceDTO{Type: info.Type, Capabilities: sourceCapabilitiesDTO{Load: info.Capabilities.Read, Save: info.Capabilities.Save}}
+}
+
+func sourceStatusDTOFrom(info app.SourceInfo) sourceStatusDTO {
+	return sourceStatusDTO{Type: info.Status.Type, Digest: info.Status.Digest, ExternalModified: info.Status.ExternalModified, Paths: append([]string{}, info.Status.Paths...)}
 }
 
 func environmentsDTOFrom(environments []project.Environment) []environmentDTO {

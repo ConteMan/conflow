@@ -154,5 +154,12 @@ func CreateExample(workspace string) (string, error) {
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		return "", err
 	}
+	dataDirectory := filepath.Join(workspace, ".conflow", "data", "environments")
+	if err := os.MkdirAll(dataDirectory, 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dataDirectory), "base.yaml"), []byte("{}\n"), 0o644); err != nil {
+		return "", err
+	}
 	return path, nil
 }

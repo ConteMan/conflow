@@ -82,6 +82,16 @@ type Mutation struct {
 	Validate func(map[string]any) error
 }
 
+// Save commits the current view's two visible draft replacements to a source.
+// The caller-owned saver executes while the draft lock is held so the source
+// snapshot, preconditions, draft cleanup, and returned view share one
+// observation boundary.
+type Save struct {
+	ExpectedRevision       uint64
+	ExpectedSourceRevision string
+	Commit                 func(SourceSnapshot, State) (SourceSnapshot, error)
+}
+
 type ConflictError struct {
 	Code                  string
 	CurrentRevision       uint64
@@ -158,6 +168,59 @@ func (s *Store) Mutate(schema Schema, environments []Environment, environmentID 
 	view, err = BuildView(schema, environments, source, cloneState(s.state), environmentID)
 	revision = s.state.Revision
 	return view, revision, err
+}
+
+func (s *Store) SaveToSource(schema Schema, environments []Environment, environmentID string, save Save) (View, uint64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if save.Commit == nil {
+		return View{}, 0, errors.New("draft source saver is required")
+	}
+	source, err := s.source()
+	if err != nil {
+		return View{}, 0, err
+	}
+	view, err := BuildView(schema, environments, source, cloneState(s.state), environmentID)
+	if err != nil {
+		return View{}, 0, err
+	}
+	revision := s.state.Revision
+	if save.ExpectedRevision != revision {
+		return View{}, 0, &ConflictError{Code: "revision_mismatch", CurrentRevision: revision, CurrentSourceRevision: view.SourceRevision, ConflictScope: "source", CurrentState: view}
+	}
+	if save.ExpectedSourceRevision != view.SourceRevision {
+		return View{}, 0, &ConflictError{Code: "source_revision_mismatch", CurrentRevision: revision, CurrentSourceRevision: view.SourceRevision, ConflictScope: "source", CurrentState: view}
+	}
+	nextSource, err := save.Commit(source, cloneState(s.state))
+	if err != nil {
+		// A source implementation can detect an external edit between the load
+		// above and its write. Re-read here so the 412 has an authoritative view.
+		if errors.Is(err, ErrSourceRevisionChanged) {
+			current, currentErr := s.source()
+			if currentErr != nil {
+				return View{}, 0, currentErr
+			}
+			currentView, currentErr := BuildView(schema, environments, current, cloneState(s.state), environmentID)
+			if currentErr != nil {
+				return View{}, 0, currentErr
+			}
+			return View{}, 0, &ConflictError{Code: "source_revision_mismatch", CurrentRevision: revision, CurrentSourceRevision: currentView.SourceRevision, ConflictScope: "source", CurrentState: currentView}
+		}
+		return View{}, 0, err
+	}
+	next := cloneState(s.state)
+	// Save only consumes replacements visible from this environment. Drafts for
+	// other environment overrides remain isolated, as mandated by Spec 004.
+	next.BaselinePresent = false
+	next.Baseline = nil
+	delete(next.EnvironmentOverrides, environmentID)
+	next.Revision++
+	if err := s.persistLocked(next); err != nil {
+		return View{}, 0, err
+	}
+	s.state = next
+	view, err = BuildView(schema, environments, nextSource, cloneState(s.state), environmentID)
+	return view, s.state.Revision, err
 }
 
 func (s *Store) viewLocked(schema Schema, environments []Environment, environmentID string) (View, uint64, error) {

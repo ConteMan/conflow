@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -146,6 +147,54 @@ func TestDraftHandlerResetAndDiscard(t *testing.T) {
 	if discardResponse.Data.Baseline.Draft.Present || discardResponse.Data.Dirty {
 		t.Fatalf("discard view = %#v", discardResponse.Data)
 	}
+}
+
+func TestDraftSaveWritesManagedFileAndClearsVisibleDraft(t *testing.T) {
+	handler, workspace := newTestHandlerWithPacks(t, packs.MustNewRegistry(draftHTTPPack()))
+	initial := getDraftForTest(t, handler, "development")
+	put := []byte(`{"expected_source_revision":"` + initial.SourceRevision + `","write_scope":"baseline","configuration":{"setting":{"enabled":true}}}`)
+	changed := executeRequest(t, handler, http.MethodPut, "/api/v1/drafts/development", `"1"`, put)
+	if changed.Code != http.StatusOK {
+		t.Fatalf("draft write status = %d: %s", changed.Code, changed.Body.String())
+	}
+	var changedResponse struct {
+		Data draftViewDTO `json:"data"`
+		Meta responseMeta `json:"meta"`
+	}
+	decodeResponse(t, changed, &changedResponse)
+	save := []byte(`{"expected_source_revision":"` + changedResponse.Data.SourceRevision + `"}`)
+	saved := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/development:save", `"2"`, save)
+	if saved.Code != http.StatusOK || saved.Header().Get("ETag") != `"3"` {
+		t.Fatalf("save status = %d, etag = %q, body = %s", saved.Code, saved.Header().Get("ETag"), saved.Body.String())
+	}
+	var savedResponse struct {
+		Data draftViewDTO `json:"data"`
+	}
+	decodeResponse(t, saved, &savedResponse)
+	if savedResponse.Data.Dirty || savedResponse.Data.Baseline.Draft.Present || savedResponse.Data.SourceRevision == changedResponse.Data.SourceRevision {
+		t.Fatalf("saved draft = %#v", savedResponse.Data)
+	}
+	content, err := os.ReadFile(filepath.Join(workspace, ".conflow", "data", "base.yaml"))
+	if err != nil || !strings.Contains(string(content), "enabled: true") {
+		t.Fatalf("managed base = %q, err = %v", content, err)
+	}
+}
+
+func TestDraftSaveExternalSourceChangeReturnsConflict(t *testing.T) {
+	handler, workspace := newTestHandlerWithPacks(t, packs.MustNewRegistry(draftHTTPPack()))
+	initial := getDraftForTest(t, handler, "development")
+	put := []byte(`{"expected_source_revision":"` + initial.SourceRevision + `","write_scope":"baseline","configuration":{"setting":{"enabled":true}}}`)
+	if response := executeRequest(t, handler, http.MethodPut, "/api/v1/drafts/development", `"1"`, put); response.Code != http.StatusOK {
+		t.Fatalf("draft write = %d: %s", response.Code, response.Body.String())
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, ".conflow", "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".conflow", "data", "base.yaml"), []byte("setting:\n  enabled: false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	conflict := executeRequest(t, handler, http.MethodPost, "/api/v1/drafts/development:save", `"2"`, []byte(`{"expected_source_revision":"`+initial.SourceRevision+`"}`))
+	assertDraftError(t, conflict, http.StatusPreconditionFailed, "source_revision_mismatch")
 }
 
 func getDraftForTest(t *testing.T, handler http.Handler, environmentID string) draftViewDTO {

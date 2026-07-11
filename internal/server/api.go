@@ -25,6 +25,8 @@ func (a *api) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", a.health)
 	mux.HandleFunc("GET /api/v1/bootstrap", a.bootstrap)
+	mux.HandleFunc("GET /api/v1/source", a.getSource)
+	mux.HandleFunc("GET /api/v1/source/status", a.getSourceStatus)
 	mux.HandleFunc("GET /api/v1/project", a.getProject)
 	mux.HandleFunc("PUT /api/v1/project", a.updateProject)
 	mux.HandleFunc("GET /api/v1/environments", a.listEnvironments)
@@ -84,6 +86,24 @@ func (a *api) bootstrap(writer http.ResponseWriter, request *http.Request) {
 		Capabilities: capabilitiesDTO{ProjectEdit: true, EnvironmentManage: true},
 	}
 	writeSuccess(writer, request, http.StatusOK, data, snapshot.Revision)
+}
+
+func (a *api) getSource(writer http.ResponseWriter, request *http.Request) {
+	info, err := a.service.SourceInfo(request.Context())
+	if err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, sourceDTOFrom(info), 1)
+}
+
+func (a *api) getSourceStatus(writer http.ResponseWriter, request *http.Request) {
+	info, err := a.service.SourceInfo(request.Context())
+	if err != nil {
+		a.writeError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, sourceStatusDTOFrom(info), 1)
 }
 
 func (a *api) getProject(writer http.ResponseWriter, request *http.Request) {
@@ -360,7 +380,7 @@ func (a *api) replaceDraft(writer http.ResponseWriter, request *http.Request) {
 
 func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 	path := strings.TrimPrefix(request.URL.Path, "/api/v1/drafts/")
-	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard", ":validate": "validate"} {
+	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard", ":validate": "validate", ":save": "save"} {
 		if strings.HasSuffix(path, suffix) {
 			environmentID := strings.TrimSuffix(path, suffix)
 			if environmentID == "" || strings.Contains(environmentID, "/") {
@@ -372,11 +392,33 @@ func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 				a.validateDraft(writer, request)
 				return
 			}
+			if action == "save" {
+				a.saveDraft(writer, request, environmentID)
+				return
+			}
 			a.mutateDraftAction(writer, request, environmentID, action)
 			return
 		}
 	}
 	routeNotFound(writer, request)
+}
+
+func (a *api) saveDraft(writer http.ResponseWriter, request *http.Request, environmentID string) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input saveDraftInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	view, nextRevision, err := a.service.SaveDraft(request.Context(), environmentID, revision, *input.ExpectedSourceRevision)
+	if err != nil {
+		a.writeDraftError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), nextRevision)
 }
 
 func (a *api) mutateDraftAction(writer http.ResponseWriter, request *http.Request, environmentID, action string) {

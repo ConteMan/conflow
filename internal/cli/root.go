@@ -16,6 +16,8 @@ func New(version string) *cobra.Command {
 	root.AddCommand(newVersionCommand(version))
 	root.AddCommand(newInitCommand())
 	root.AddCommand(newValidateCommand())
+	root.AddCommand(newSourceCommand())
+	root.AddCommand(newSaveCommand())
 	root.AddCommand(newServeCommand())
 	root.SetHelpFunc(func(command *cobra.Command, args []string) {
 		fmt.Fprint(command.OutOrStdout(), command.UsageString())

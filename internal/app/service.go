@@ -2,10 +2,9 @@ package app
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
 )
 
@@ -26,6 +26,7 @@ type Service struct {
 	projects     *project.Store
 	packRegistry *packs.Registry
 	drafts       *draft.Store
+	source       source.Adapter
 	validations  *validation.Store
 }
 
@@ -45,17 +46,20 @@ func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
+	manifest, err := store.Snapshot()
+	if err != nil {
+		return nil, err
+	}
+	if manifest.Manifest.Source.Type != "managed-file" {
+		return nil, fmt.Errorf("unsupported source adapter %q", manifest.Manifest.Source.Type)
+	}
+	managed := source.OpenManagedFile(workspace)
 	draftStore, err := draft.Open(filepath.Join(workspace, ".conflow", "draft.json"), func() (draft.SourceSnapshot, error) {
-		snapshot, snapshotErr := store.Snapshot()
+		snapshot, snapshotErr := managed.Load()
 		if snapshotErr != nil {
 			return draft.SourceSnapshot{}, snapshotErr
 		}
-		// Spec 005 has not defined Managed File persistence yet. Until it does,
-		// source configuration is the empty managed-file placeholder and its
-		// revision is derived from the manifest snapshot that selected the source.
-		// Draft data itself remains isolated in .conflow/draft.json.
-		digest := sha256.Sum256([]byte(snapshot.Digest))
-		return draft.SourceSnapshot{Revision: "src-" + hex.EncodeToString(digest[:8]), Baseline: map[string]any{}, EnvironmentOverrides: map[string]map[string]any{}}, nil
+		return draftSourceSnapshot(snapshot), nil
 	})
 	if err != nil {
 		return nil, err
@@ -64,7 +68,7 @@ func OpenWithPacks(workspace string, registry *packs.Registry) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, validations: validationStore}, nil
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: managed, validations: validationStore}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -171,6 +175,62 @@ func (s *Service) MutateDraft(_ context.Context, environmentID string, mutation 
 		return draft.View{}, 0, err
 	}
 	return s.drafts.Mutate(schema, environments, environmentID, mutation)
+}
+
+type SourceInfo struct {
+	Type         string
+	Capabilities source.Capabilities
+	Status       source.Status
+}
+
+func (s *Service) SourceInfo(_ context.Context) (SourceInfo, error) {
+	status, err := s.source.Status()
+	if err != nil {
+		return SourceInfo{}, err
+	}
+	return SourceInfo{Type: status.Type, Capabilities: s.source.Capabilities(), Status: status}, nil
+}
+
+// SaveDraft writes the resolved source replacement for the selected view and
+// then consumes that view's draft replacements. The draft Store retains the
+// existing lock/snapshot boundary from Spec 004.
+func (s *Service) SaveDraft(_ context.Context, environmentID string, expectedRevision uint64, expectedSourceRevision string) (draft.View, uint64, error) {
+	snapshot, err := s.projects.Snapshot()
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	schema, environments, err := s.draftSchema(snapshot.Manifest)
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	return s.drafts.SaveToSource(schema, environments, environmentID, draft.Save{
+		ExpectedRevision: expectedRevision, ExpectedSourceRevision: expectedSourceRevision,
+		Commit: func(current draft.SourceSnapshot, state draft.State) (draft.SourceSnapshot, error) {
+			baseline := current.Baseline
+			if state.BaselinePresent {
+				baseline = state.Baseline
+			}
+			override, present := current.EnvironmentOverrides[environmentID]
+			if replacement, exists := state.EnvironmentOverrides[environmentID]; exists {
+				override, present = replacement, true
+			}
+			if !present {
+				override = nil
+			}
+			next, saveErr := s.source.Save(source.SaveInput{ExpectedRevision: current.Revision, EnvironmentID: environmentID, Baseline: baseline, EnvironmentOverride: override})
+			if errors.Is(saveErr, source.ErrRevisionMismatch) {
+				return draft.SourceSnapshot{}, draft.ErrSourceRevisionChanged
+			}
+			if saveErr != nil {
+				return draft.SourceSnapshot{}, saveErr
+			}
+			return draftSourceSnapshot(next), nil
+		},
+	})
+}
+
+func draftSourceSnapshot(snapshot source.Snapshot) draft.SourceSnapshot {
+	return draft.SourceSnapshot{Revision: snapshot.Revision, Baseline: snapshot.Baseline, EnvironmentOverrides: snapshot.EnvironmentOverrides}
 }
 
 // ValidateDraft runs the complete Spec 007 validation against one captured
