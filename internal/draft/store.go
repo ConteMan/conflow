@@ -73,6 +73,13 @@ type Mutation struct {
 	Scope                  string
 	Action                 string
 	Configuration          json.RawMessage
+	// Prepare runs under the same lock and source snapshot as precondition
+	// checks. It lets higher-level resources turn a focused operation into the
+	// complete replacement required by the draft model.
+	Prepare func(View) (json.RawMessage, error)
+	// Validate runs after structural validation and before the replacement is
+	// committed. Domain services use it for rules outside the Pack structure.
+	Validate func(map[string]any) error
 }
 
 type ConflictError struct {
@@ -115,10 +122,21 @@ func (s *Store) Mutate(schema Schema, environments []Environment, environmentID 
 	}
 	var replacement map[string]any
 	if mutation.Action == "put" {
+		if mutation.Prepare != nil {
+			mutation.Configuration, err = mutation.Prepare(view)
+			if err != nil {
+				return View{}, 0, err
+			}
+		}
 		var details []StructuralError
 		replacement, details = ValidateReplacement(schema, mutation.Scope, mutation.Configuration)
 		if len(details) > 0 {
 			return View{}, 0, &ValidationError{Details: details}
+		}
+		if mutation.Validate != nil {
+			if err := mutation.Validate(replacement); err != nil {
+				return View{}, 0, err
+			}
 		}
 	}
 	next := cloneState(s.state)

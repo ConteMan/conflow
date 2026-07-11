@@ -22,7 +22,11 @@ type Metadata struct {
 }
 
 type EntityMetadata struct {
-	Name                      string         `json:"name"`
+	Name string `json:"name"`
+	// Collection is the configuration field that stores the entity records. It
+	// is intentionally internal until the public Pack metadata contract gains a
+	// collection member.
+	Collection                string         `json:"-"`
 	Label                     string         `json:"label"`
 	Description               string         `json:"description"`
 	IDRule                    IDRule         `json:"id_rule"`

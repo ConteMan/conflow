@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/project"
 )
@@ -173,6 +174,11 @@ func writeDraftConflict(writer http.ResponseWriter, request *http.Request, confl
 
 func writeDraftValidationError(writer http.ResponseWriter, request *http.Request, details []draft.StructuralError) {
 	writeJSON(writer, http.StatusUnprocessableEntity, draftValidationEnvelope{Error: draftValidationDTO{Code: "validation_failed", Message: "草稿 replacement 不符合 Pack schema", RequestID: requestID(request), Details: details}})
+}
+
+func writeEntityReferenced(writer http.ResponseWriter, request *http.Request, revision uint64, references []app.EntityReference) {
+	writer.Header().Set("ETag", strconv.Quote(strconv.FormatUint(revision, 10)))
+	writeJSON(writer, http.StatusConflict, entityReferencedEnvelope{Error: entityReferencedDTO{Code: "entity_referenced", Message: "实体仍被有效配置引用", RequestID: requestID(request), CurrentRevision: revision, References: references}})
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {

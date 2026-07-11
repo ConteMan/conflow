@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 
+	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
@@ -64,6 +65,48 @@ func (input replaceDraftInput) valid() bool {
 type draftScopeMutationInput struct {
 	ExpectedSourceRevision *string `json:"expected_source_revision"`
 	WriteScope             string  `json:"write_scope"`
+}
+
+type createEntityInput struct {
+	ExpectedSourceRevision *string           `json:"expected_source_revision"`
+	WriteScope             string            `json:"write_scope"`
+	EntityType             string            `json:"entity_type"`
+	Entity                 *app.EntityRecord `json:"entity"`
+}
+
+func (input createEntityInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != "" && input.WriteScope != "" && input.EntityType != "" && input.Entity != nil && input.Entity.ID != ""
+}
+
+type entityMutationInput struct {
+	ExpectedSourceRevision *string           `json:"expected_source_revision"`
+	WriteScope             string            `json:"write_scope"`
+	Entity                 *app.EntityRecord `json:"entity"`
+}
+
+func (input entityMutationInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != "" && input.WriteScope != "" && input.Entity != nil && input.Entity.ID != ""
+}
+
+type entityDeleteInput struct {
+	ExpectedSourceRevision *string `json:"expected_source_revision"`
+	WriteScope             string  `json:"write_scope"`
+}
+
+func (input entityDeleteInput) valid() bool {
+	return input.ExpectedSourceRevision != nil && *input.ExpectedSourceRevision != "" && input.WriteScope != ""
+}
+
+type entityReferencedEnvelope struct {
+	Error entityReferencedDTO `json:"error"`
+}
+
+type entityReferencedDTO struct {
+	Code            string                `json:"code"`
+	Message         string                `json:"message"`
+	RequestID       string                `json:"request_id"`
+	CurrentRevision uint64                `json:"current_revision"`
+	References      []app.EntityReference `json:"references"`
 }
 
 func (input draftScopeMutationInput) valid() bool {

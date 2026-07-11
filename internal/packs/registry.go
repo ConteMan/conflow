@@ -240,6 +240,9 @@ func validatedCopy(definition Definition) (Definition, error) {
 		if strings.TrimSpace(entity.IDRule.Pattern) == "" || entity.IDRule.MinLength < 1 || entity.IDRule.MaxLength < entity.IDRule.MinLength {
 			return Definition{}, fmt.Errorf("%w: ID rule %q", ErrInvalidDefinition, entity.Name)
 		}
+		if entity.Collection != "" && !identifierPattern.MatchString(entity.Collection) {
+			return Definition{}, fmt.Errorf("%w: entity collection %q", ErrInvalidDefinition, entity.Collection)
+		}
 		if _, err := regexp.Compile(entity.IDRule.Pattern); err != nil {
 			return Definition{}, fmt.Errorf("%w: ID pattern %q", ErrInvalidDefinition, entity.Name)
 		}

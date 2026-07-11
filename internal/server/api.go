@@ -36,6 +36,12 @@ func (a *api) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/packs/{pack_name}/versions/{pack_version}/schema", a.getPackSchema)
 	mux.HandleFunc("GET /api/v1/drafts/{environment_id}", a.getDraft)
 	mux.HandleFunc("PUT /api/v1/drafts/{environment_id}", a.replaceDraft)
+	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities", a.listEntities)
+	mux.HandleFunc("POST /api/v1/drafts/{environment_id}/entities", a.createEntity)
+	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}", a.getEntity)
+	mux.HandleFunc("PUT /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}", a.replaceEntity)
+	mux.HandleFunc("DELETE /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}", a.deleteEntity)
+	mux.HandleFunc("GET /api/v1/drafts/{environment_id}/entities/{entity_type}/{entity_id}/referenced-by", a.getEntityReferences)
 	mux.HandleFunc("POST /api/v1/drafts/", a.draftAction)
 	mux.HandleFunc("/api/v1/project", methodNotAllowed)
 	mux.HandleFunc("/api/v1/environments", methodNotAllowed)
@@ -227,6 +233,94 @@ func (a *api) getDraft(writer http.ResponseWriter, request *http.Request) {
 	writeSuccess(writer, request, http.StatusOK, draftViewDTOFrom(view), revision)
 }
 
+func (a *api) listEntities(writer http.ResponseWriter, request *http.Request) {
+	values := request.URL.Query()["entity_type"]
+	if len(values) > 1 {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "entity_type 只能提供一次", 0)
+		return
+	}
+	entityType := ""
+	if len(values) == 1 {
+		entityType = values[0]
+	}
+	entities, revision, err := a.service.ListEntities(request.Context(), request.PathValue("environment_id"), entityType)
+	if err != nil {
+		a.writeEntityError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, entities, revision)
+}
+
+func (a *api) getEntity(writer http.ResponseWriter, request *http.Request) {
+	entity, revision, err := a.service.GetEntity(request.Context(), request.PathValue("environment_id"), request.PathValue("entity_type"), request.PathValue("entity_id"))
+	if err != nil {
+		a.writeEntityError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, entity, revision)
+}
+
+func (a *api) getEntityReferences(writer http.ResponseWriter, request *http.Request) {
+	references, revision, err := a.service.GetEntityReferences(request.Context(), request.PathValue("environment_id"), request.PathValue("entity_type"), request.PathValue("entity_id"))
+	if err != nil {
+		a.writeEntityError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, references, revision)
+}
+
+func (a *api) createEntity(writer http.ResponseWriter, request *http.Request) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input createEntityInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	a.mutateEntity(writer, request, http.StatusCreated, app.EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: *input.ExpectedSourceRevision, Scope: input.WriteScope, EntityType: input.EntityType, EntityID: input.Entity.ID, Entity: input.Entity, Action: "create"})
+}
+
+func (a *api) replaceEntity(writer http.ResponseWriter, request *http.Request) {
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input entityMutationInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	a.mutateEntity(writer, request, http.StatusOK, app.EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: *input.ExpectedSourceRevision, Scope: input.WriteScope, EntityType: request.PathValue("entity_type"), EntityID: request.PathValue("entity_id"), Entity: input.Entity, Action: "replace"})
+}
+
+func (a *api) deleteEntity(writer http.ResponseWriter, request *http.Request) {
+	if !hasJSONContentType(request.Header.Get("Content-Type")) {
+		writeAPIError(writer, request, http.StatusUnsupportedMediaType, "unsupported_media_type", "请求必须使用 application/json", 0)
+		return
+	}
+	revision, ok := requireRevision(writer, request)
+	if !ok {
+		return
+	}
+	var input entityDeleteInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeRequestError(writer, request, err)
+		return
+	}
+	a.mutateEntity(writer, request, http.StatusOK, app.EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: *input.ExpectedSourceRevision, Scope: input.WriteScope, EntityType: request.PathValue("entity_type"), EntityID: request.PathValue("entity_id"), Action: "delete"})
+}
+
+func (a *api) mutateEntity(writer http.ResponseWriter, request *http.Request, status int, mutation app.EntityMutation) {
+	entity, revision, err := a.service.MutateEntity(request.Context(), request.PathValue("environment_id"), mutation)
+	if err != nil {
+		a.writeEntityError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, status, entity, revision)
+}
+
 func (a *api) replaceDraft(writer http.ResponseWriter, request *http.Request) {
 	revision, ok := requireRevision(writer, request)
 	if !ok {
@@ -340,5 +434,19 @@ func (a *api) writeDraftError(writer http.ResponseWriter, request *http.Request,
 		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "write_scope 不合法", 0)
 	default:
 		a.writeError(writer, request, err)
+	}
+}
+
+func (a *api) writeEntityError(writer http.ResponseWriter, request *http.Request, err error) {
+	var referenced *app.EntityReferencedError
+	switch {
+	case errors.As(err, &referenced):
+		writeEntityReferenced(writer, request, referenced.Revision, referenced.References)
+	case errors.Is(err, app.ErrEntityNotFound):
+		writeAPIError(writer, request, http.StatusNotFound, "entity_not_found", "实体不存在", 0)
+	case errors.Is(err, app.ErrEntityTypeInvalid), errors.Is(err, app.ErrEntityIDInvalid), errors.Is(err, app.ErrEntityIDImmutable), errors.Is(err, app.ErrEntityExists):
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "实体请求不合法", 0)
+	default:
+		a.writeDraftError(writer, request, err)
 	}
 }
