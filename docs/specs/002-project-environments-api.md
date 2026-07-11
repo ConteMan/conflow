@@ -14,6 +14,7 @@
 - 引入应用服务层，Handler 和 CLI 不直接编排文件读写。
 - 读取、创建、更新项目资料与环境；环境 ID 创建后不可原地改名。
 - 环境使用显式 `name` 与 `kind`；`kind` 是 Production 风险身份的服务端事实，创建后与 ID 一样不可修改。
+- Project 资源承载项目级发布确认策略；它与环境身份、风险分析和 Release 资源使用不同的职责边界。
 - 项目清单外部变化检测和单调 revision。
 - API request ID、`Cache-Control: no-store`、JSON 未知字段拒绝、错误 envelope。
 - loopback、Host、Origin 和 Content-Type 安全校验。
@@ -45,6 +46,7 @@
 - `Environment.kind` 固定为 `development`、`staging`、`production`、`custom`；允许多个同类环境。UI 不得从环境 ID、名称、Provider project ID 或确认开关推断类别。
 - manifest revision 冲突返回原子的 `current_state`（项目 + 环境集合）；`current_revision` 与响应头 ETag 属于同一 Store 快照。该状态供 UI 对照，不授权自动重试或覆盖。
 - 本合同在稳定 v1 发布前直接纳入 manifest version 1；实验性旧清单必须显式补齐 `name` 与 `kind`，不做隐式类别推断。
+- 合同增补（待实现）：`Project.release_confirmation_policy.production_low_risk_mode` 是 `environment_id|acknowledgement`，默认 `environment_id`。为保留既有 manifest/API 客户端兼容性，读响应可以省略该字段来表示默认值，写请求省略则保持当前策略；新建或迁移后的 manifest 应显式写入默认值。它只允许放宽低风险 Production Plan 的环境 ID 输入要求；一般确认、高风险逐项确认和 blocking 规则仍由 Spec 008/010 的服务端权威结果决定。该字段与 Project 资料共用 manifest revision / ETag 域。`Environment.publish.requires_confirmation` 保留为兼容性字段，只表示一般确认是否适用，不能表达强度或覆盖项目策略。
 
 ## 示例
 
@@ -62,7 +64,10 @@ Host: 127.0.0.1:9010
       "id": "photo-editor",
       "name": "Photo Editor",
       "pack_ref": "mobile-ad-monetization/v1",
-      "source_type": "managed-file"
+      "source_type": "managed-file",
+      "release_confirmation_policy": {
+        "production_low_risk_mode": "environment_id"
+      }
     },
     "environments": [
       {

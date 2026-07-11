@@ -1,0 +1,201 @@
+{
+  "contract_version": 1,
+  "pack_ref": "mobile-ad-monetization/v1",
+  "base_fixture": "entities.json",
+  "validation_overlay": "validation-overlays.json#large-diff-input",
+  "description": "Plan, risk, Operation, publish conflict, and rollback contract scenarios. This is executable shared input for future Go golden tests, API tests, and UI E2E; it contains no Firebase template, credential, token, or real unit ID.",
+  "scenarios": [
+    {
+      "id": "large-diff-inter-global-cap-30-to-120",
+      "environment_id": "staging",
+      "given": {
+        "draft_revision": 13,
+        "source_digest": "sha256:source-fixture-1",
+        "remote_snapshot": {
+          "remote_etag": "etag-remote-57",
+          "version": "57",
+          "observed_at": "2026-07-11T10:00:02Z",
+          "summary": {
+            "parameter_count": 42,
+            "managed_parameter_count": 18,
+            "condition_count": 0,
+            "content_digest": "sha256:remote-fixture-57"
+          }
+        },
+        "project_release_confirmation_policy": {
+          "production_low_risk_mode": "environment_id"
+        }
+      },
+      "input": {
+        "entity_replacements": [
+          {"entity_type": "frequency_policy", "entity_id": "inter_global_cap", "fields": {"cooldown_ms": 120000}},
+          {"entity_type": "feature_switch", "entity_id": "use_amazon_bidding", "fields": {"default_value": true}},
+          {"entity_type": "feature_switch", "entity_id": "enable_native_preload", "fields": {"default_value": false}},
+          {"entity_type": "feature_switch", "entity_id": "show_subscription_offer", "fields": {"default_value": false}}
+        ],
+        "environment_override_replacements": [
+          {"entity_type": "feature_switch", "entity_id": "use_amazon_bidding", "fields": {"default_value": false}}
+        ]
+      },
+      "expected_plan": {
+        "status": "ready",
+        "snapshot_token": "pst_fixture_01",
+        "draft_revision": 13,
+        "source_digest": "sha256:source-fixture-1",
+        "remote_etag": "etag-remote-57",
+        "expires_at": "2026-07-11T10:15:04Z",
+        "direct_changes_count": 5,
+        "affected_entities_count": 10,
+        "semantic_changes": [
+          {
+            "node_id": "node_semantic_inter_global_cap",
+            "change_kind": "updated",
+            "direct_entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap",
+            "field_path": "/cooldown_ms",
+            "before_summary": "30 seconds",
+            "after_summary": "120 seconds",
+            "affected_entity_node_ids": [
+              "node_entity_ad_interstitial_001",
+              "node_entity_ad_interstitial_002",
+              "node_entity_ad_interstitial_003",
+              "node_entity_ad_interstitial_004",
+              "node_entity_ad_interstitial_005",
+              "node_entity_ad_interstitial_006",
+              "node_entity_ad_interstitial_007",
+              "node_entity_ad_interstitial_008",
+              "node_entity_ad_interstitial_009",
+              "node_entity_ad_interstitial_010"
+            ],
+            "remote_parameter_node_ids": ["node_remote_inter_global_cap"]
+          }
+        ],
+        "affected_entities_subset": [
+          {"node_id": "node_entity_ad_interstitial_001", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_interstitial_001", "impact_kind": "referenced", "caused_by_semantic_change_ids": ["node_semantic_inter_global_cap"]},
+          {"node_id": "node_entity_ad_interstitial_010", "entity_ref": "entity:mobile-ad-monetization/v1:placement:ad_interstitial_010", "impact_kind": "referenced", "caused_by_semantic_change_ids": ["node_semantic_inter_global_cap"]}
+        ],
+        "remote_parameter_changes": [
+          {"node_id": "node_remote_inter_global_cap", "parameter_key": "ad_frequency_inter_global_cap", "change_kind": "updated", "before_summary": "30 seconds", "after_summary": "120 seconds", "managed": true, "projection_id": "rvp_inter_global_cap", "caused_by_semantic_change_ids": ["node_semantic_inter_global_cap"], "affected_entity_node_ids": ["node_entity_ad_interstitial_001", "node_entity_ad_interstitial_010"]}
+        ],
+        "severity": "high",
+        "risk_items": [
+          {"risk_item_id": "risk_shared_frequency_relaxed", "severity": "high", "reason_code": "shared_frequency_policy_relaxed", "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap", "acknowledgement_required": true}
+        ],
+        "blocking_reasons": [],
+        "confirmation_requirements": {
+          "requires_acknowledgement": true,
+          "environment_id_requirement": "not_required",
+          "required_risk_item_ids": ["risk_shared_frequency_relaxed"],
+          "policy_source": "project.release_confirmation_policy"
+        },
+        "artifact_metadata": [
+          {"artifact_name": "review.json", "media_type": "application/json", "content_digest": "sha256:artifact-review-1", "size_bytes": 4096, "sensitive": false, "available": true},
+          {"artifact_name": "provider-input.json", "media_type": "application/json", "content_digest": "sha256:artifact-provider-1", "size_bytes": 2048, "sensitive": false, "available": true}
+        ]
+      },
+      "expected_remote_projection": {
+        "projection_id": "rvp_inter_global_cap",
+        "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap",
+        "field_path": "/cooldown_ms",
+        "parameter_key": "ad_frequency_inter_global_cap",
+        "value_summary": "30 seconds",
+        "snapshot_etag": "etag-remote-57",
+        "availability": "available",
+        "redacted": false
+      },
+      "expected_operations": [
+        {
+          "operation_type": "plan",
+          "transitions": ["queued", "reading_remote", "compiling", "analyzing", "completed"],
+          "status": "succeeded",
+          "remote_state": "unchanged",
+          "result": {"resource_type": "plan", "resource_id": "plan_fixture_01"}
+        },
+        {
+          "operation_type": "publish",
+          "transitions": ["queued", "validating_remote", "submitting", "verifying", "recording_audit", "completed"],
+          "status": "succeeded",
+          "remote_state": "changed",
+          "result": {"resource_type": "release", "resource_id": "rel_fixture_publish_01"}
+        }
+      ],
+      "expected_publish_request": {
+        "idempotency_key": "fixture-publish-key-0001",
+        "plan_id": "plan_fixture_01",
+        "expected_draft_revision": 13,
+        "expected_remote_etag": "etag-remote-57",
+        "confirmation": {
+          "acknowledged": true,
+          "acknowledged_risk_item_ids": ["risk_shared_frequency_relaxed"]
+        }
+      }
+    },
+    {
+      "id": "remote-etag-mismatch-requires-plan-rebuild",
+      "environment_id": "production",
+      "given": {
+        "plan_id": "plan_fixture_production_01",
+        "expected_remote_etag": "etag-remote-57",
+        "current_remote": {
+          "remote_etag": "etag-remote-58",
+          "version": "58",
+          "observed_at": "2026-07-11T10:02:00Z",
+          "summary": {"parameter_count": 43, "managed_parameter_count": 18, "condition_count": 0, "content_digest": "sha256:remote-fixture-58"}
+        }
+      },
+      "expected": {
+        "status": 412,
+        "error_code": "remote_etag_mismatch",
+        "remote_update_sent": false,
+        "rebuild": {"required": true, "plan_endpoint": "/api/v1/drafts/production:plan", "reason_code": "remote_etag_changed"},
+        "must_not_include": ["current_revision", "current_source_revision", "current_state"]
+      }
+    },
+    {
+      "id": "publish-submit-transport-ambiguity",
+      "environment_id": "production",
+      "given": {"operation_id": "op_fixture_unknown_01"},
+      "expected_operation": {
+        "operation_type": "publish",
+        "status": "failed",
+        "stage": "submitting",
+        "remote_state": "unknown",
+        "failure": {"code": "provider_response_unknown", "retryable": false, "stage": "submitting"},
+        "ui_recovery": "verify_remote_before_any_new_publish"
+      }
+    },
+    {
+      "id": "rollback-preview-and-new-release",
+      "environment_id": "production",
+      "given": {
+        "target_release_id": "rel_fixture_publish_01",
+        "current_remote_etag": "etag-remote-58",
+        "target_remote_version": "57",
+        "project_release_confirmation_policy": {"production_low_risk_mode": "environment_id"}
+      },
+      "expected_preview": {
+        "status": "ready",
+        "rollback_preview_id": "rbp_fixture_01",
+        "expected_remote_etag": "etag-remote-58",
+        "confirmation_requirements": {"requires_acknowledgement": true, "environment_id_requirement": "required", "required_risk_item_ids": [], "policy_source": "project.release_confirmation_policy"}
+      },
+      "expected_rollback_request": {
+        "idempotency_key": "fixture-rollback-key-0001",
+        "rollback_preview_id": "rbp_fixture_01",
+        "expected_remote_etag": "etag-remote-58",
+        "confirmation": {"acknowledged": true, "environment_id": "production", "acknowledged_risk_item_ids": []}
+      },
+      "expected_operation": {
+        "operation_type": "rollback",
+        "status": "succeeded",
+        "remote_state": "changed",
+        "result": {"resource_type": "release", "resource_id": "rel_fixture_rollback_01"}
+      },
+      "expected_release": {
+        "release_id": "rel_fixture_rollback_01",
+        "kind": "rollback",
+        "outcome": "succeeded",
+        "rollback_of_release_id": "rel_fixture_publish_01"
+      }
+    }
+  ]
+}

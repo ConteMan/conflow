@@ -69,6 +69,18 @@
 | `UI-API-020` | 发布展示预校验、提交、确认生效；失败必须回答线上是否变化；关闭页面后可恢复（`flows/05-production-release.md:13,16`；Spec 015:25,40）。 | Operation 只有通用状态概念，缺 stage、result、远端结果确定性和恢复发现方式。 | Operation 定义稳定 stage、结构化 failure、`remote_state: unchanged|changed|unknown`、result resource；SSE 仅增强，GET 轮询是权威恢复路径。 | 009 / 010 |
 | `UI-API-021` | 回滚前展示目标版本与差异，使用与发布同级的 ETag、幂等和确认（`flows/05-production-release.md:19,25`）。 | 011 有回滚动作，但没有 preview、confirmation 或 Operation DTO。 | 定义 rollback preview/read model、回滚请求、confirmation、Idempotency-Key 和 Operation result；回滚仍生成新的 Release。 | 011 |
 
+处理状态（2026-07-11，contract-only 草案，待主控初审与维护者终审）：
+
+- `UI-API-009`：合同已定义。`GET /environments/{environment_id}/remote/projection` 返回脱敏、可按 `entity_ref + field_path` 映射的远端值摘要；Plan 的远端参数节点可链接同一 projection。它只是展示 read model，不能授权发布。
+- `UI-API-014`：合同已定义。`POST :plan` 始终返回 Operation；Plan Operation 统一编排远端读取、本地编译与风险分析。远端不可达可产生 `preview_only` Plan，明确不可发布。
+- `UI-API-015`：合同已定义。Plan 以稳定 `node_id` 返回 semantic changes、affected entities、remote parameter changes 和 artifact metadata，直接支持逐层展开树。
+- `UI-API-016`：合同已定义。Plan 返回闭合 severity、稳定 reason code、risk items、blocking reasons 和服务端计算的 confirmation requirements；UI 不得重算。
+- `UI-API-017`：合同已定义。Plan 固定快照令牌、draft revision、source digest、remote ETag、TTL、状态和 invalidation reason；本地与远端令牌保持独立错误域。
+- `UI-API-018`：合同已定义。`412 remote_etag_mismatch` 返回最新脱敏远端摘要与强制重建路径，不能与 Draft/manifest revision 冲突混用。
+- `UI-API-019`：合同已定义。发布请求使用结构化 confirmation；服务端对 Plan requirements 与项目级确认策略逐项校验。项目策略的最终落位仍由 ADR-006 维护者终审。
+- `UI-API-020`：合同已定义。Operation 固定 stage、failure、remote state 和 result resource；GET 轮询是恢复权威，SSE 仅增强。
+- `UI-API-021`：合同已定义。回滚先构建不可变 preview，再携带 preview ID、ETag、confirmation、Idempotency-Key 创建 Operation；成功回滚生成新的 Release。
+
 ## 已发现的术语与数据漂移
 
 | 问题 | 处理 |
@@ -96,5 +108,5 @@
 ## 审计结论
 
 - Spec 013 的合同前置已满足，可以开始应用壳、Production 状态和 revision 冲突交互；最终 E2E 前仍须完成 API `0.4.0` 的 Go 运行时对齐。
-- Spec 014 的 004、006、007 合同前置已经具备；`UI-API-009` 的远端值投影仍未关闭，必须先完成该合同或在 014 明确降级。无论如何，不能把 OpenAPI、fixture 或 mock 视为 Handler / React 验收通过。
-- Spec 015 必须消费服务端权威的 readiness、Plan lifecycle、risk items、confirmation requirements 和 Operation state，不能在前端复制规则。
+- Spec 014 的 004、006、007 合同前置以及 `UI-API-009` 已具备；运行时实现、远端快照安全验证与 UI E2E 仍不属于本合同批次。无论如何，不能把 OpenAPI、fixture 或 mock 视为 Handler / React 验收通过。
+- Spec 015 的 `UI-API-014` 到 `UI-API-021` 合同前置已在草案中收口，待 ADR-006 的维护者终审和合同合并后才能消费；UI 必须使用服务端权威的 readiness、Plan lifecycle、risk items、confirmation requirements 和 Operation state，不能在前端复制规则。

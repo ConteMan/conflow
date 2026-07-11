@@ -43,6 +43,8 @@ version: 1
 project:
   id: photo-editor
   name: Photo Editor
+  release_confirmation_policy:
+    production_low_risk_mode: environment_id
 pack:
   id: mobile-ad-monetization/v1
 source:
@@ -69,6 +71,8 @@ environments:
 Conflow 尚未冻结稳定 manifest 格式，本约束直接纳入 manifest version 1。此前的实验性 manifest 必须显式补齐 `name` 与 `kind`；服务端不得静默猜测环境类别。
 
 项目可选 `git-json` 源适配器，以读取并写回既有仓库中 `config/remote-config/` 一类结构。适配器映射是项目配置，不承担广告业务规则。
+
+`project.release_confirmation_policy.production_low_risk_mode` 是项目级、版本化的发布确认策略，取值为 `environment_id`（默认）或 `acknowledgement`。为兼容已有 manifest，省略字段等价于默认值；新建或迁移后的 manifest 应显式写入默认值。它只放宽低风险 Production Plan 是否必须输入环境 ID；高风险逐项确认、blocking 风险和最终确认要求由服务端按 Plan 计算，不能由 UI 或环境名称推断。`environment.publish.requires_confirmation` 保留为一般确认适用性，不能用来表达确认强度。
 
 ## 环境覆盖
 

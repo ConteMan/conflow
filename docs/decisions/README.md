@@ -9,3 +9,4 @@ ADR 记录已接受的架构决策。推翻现有 ADR 时，新增一条 ADR 说
 | [ADR-003](ADR-003-react-base-ui.md) | React、Vite、shadcn/ui 与 Base UI | 已接受 |
 | [ADR-004](ADR-004-http-api-contract.md) | 前后端通过版本化 HTTP API 交互 | 已接受 |
 | [ADR-005](ADR-005-targeted-draft-layer.md) | 草稿定向替换配置层 | 已接受 |
+| [ADR-006](ADR-006-plan-operation-and-confirmation-policy.md) | Plan Operation 与项目级确认策略 | 提议 |
