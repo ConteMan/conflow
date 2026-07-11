@@ -157,7 +157,7 @@ test("频控抽屉可编辑并展示受影响广告位", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("tab", { name: "频控策略" }).click();
   await page.getByRole("button", { name: "编辑频控策略 inter_global_cap" }).click();
   const drawer = page.getByRole("dialog", { name: "编辑频控策略 inter_global_cap" });
-  await expect(drawer.getByText("引用此策略的广告位")).toBeVisible(); await expect(drawer.getByText("ad_interstitial_001")).toBeVisible();
+  await expect(drawer.getByRole("heading", { name: "引用此策略的广告位" })).toBeVisible(); await expect(drawer.getByText("ad_interstitial_001")).toBeVisible();
   await drawer.getByLabel("冷却时间（毫秒）").fill("45000"); await drawer.getByRole("button", { name: "保存策略" }).click();
   await expect(page.getByRole("dialog", { name: "编辑频控策略 inter_global_cap" })).toHaveCount(0);
 });
