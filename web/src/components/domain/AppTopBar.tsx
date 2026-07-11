@@ -1,17 +1,18 @@
 import { ChevronDown, Layers3, Menu, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import type { Environment, Project } from "../../api/client";
+import type { Environment, Project, ValidationResult } from "../../api/client";
 
-export type Page = "overview" | "configuration" | "environments" | "project";
+export type Page = "overview" | "configuration" | "environments" | "project" | "validation" | "plan";
 
-const disabledNavigation = ["校验", "发布计划", "发布记录"];
+const disabledNavigation = ["发布记录"];
 
-export function AppTopBar({ project, environments, selectedEnvironment, page, draftDirty, environmentSelectRef, onEnvironmentChange, onPageChange }: {
+export function AppTopBar({ project, environments, selectedEnvironment, page, draftDirty, validation, environmentSelectRef, onEnvironmentChange, onPageChange }: {
   project: Project;
   environments: Environment[];
   selectedEnvironment: Environment;
   page: Page;
   draftDirty: boolean;
+  validation: ValidationResult | null;
   environmentSelectRef: RefObject<HTMLSelectElement | null>;
   onEnvironmentChange: (id: string) => void;
   onPageChange: (page: Page) => void;
@@ -35,15 +36,22 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
       <nav className="desktop-nav" aria-label="主导航">
         <NavButton label="概览" page="overview" active={page === "overview"} onClick={onPageChange} />
         <NavButton label="配置" page="configuration" active={page === "configuration"} onClick={onPageChange} />
+        <NavButton label="校验" page="validation" active={page === "validation"} onClick={onPageChange} />
+        <NavButton label="发布计划" page="plan" active={page === "plan"} onClick={onPageChange} />
         {disabledNavigation.map((label) => <span key={label} className="nav-disabled" aria-disabled="true" title="后续 Spec 接入">{label}</span>)}
       </nav>
-      <div className={draftDirty ? "draft-slot draft-slot--dirty" : "draft-slot"} aria-label="未发布修改状态">{draftDirty ? "有未发布修改" : "尚未有修改"}</div>
+      <div className="topbar-statuses">
+        {validation ? <button className={`validation-global-badge validation-global-badge--${validation.readiness} validation-global-badge--${validation.status}`} onClick={() => onPageChange("validation")} aria-label="查看校验结果">{validation.status === "stale" ? "校验结果可能过期" : validation.readiness === "ready" ? "校验通过" : `${validation.diagnostics.length} 项校验问题`}</button> : null}
+        <div className={draftDirty ? "draft-slot draft-slot--dirty" : "draft-slot"} aria-label="未发布修改状态">{draftDirty ? "有未发布修改" : "尚未有修改"}</div>
+      </div>
       <button className="mobile-menu-button" aria-label={menuOpen ? "关闭导航" : "打开导航"} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
         {menuOpen ? <X /> : <Menu />}
       </button>
       {menuOpen ? <nav className="mobile-nav" aria-label="窄屏导航">
         <NavButton label="概览" page="overview" active={page === "overview"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
         <NavButton label="配置" page="configuration" active={page === "configuration"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
+        <NavButton label="校验" page="validation" active={page === "validation"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
+        <NavButton label="发布计划" page="plan" active={page === "plan"} onClick={(next) => { onPageChange(next); setMenuOpen(false); }} />
         {disabledNavigation.map((label) => <span key={label} className="nav-disabled" aria-disabled="true" title="后续 Spec 接入">{label}</span>)}
       </nav> : null}
     </header>
