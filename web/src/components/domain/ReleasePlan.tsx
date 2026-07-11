@@ -14,6 +14,7 @@ export function ReleasePlan({ environment, onOpenConfiguration }: { environment:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ code: string; requestId?: string } | null>(null);
   const operationRef = useRef<string | null>(null);
+  const startingEnvironmentRef = useRef<string | null>(null);
 
   const poll = useCallback(async (operationID: string, signal?: AbortSignal) => {
     try {
@@ -27,14 +28,20 @@ export function ReleasePlan({ environment, onOpenConfiguration }: { environment:
   }, []);
 
   const start = useCallback(async (replace = false) => {
+    const environmentID = environment.id;
+    if (!replace && startingEnvironmentRef.current === environmentID) return;
+    startingEnvironmentRef.current = environmentID;
     setLoading(true); setError(null); setPlan(null); setOperation(null);
-    if (replace) sessionStorage.removeItem(operationStorageKey(environment.id));
+    if (replace) sessionStorage.removeItem(operationStorageKey(environmentID));
     try {
-      const response = await createPlan(environment.id);
+      const response = await createPlan(environmentID);
       operationRef.current = response.data.operation_id;
-      sessionStorage.setItem(operationStorageKey(environment.id), response.data.operation_id);
+      sessionStorage.setItem(operationStorageKey(environmentID), response.data.operation_id);
       setOperation(response.data);
     } catch (cause) { setLoading(false); setError(toRequestError(cause)); }
+    finally {
+      if (startingEnvironmentRef.current === environmentID) startingEnvironmentRef.current = null;
+    }
   }, [environment.id]);
 
   useEffect(() => {
@@ -42,7 +49,7 @@ export function ReleasePlan({ environment, onOpenConfiguration }: { environment:
     setPlan(null); setOperation(null); setError(null);
     operationRef.current = savedOperationID;
     if (savedOperationID) { setLoading(true); void poll(savedOperationID); }
-    else void start();
+    else if (startingEnvironmentRef.current !== environment.id) void start();
     return () => { operationRef.current = null; };
   }, [environment.id, poll, start]);
 

@@ -123,11 +123,11 @@ test("updates project details through the manifest API", async ({ page }) => {
 test("deletes an environment and selects the remaining environment", async ({ page }) => {
   await mockAPI(page);
   await page.goto("/#environments");
-  await page.getByRole("button", { name: "删除" }).click();
+  await page.getByRole("button", { name: "删除", exact: true }).click();
   await page.getByRole("button", { name: "确认删除" }).click();
   await expect(page.getByRole("row", { name: /Development development/ })).toHaveCount(0);
   await expect(page.getByTestId("production-marker")).toHaveText("Production 环境");
-  await expect(page.getByRole("button", { name: "删除" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "删除", exact: true })).toBeDisabled();
 });
 
 test("renders project and environment forms as read-only from server capabilities", async ({ page }) => {

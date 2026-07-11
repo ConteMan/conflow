@@ -44,6 +44,10 @@ export default function App() {
   const [draftDirty, setDraftDirty] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const environmentSelectRef = useRef<HTMLSelectElement>(null);
+  const updateDraftState = useCallback((nextRevision: number, dirty: boolean) => {
+    setRevision(nextRevision);
+    setDraftDirty(dirty);
+  }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -133,8 +137,6 @@ export default function App() {
     { resource: "environment", title: environment.id, name: environment.name, providerProjectId: environment.provider.project_id },
     () => { setData((current) => current ? { ...current, environments: current.environments.filter((item) => item.id !== environment.id) } : current); if (selectedEnvironmentId === environment.id) setSelectedEnvironmentId(data.environments.find((item) => item.id !== environment.id)?.id ?? ""); },
   );
-  const updateDraftState = (nextRevision: number, dirty: boolean) => { setRevision(nextRevision); setDraftDirty(dirty); };
-
   return (
     <div className="app-shell">
       <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={draftDirty} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />

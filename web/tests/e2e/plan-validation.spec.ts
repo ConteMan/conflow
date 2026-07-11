@@ -40,7 +40,7 @@ test("校验中心可加载、筛选、跳转并重新校验", async ({ page }) 
   await page.goto("/#validation");
   await expect(page.getByRole("heading", { name: "校验中心" })).toBeVisible();
   await expect(page.getByText("结果可能已过期", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "警告" }).click();
+  await page.getByRole("button", { name: "警告", exact: true }).click();
   await expect(page.getByText("频控策略接近风险阈值")).toBeVisible();
   await expect(page.getByText("广告位配置不完整")).toHaveCount(0);
   await page.getByRole("button", { name: "全部" }).click();
@@ -56,7 +56,7 @@ test("发布计划显示 Operation 进度和三级展开树", async ({ page }) =
   await mockReleaseAPI(page);
   await page.goto("/#plan");
   await expect(page.getByText("正在构建发布计划")).toBeVisible();
-  await expect(page.getByText("读取线上配置")).toBeVisible();
+  await expect(page.getByText("读取线上配置", { exact: true })).toBeVisible();
   await expect(page.getByText("频控策略冷却时间")).toBeVisible({ timeout: 7000 });
   await expect(page.getByText("2 项直接修改 · 2 个受影响实体 · 2 个远端参数")).toBeVisible();
   await page.getByRole("button", { name: /频控策略冷却时间/ }).click();
@@ -68,14 +68,14 @@ test("预览计划明确不可发布", async ({ page }) => {
   await mockReleaseAPI(page, "preview");
   await page.goto("/#plan");
   await expect(page.getByText("不可发布", { exact: true })).toBeVisible({ timeout: 7000 });
-  await expect(page.getByText("线上配置包含未建模条件值")).toBeVisible();
+  await expect(page.locator(".plan-status").getByText("线上配置包含未建模条件值", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "发布到 Staging" })).toBeDisabled();
 });
 
 test("失效计划保留旧树并可重新构建", async ({ page }) => {
   const mock = await mockReleaseAPI(page, "invalid");
   await page.goto("/#plan");
-  await expect(page.getByText("这份发布计划已失效")).toBeVisible({ timeout: 7000 });
+  await expect(page.locator(".plan-status").getByText("这份发布计划已失效", { exact: true })).toBeVisible({ timeout: 7000 });
   await expect(page.getByText("频控策略冷却时间")).toBeVisible();
   await page.getByRole("button", { name: "重新构建计划" }).last().click();
   await expect.poll(mock.planRequests).toBe(2);
@@ -85,6 +85,7 @@ test("刷新后从 sessionStorage 恢复计划 Operation", async ({ page }) => {
   const mock = await mockReleaseAPI(page);
   await page.goto("/#plan");
   await expect(page.getByText("正在构建发布计划")).toBeVisible();
+  await expect(page.getByText("op_plan", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText("频控策略冷却时间")).toBeVisible({ timeout: 7000 });
   expect(mock.planRequests()).toBe(1);
