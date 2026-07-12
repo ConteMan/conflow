@@ -264,3 +264,12 @@ function meta(revision: number) { return { request_id: "req_configuration", revi
 function view(type: string, id: string, fields: Record<string, unknown>, dirty: boolean) { const record = { id, fields }; return { entity_ref: `entity:mobile-ad-monetization/v1:${type}:${id}`, entity_type: type, entity_id: id, source: { present: true, value: record }, draft: dirty ? { present: true, value: record } : { present: false }, resolved: { present: true, value: record }, effective: { present: true, value: record }, origin: dirty ? "draft_baseline" : "baseline", source_revision: "source_1" }; }
 function draft(environmentID: string, placements: Placement[], dirty: boolean) { return { environment_id: environmentID, pack_ref: "mobile-ad-monetization/v1", source_revision: "source_1", dirty, dirty_scopes: dirty ? ["baseline"] : [], baseline: { source: { present: true, value: {} }, draft: { present: dirty, value: dirty ? {} : undefined }, resolved: { present: true, value: {} }, dirty }, environment_override: { source: { present: false }, draft: { present: false }, resolved: { present: false }, dirty: false }, effective: { placements: placements.map((item) => ({ id: item.id, fields: fieldsOf(item) })) }, field_states: placements.flatMap((placement) => Object.entries(fieldsOf(placement)).map(([name, value]) => ({ path: `/placements/${placement.id}/${name}`, pack_default: { present: false }, baseline: { present: true, value }, draft_baseline: { present: dirty, value }, environment_override: { present: false }, draft_environment_override: { present: false }, effective: { present: true, value }, origin: dirty ? "draft_baseline" : "baseline", environment_override_allowed: false, is_environment_overridden: false, source_revision: "source_1", nullable: false }))), affected_environments: [] }; }
 async function json(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
+
+test("已有频控时新建广告位默认选中策略且状态一致", async ({ page }) => {
+  await mockConfigurationAPI(page); await page.goto("/#configuration");
+  await page.getByRole("button", { name: "新建广告位" }).click();
+  await expect(page.getByLabel("频控策略")).toHaveValue("inter_global_cap");
+  await page.getByLabel("稳定 ID").fill("ad_default_ref_001"); await page.getByLabel("广告位键").fill("default_ref_entry");
+  await page.getByRole("button", { name: "保存修改" }).click();
+  await expect(page.getByRole("row", { name: /default_ref_entry/ })).toBeVisible();
+});

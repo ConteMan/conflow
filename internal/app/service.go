@@ -542,6 +542,9 @@ func (s *Service) StartProviderConnect(ctx context.Context, environmentID, crede
 	if strings.TrimSpace(environment.Provider.ProjectID) == "" {
 		return operation.Operation{}, ErrProviderProjectIDMissing
 	}
+	if err := provider.ValidateFirebaseServiceAccount(credentialsPath); err != nil {
+		return operation.Operation{}, err
+	}
 	if err := provider.SaveCredentialReference(s.workspace, environmentID, credentialsPath); err != nil {
 		return operation.Operation{}, err
 	}
@@ -549,23 +552,10 @@ func (s *Service) StartProviderConnect(ctx context.Context, environmentID, crede
 	if err != nil {
 		return operation.Operation{}, err
 	}
-	go func() {
-		_, _ = s.operations.Update(op.OperationID, "running", "reading_remote", nil, nil, "unchanged")
-		_, environment, getErr := s.GetEnvironment(context.Background(), environmentID)
-		if getErr == nil {
-			var adapter provider.Adapter
-			adapter, getErr = s.providerFor(environment)
-			if getErr == nil {
-				getErr = adapter.Connect(context.Background())
-			}
-		}
-		if getErr != nil {
-			s.failProviderOperation(op.OperationID, "reading_remote", getErr)
-		} else {
-			_, _ = s.operations.Update(op.OperationID, "succeeded", "completed", nil, nil, "unchanged")
-		}
-	}()
-	return op, nil
+	// Connect validates and stores a local reference only. Remote verification
+	// happens during pull, so a valid local credential cannot fail as an
+	// unrelated provider_not_configured operation.
+	return s.operations.Update(op.OperationID, "succeeded", "completed", nil, nil, "unchanged")
 }
 
 func (s *Service) StartPull(ctx context.Context, environmentID string) (operation.Operation, error) {

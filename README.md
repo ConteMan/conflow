@@ -14,14 +14,13 @@ cd conflow
 make bootstrap
 make check
 
-# 交互式创建项目、首个环境，并可选择稍后填写 Firebase 项目 ID
+# 交互式创建项目。默认会创建 development 和 production；Firebase 项目 ID 可稍后填写。
 go run ./cmd/conflow init --dir ./examples/photo-editor
 
-# 自动化场景必须显式提供创建参数；缺少必填参数会以 exit 64 结束
+# 自动化场景必须显式提供项目参数；缺少必填参数会以 exit 64 结束。
+# --json 会返回 project_path 和 next_steps 数组。
 go run ./cmd/conflow init --non-interactive --dir ./examples/photo-editor \
-  --project-id photo-editor --project-name "Photo Editor" \
-  --environment-id development --environment-name Development \
-  --environment-kind development --provider-project-id photo-editor-dev
+  --project-id photo-editor --project-name "Photo Editor" --json
 
 go run ./cmd/conflow serve --workspace ./examples/photo-editor
 ```
@@ -30,7 +29,7 @@ go run ./cmd/conflow serve --workspace ./examples/photo-editor
 
 ## 连接 Firebase
 
-服务账号 JSON 永远保留在本机路径，Conflow 只在已忽略的 `.conflow/` 本地状态中保存路径引用。GUI 的 Firebase 连接卡会在提交后清空输入，并仅显示 `…/firebase.json` 一类脱敏尾部。
+服务账号 JSON 永远保留在本机路径，Conflow 只在已忽略的 `.conflow/` 本地状态中保存路径引用。连接会先校验文件存在、可读、JSON 格式、`type=service_account` 和必填字段；任一步失败都不会写入或覆盖已有引用。GUI 的 Firebase 连接卡会在提交后清空输入，并仅显示 `…/firebase.json` 一类脱敏尾部。远端连通性检查在 `pull` 时进行。
 
 ```sh
 go run ./cmd/conflow provider connect --workspace ./examples/photo-editor \

@@ -1,6 +1,26 @@
 package project
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+func TestCreateAddsChineseTopLevelManifestComments(t *testing.T) {
+	workspace := t.TempDir()
+	if _, err := CreateExample(workspace); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(ManifestPath(workspace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, comment := range []string{"# 清单格式版本。", "# 项目元数据：", "# 配置包：", "# 配置来源：", "# 环境："} {
+		if !strings.Contains(string(content), comment) {
+			t.Fatalf("manifest does not contain %q:\n%s", comment, content)
+		}
+	}
+}
 
 func TestValidateAcceptsExampleManifest(t *testing.T) {
 	manifest := Manifest{

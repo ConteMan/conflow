@@ -420,7 +420,7 @@ func validateRecords(definition packs.Definition, metadata packs.EntityMetadata,
 }
 
 func validationError(scope, collection, id, field, code string) error {
-	return &draft.ValidationError{Details: []draft.StructuralError{{Code: code, Path: "/" + collection + "/" + id + "/fields/" + field, Scope: scope, Message: "entity field violates the Pack schema"}}}
+	return &draft.ValidationError{Details: []draft.StructuralError{{Code: code, Path: "/" + collection + "/" + id + "/fields/" + field, Scope: scope, Message: "字段值不符合配置包规则"}}}
 }
 
 func findEntitySchema(definition packs.Definition, name string) (packs.EntitySchema, bool) {

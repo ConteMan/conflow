@@ -44,7 +44,17 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     }
     if (path === "/api/v1/environments/development/provider:connect" && request.method() === "POST") {
       expect(request.headers()["content-type"]).toContain("application/json");
-      expect(request.postDataJSON()).toEqual({ credentials_path: "/private/keys/firebase.json" });
+      const credentialsPath = (request.postDataJSON() as { credentials_path: string }).credentials_path;
+      const credentialErrors: Record<string, { code: string; message: string }> = {
+        "/private/keys/nope.json": { code: "credential_file_missing", message: "ignored by UI" },
+        "/private/keys/bad.json": { code: "credential_json_invalid", message: "ignored by UI" },
+        "/private/keys/partial.json": { code: "credential_fields_missing", message: "ignored by UI" },
+        "/private/keys/not-service-account.json": { code: "credential_service_account_invalid", message: "ignored by UI" },
+      };
+      if (credentialErrors[credentialsPath]) {
+        await json(route, { error: { ...credentialErrors[credentialsPath], request_id: "req_credential" } }, 422); return;
+      }
+      expect(credentialsPath).toBe("/private/keys/firebase.json");
       providerConnected = true;
       await json(route, { data: { operation_id: "op_connect", operation_type: "provider_connect", status: "pending", stage: "queued", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:00Z" }, meta: { request_id: "req_connect", revision: 1 } }, 202); return;
     }
@@ -135,10 +145,26 @@ test("Firebase card submits a path without retaining its directory", async ({ pa
   await mockAPI(page);
   await page.goto("/");
   await page.getByLabel("服务账号 JSON 路径").fill("/private/keys/firebase.json");
-  await page.getByRole("button", { name: "连接并验证" }).click();
+  await page.getByRole("button", { name: "连接 Firebase" }).click();
   await expect(page.getByText("已配置：")).toContainText("…/firebase.json");
   await expect(page.getByLabel("服务账号 JSON 路径")).toHaveValue("");
   await expect(page.locator("body")).not.toContainText("/private/keys/firebase.json");
+});
+
+test("Firebase card shows actionable local credential errors", async ({ page }) => {
+  await mockAPI(page);
+  await page.goto("/");
+  const cases = [
+    ["/private/keys/nope.json", "凭据文件不存在，请检查路径后重试。"],
+    ["/private/keys/bad.json", "凭据文件不是有效的 JSON。"],
+    ["/private/keys/partial.json", "凭据文件缺少字段；需要 Firebase 服务账号 JSON。"],
+    ["/private/keys/not-service-account.json", "凭据文件不是 Firebase 服务账号 JSON（type 必须为 service_account）。"],
+  ];
+  for (const [path, message] of cases) {
+    await page.getByLabel("服务账号 JSON 路径").fill(path);
+    await page.getByRole("button", { name: "连接 Firebase" }).click();
+    await expect(page.getByRole("alert")).toHaveText(message);
+  }
 });
 
 test("updates project details through the manifest API", async ({ page }) => {

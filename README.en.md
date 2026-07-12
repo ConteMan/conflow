@@ -14,14 +14,13 @@ cd conflow
 make bootstrap
 make check
 
-# Interactively create a project and first environment. Firebase project ID can be added later.
+# Interactively create a project. Development and production are created by default; Firebase project IDs can be added later.
 go run ./cmd/conflow init --dir ./examples/photo-editor
 
-# Automation must provide explicit creation values; missing required values exit with code 64.
+# Automation must provide explicit project values; missing required values exit with code 64.
+# --json returns project_path and a next_steps array.
 go run ./cmd/conflow init --non-interactive --dir ./examples/photo-editor \
-  --project-id photo-editor --project-name "Photo Editor" \
-  --environment-id development --environment-name Development \
-  --environment-kind development --provider-project-id photo-editor-dev
+  --project-id photo-editor --project-name "Photo Editor" --json
 
 go run ./cmd/conflow serve --workspace ./examples/photo-editor
 ```
@@ -30,7 +29,7 @@ Open the local address printed by the terminal. The overview page can create add
 
 ## Connect Firebase
 
-Service account JSON remains at its local path. Conflow stores only a path reference in ignored local `.conflow/` state. The GUI Firebase connection card clears the input after submission and displays only a redacted tail such as `…/firebase.json`.
+Service account JSON remains at its local path. Conflow stores only a path reference in ignored local `.conflow/` state. Connect first validates existence, readability, JSON syntax, `type=service_account`, and required fields; a failure never writes or replaces an existing reference. The GUI Firebase connection card clears the input after submission and displays only a redacted tail such as `…/firebase.json`. Remote connectivity is checked by `pull`.
 
 ```sh
 go run ./cmd/conflow provider connect --workspace ./examples/photo-editor \

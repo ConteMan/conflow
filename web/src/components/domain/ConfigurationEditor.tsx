@@ -382,7 +382,8 @@ function PlacementDetail({ environment, environments, revision, schema, validati
         Promise.all(environments.map(async (item) => [item.id, (await listDraftEntities(item.id, "unit_binding", signal)).data] as const)),
         placementID ? getDraftEntity(environment.id, "placement", placementID, signal) : Promise.resolve(null),
       ]);
-      const initial = nextPlacement?.data.effective.value.fields ?? defaultsFor(placementSchema?.fields ?? []);
+      let initial = nextPlacement?.data.effective.value.fields ?? defaultsFor(placementSchema?.fields ?? []);
+      if (!nextPlacement && !initial.frequency_policy_id && nextPolicies.data.length > 0) initial = { ...initial, frequency_policy_id: nextPolicies.data[0].entity_id };
       setDraft(nextDraft.data); setPolicies(nextPolicies.data); setBindings(Object.fromEntries(nextBindings)); setPlacement(nextPlacement?.data ?? null); setFields(initial);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -400,6 +401,10 @@ function PlacementDetail({ environment, environments, revision, schema, validati
 
   const save = async () => {
     if (!draft || !placementSchema) return;
+    if (!String(fields.frequency_policy_id ?? "").trim()) {
+      setFieldErrors({ frequency_policy_id: policies.length === 0 ? "还没有频控策略——先创建一个" : "请选择频控策略" });
+      return;
+    }
     setSaving(true); setSystemError(null); setFieldErrors({});
     const record: EntityRecord = { id, fields };
     try {
@@ -442,7 +447,7 @@ function PlacementField({ field, value, readOnly, policies, caption, error, onCr
   return <label className={error ? "form-field form-field--error" : "form-field"} htmlFor={id}><span>{field.ui.label}</span>
     {field.type === "boolean" ? <button id={id} type="button" className={value ? "switch-control switch-control--on" : "switch-control"} role="switch" aria-checked={Boolean(value)} disabled={readOnly} onClick={() => onChange(field.name, !value)}><span aria-hidden="true" /></button>
       : field.type === "reference" && policies.length === 0 ? <div className="reference-empty"><span>还没有频控策略——先创建一个</span><Button type="button" variant="secondary" icon={<Plus size={15} />} disabled={readOnly} onClick={onCreatePolicy}>新建频控策略</Button></div>
-        : field.type === "reference" || field.validation.enum.length > 0 ? <select id={id} aria-label={field.ui.label} value={String(value ?? "")} disabled={readOnly} onChange={(event) => onChange(field.name, event.target.value)}>{options.map((option) => <option key={option} value={option}>{field.type === "reference" ? option : enumLabel(field.name, option)}</option>)}</select>
+        : field.type === "reference" || field.validation.enum.length > 0 ? <select id={id} aria-label={field.ui.label} value={String(value ?? "")} disabled={readOnly} onChange={(event) => onChange(field.name, event.target.value)}>{field.type === "reference" && !value ? <option value="">请选择频控策略</option> : null}{options.map((option) => <option key={option} value={option}>{field.type === "reference" ? option : enumLabel(field.name, option)}</option>)}</select>
         : <input id={id} aria-label={field.ui.label} type={field.type === "integer" || field.type === "number" ? "number" : "text"} value={String(value ?? "")} readOnly={readOnly} onChange={(event) => onChange(field.name, field.type === "integer" || field.type === "number" ? Number(event.target.value) : event.target.value)} />}
     <small>{caption}{field.ui.description ? ` · ${field.ui.description}` : ""}</small>{error ? <span className="field-error" role="alert">{error}</span> : null}
   </label>;

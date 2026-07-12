@@ -162,7 +162,7 @@ func Create(workspace string, manifest Manifest) (string, error) {
 	if err := Validate(manifest); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrInvalidManifest, err)
 	}
-	content, err := yaml.Marshal(manifest)
+	content, err := marshalInitialManifest(manifest)
 	if err != nil {
 		return "", err
 	}
@@ -177,6 +177,23 @@ func Create(workspace string, manifest Manifest) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func marshalInitialManifest(manifest Manifest) ([]byte, error) {
+	content, err := yaml.Marshal(manifest)
+	if err != nil {
+		return nil, err
+	}
+	annotated := "# Conflow 项目清单。\n# 清单格式版本。\n" + string(content)
+	for _, section := range []struct{ key, comment string }{
+		{"project:", "# 项目元数据：稳定 ID、显示名称与发布确认策略。"},
+		{"pack:", "# 配置包：定义可管理的业务实体和规则。"},
+		{"source:", "# 配置来源：保存和读取项目配置的适配器。"},
+		{"environments:", "# 环境：各发布目标的 Firebase 项目与发布策略。"},
+	} {
+		annotated = strings.Replace(annotated, "\n"+section.key, "\n"+section.comment+"\n"+section.key, 1)
+	}
+	return []byte(annotated), nil
 }
 
 func CreateExample(workspace string) (string, error) {
