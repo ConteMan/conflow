@@ -28,6 +28,7 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
   const state = bootstrap(structuredClone(initialEnvironments));
   if (options.readOnly) state.data.capabilities = { project_edit: false, environment_manage: false };
   let bootstrapFailures = 0;
+  let providerConnected = false;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -37,6 +38,28 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     }
     if (path === "/api/v1/packs/mobile-ad-monetization/versions/v1") {
       await json(route, { data: { ref: "mobile-ad-monetization/v1", name: "mobile-ad-monetization", version: "v1", description: "Mobile ad placement and frequency controls.", capabilities: ["environment_overrides", "semantic_diff"], schema_version: 1, entity_types: [] }, meta: { request_id: "req_pack", revision: 1 } }); return;
+    }
+    if (path === "/api/v1/environments/development/provider" && request.method() === "GET") {
+      await json(route, { data: { environment_id: "development", provider_type: "firebase-remote-config", status: providerConnected ? "connected" : "not_configured", credentials_path_display: providerConnected ? "…/firebase.json" : undefined, capabilities: { pull: true, validate: true, publish: true, rollback: true } }, meta: { request_id: "req_provider", revision: 1 } }); return;
+    }
+    if (path === "/api/v1/environments/development/provider:connect" && request.method() === "POST") {
+      expect(request.headers()["content-type"]).toContain("application/json");
+      const credentialsPath = (request.postDataJSON() as { credentials_path: string }).credentials_path;
+      const credentialErrors: Record<string, { code: string; message: string }> = {
+        "/private/keys/nope.json": { code: "credential_file_missing", message: "ignored by UI" },
+        "/private/keys/bad.json": { code: "credential_json_invalid", message: "ignored by UI" },
+        "/private/keys/partial.json": { code: "credential_fields_missing", message: "ignored by UI" },
+        "/private/keys/not-service-account.json": { code: "credential_service_account_invalid", message: "ignored by UI" },
+      };
+      if (credentialErrors[credentialsPath]) {
+        await json(route, { error: { ...credentialErrors[credentialsPath], request_id: "req_credential" } }, 422); return;
+      }
+      expect(credentialsPath).toBe("/private/keys/firebase.json");
+      providerConnected = true;
+      await json(route, { data: { operation_id: "op_connect", operation_type: "provider_connect", status: "pending", stage: "queued", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:00Z" }, meta: { request_id: "req_connect", revision: 1 } }, 202); return;
+    }
+    if (path === "/api/v1/operations/op_connect") {
+      await json(route, { data: { operation_id: "op_connect", operation_type: "provider_connect", status: "succeeded", stage: "completed", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:01Z" }, meta: { request_id: "req_operation", revision: 1 } }); return;
     }
     if (path === "/api/v1/project" && request.method() === "PUT") {
       await expectRevision(request, state.meta.revision);
@@ -83,7 +106,7 @@ test("bootstrap renders project overview from API data", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Photo Editor" })).toBeVisible();
   await expect(page.getByText("mobile-ad-monetization/v1")).toBeVisible();
-  await expect(page.getByText("Provider 状态").locator("../..").getByText("尚未接入")).toBeVisible();
+  await expect(page.getByText("Provider 状态").locator("../..").getByText("查看连接卡")).toBeVisible();
 });
 
 test("production identity comes from environment kind and remains explicit", async ({ page }) => {
@@ -109,6 +132,39 @@ test("creates and edits an environment through the manifest API", async ({ page 
   await page.getByRole("button", { name: "保存环境" }).click();
   await expect(page.getByRole("row", { name: /QA Staging staging/ })).toBeVisible();
   await expect(page.getByLabel("环境类型")).toBeDisabled();
+});
+
+test("overview creates an environment through the primary entry point", async ({ page }) => {
+  await mockAPI(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "新建环境" }).click();
+  await expect(page.getByRole("heading", { name: "新建环境" })).toBeVisible();
+});
+
+test("Firebase card submits a path without retaining its directory", async ({ page }) => {
+  await mockAPI(page);
+  await page.goto("/");
+  await page.getByLabel("服务账号 JSON 路径").fill("/private/keys/firebase.json");
+  await page.getByRole("button", { name: "连接 Firebase" }).click();
+  await expect(page.getByText("已配置：")).toContainText("…/firebase.json");
+  await expect(page.getByLabel("服务账号 JSON 路径")).toHaveValue("");
+  await expect(page.locator("body")).not.toContainText("/private/keys/firebase.json");
+});
+
+test("Firebase card shows actionable local credential errors", async ({ page }) => {
+  await mockAPI(page);
+  await page.goto("/");
+  const cases = [
+    ["/private/keys/nope.json", "凭据文件不存在，请检查路径后重试。"],
+    ["/private/keys/bad.json", "凭据文件不是有效的 JSON。"],
+    ["/private/keys/partial.json", "凭据文件缺少字段；需要 Firebase 服务账号 JSON。"],
+    ["/private/keys/not-service-account.json", "凭据文件不是 Firebase 服务账号 JSON（type 必须为 service_account）。"],
+  ];
+  for (const [path, message] of cases) {
+    await page.getByLabel("服务账号 JSON 路径").fill(path);
+    await page.getByRole("button", { name: "连接 Firebase" }).click();
+    await expect(page.getByRole("alert")).toHaveText(message);
+  }
 });
 
 test("updates project details through the manifest API", async ({ page }) => {

@@ -53,7 +53,12 @@ func (a *api) getProviderStatus(writer http.ResponseWriter, request *http.Reques
 }
 
 func (a *api) connectProvider(writer http.ResponseWriter, request *http.Request) {
-	op, err := a.service.StartProviderConnect(request.Context(), request.PathValue("environment_id"))
+	var input connectProviderInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "credentials_path 是必填项", 0)
+		return
+	}
+	op, err := a.service.StartProviderConnect(request.Context(), request.PathValue("environment_id"), input.CredentialsPath)
 	if err != nil {
 		a.writeProviderError(writer, request, err)
 		return
@@ -991,6 +996,18 @@ func (a *api) writePlanError(writer http.ResponseWriter, request *http.Request, 
 func (a *api) writeProviderError(writer http.ResponseWriter, request *http.Request, err error) {
 	var invalidated *app.PlanInvalidatedError
 	switch {
+	case errors.Is(err, app.ErrProviderProjectIDMissing):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "provider_project_id_required", "先在环境管理中填写 Firebase 项目 ID", 0)
+	case errors.Is(err, provider.ErrCredentialFileMissing):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "credential_file_missing", "凭据文件不存在，请检查路径后重试。", 0)
+	case errors.Is(err, provider.ErrCredentialFileUnreadable):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "credential_file_unreadable", "凭据文件无法读取，请检查权限后重试。", 0)
+	case errors.Is(err, provider.ErrCredentialJSONInvalid):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "credential_json_invalid", "凭据文件不是有效的 JSON。", 0)
+	case errors.Is(err, provider.ErrCredentialServiceAccount):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "credential_service_account_invalid", "凭据文件不是 Firebase 服务账号 JSON（type 必须为 service_account）。", 0)
+	case errors.Is(err, provider.ErrCredentialFieldsMissing):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "credential_fields_missing", "凭据文件缺少字段；需要 Firebase 服务账号 JSON。", 0)
 	case errors.Is(err, app.ErrRemoteSnapshotUnavailable):
 		writeAPIError(writer, request, http.StatusNotFound, "remote_snapshot_not_found", "远端快照不可用", 0)
 	case errors.As(err, &invalidated):

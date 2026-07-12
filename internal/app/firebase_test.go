@@ -48,6 +48,61 @@ func (f *fakeFirebase) Capabilities() provider.Capabilities {
 	return provider.Capabilities{Pull: true, Validate: true, Publish: true, Rollback: true}
 }
 
+func TestProviderConnectValidatesBeforeSavingAndPreservesExistingReference(t *testing.T) {
+	workspace := t.TempDir()
+	if _, err := project.CreateExample(workspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.SaveCredentialReference(workspace, "production", "/existing/firebase.json"); err != nil {
+		t.Fatal(err)
+	}
+	service, err := Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	validPath := filepath.Join(directory, "service-account.json")
+	if err := os.WriteFile(validPath, []byte(`{"type":"service_account","client_email":"bot@example.invalid","private_key":"test-private-key","project_id":"photo-editor-prod"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		path    string
+		content string
+		want    error
+	}{
+		{name: "missing path", path: filepath.Join(directory, "missing.json"), want: provider.ErrCredentialFileMissing},
+		{name: "bad JSON", path: filepath.Join(directory, "bad.json"), content: `{`, want: provider.ErrCredentialJSONInvalid},
+		{name: "wrong service account type", path: filepath.Join(directory, "wrong-type.json"), content: `{"type":"authorized_user"}`, want: provider.ErrCredentialServiceAccount},
+		{name: "missing required fields", path: filepath.Join(directory, "partial.json"), content: `{"type":"service_account"}`, want: provider.ErrCredentialFieldsMissing},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.content != "" {
+				if err := os.WriteFile(test.path, []byte(test.content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := service.StartProviderConnect(context.Background(), "production", test.path); !errors.Is(err, test.want) {
+				t.Fatalf("error = %v, want %v", err, test.want)
+			}
+			stored, err := provider.LoadCredentialReference(workspace, "production")
+			if err != nil || stored != "/existing/firebase.json" {
+				t.Fatalf("stored = %q, err = %v; invalid input overwrote existing reference", stored, err)
+			}
+		})
+	}
+
+	op, err := service.StartProviderConnect(context.Background(), "production", validPath)
+	if err != nil || op.Status != "succeeded" || op.Stage != "completed" {
+		t.Fatalf("connect operation = %#v, err = %v", op, err)
+	}
+	stored, err := provider.LoadCredentialReference(workspace, "production")
+	if err != nil || stored != validPath {
+		t.Fatalf("stored = %q, err = %v", stored, err)
+	}
+}
+
 func TestPullValidateAndConditionRiskUseProviderBoundary(t *testing.T) {
 	workspace := t.TempDir()
 	if _, err := project.CreateExample(workspace); err != nil {

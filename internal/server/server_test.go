@@ -12,6 +12,7 @@ import (
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/provider"
 )
 
 func TestHealthEndpoint(t *testing.T) {
@@ -76,6 +77,36 @@ func TestBootstrapReturnsRevisionAndRequestID(t *testing.T) {
 	}
 	if response.Meta.RequestID != recorder.Header().Get("X-Request-ID") {
 		t.Fatalf("meta request ID = %q, header = %q", response.Meta.RequestID, recorder.Header().Get("X-Request-ID"))
+	}
+}
+
+func TestProviderStatusRedactsStoredCredentialPath(t *testing.T) {
+	handler, workspace := newTestHandler(t)
+	if err := provider.SaveCredentialReference(workspace, "development", "/private/keys/firebase.json"); err != nil {
+		t.Fatal(err)
+	}
+	recorder := executeRequest(t, handler, http.MethodGet, "/api/v1/environments/development/provider", "", nil)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "/private/keys") || !strings.Contains(recorder.Body.String(), "…/firebase.json") {
+		t.Fatalf("credential display = %s", recorder.Body.String())
+	}
+}
+
+func TestProviderConnectRequiresBodyAndFirebaseProjectID(t *testing.T) {
+	handler, _ := newTestHandler(t)
+	missingBody := executeRequest(t, handler, http.MethodPost, "/api/v1/environments/development/provider:connect", "", nil)
+	if missingBody.Code != http.StatusBadRequest {
+		t.Fatalf("missing body status = %d, body = %s", missingBody.Code, missingBody.Body.String())
+	}
+	update := executeRequest(t, handler, http.MethodPut, "/api/v1/environments/development", `"1"`, []byte(`{"name":"Development","provider":{"type":"firebase-remote-config","project_id":""},"publish":{"requires_confirmation":false}}`))
+	if update.Code != http.StatusOK {
+		t.Fatalf("update status = %d, body = %s", update.Code, update.Body.String())
+	}
+	pull := executeRequest(t, handler, http.MethodPost, "/api/v1/environments/development/remote:pull", "", []byte(`{}`))
+	if pull.Code != http.StatusUnprocessableEntity || !strings.Contains(pull.Body.String(), "先在环境管理中填写 Firebase 项目 ID") {
+		t.Fatalf("pull status = %d, body = %s", pull.Code, pull.Body.String())
 	}
 }
 

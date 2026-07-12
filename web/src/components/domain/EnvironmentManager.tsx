@@ -21,6 +21,10 @@ export function EnvironmentManager({ environments, selectedEnvironmentId, busy, 
   const [deleteTarget, setDeleteTarget] = useState<Environment | null>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.hash.split("?")[1]).get("new") === "1") setMode("create");
+  }, []);
+
   return (
     <main className="page-container">
       <header className="page-heading"><div><h1>环境管理</h1><p>环境 ID 与类型创建后不可修改；显示名称可随时调整。</p></div><Button ref={createButtonRef} variant="primary" icon={<Plus size={16} />} disabled={readOnly} onClick={() => setMode("create")}>新建环境</Button></header>
@@ -29,7 +33,7 @@ export function EnvironmentManager({ environments, selectedEnvironmentId, busy, 
         <section className="table-panel">
           <table>
             <thead><tr><th>名称</th><th>环境 ID</th><th>类型</th><th>Firebase 项目</th><th>发布确认</th></tr></thead>
-            <tbody>{environments.map((environment) => <tr key={environment.id} className={selected?.id === environment.id && mode === "edit" ? "selected-row" : ""} onClick={() => { onSelect(environment.id); setMode("edit"); }}><td><button type="button" className="row-select-button" aria-label={`编辑环境 ${environment.name}`} onClick={() => { onSelect(environment.id); setMode("edit"); }}><strong>{environment.name}</strong></button></td><td><code>{environment.id}</code></td><td><span className={`kind-badge kind-badge--${environment.kind}`}>{kindLabel(environment.kind)}</span></td><td><code>{environment.provider.project_id}</code></td><td>{environment.publish.requires_confirmation ? "需要" : "不需要"}</td></tr>)}</tbody>
+            <tbody>{environments.map((environment) => <tr key={environment.id} className={selected?.id === environment.id && mode === "edit" ? "selected-row" : ""} onClick={() => { onSelect(environment.id); setMode("edit"); }}><td><button type="button" className="row-select-button" aria-label={`编辑环境 ${environment.name}`} onClick={() => { onSelect(environment.id); setMode("edit"); }}><strong>{environment.name}</strong></button></td><td><code>{environment.id}</code></td><td><span className={`kind-badge kind-badge--${environment.kind}`}>{kindLabel(environment.kind)}</span></td><td>{environment.provider.project_id ? <code>{environment.provider.project_id}</code> : <span className="muted-cell">尚未填写</span>}</td><td>{environment.publish.requires_confirmation ? "需要" : "不需要"}</td></tr>)}</tbody>
           </table>
         </section>
         <EnvironmentForm key={mode === "create" ? "create" : selected?.id} mode={mode} environment={mode === "edit" ? selected : undefined} busy={busy} readOnly={readOnly} onCancel={() => { setMode("edit"); createButtonRef.current?.focus(); }} onSubmit={async (payload) => { const saved = await onSubmit(payload); if (saved) setMode("edit"); }} onRequestDelete={(environment) => setDeleteTarget(environment)} canDelete={environments.length > 1} />
@@ -66,7 +70,7 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
     setProjectId(environment.provider.project_id);
   }, [environment]);
   useEffect(() => { nameRef.current?.focus(); }, [mode, environment?.id]);
-  const valid = id.trim().length >= 2 && name.trim().length > 0 && projectId.trim().length > 0;
+  const valid = id.trim().length >= 2 && name.trim().length > 0;
   return (
     <aside className="editor-panel" aria-label={mode === "create" ? "新建环境" : `编辑 ${environment?.name}`}>
       <header><div><h2>{mode === "create" ? "新建环境" : `编辑 ${environment?.name}`}</h2><p>连接和发布策略仅影响此环境。</p></div>{mode === "edit" && environment ? <span className={`kind-badge kind-badge--${environment.kind}`}>{kindLabel(environment.kind)}</span> : null}</header>
@@ -74,8 +78,8 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
         <label>显示名称<input ref={nameRef} value={name} maxLength={120} disabled={readOnly} onChange={(event) => setName(event.target.value)} required /></label>
         <label>环境 ID<div className="locked-input"><input value={id} disabled={mode === "edit" || readOnly} pattern="[a-z][a-z0-9-]{1,62}" onChange={(event) => setId(event.target.value)} required />{mode === "edit" ? <LockKeyhole size={15} /> : null}</div><small>{mode === "edit" ? "创建后不可修改" : "2–63 位小写字母、数字或连字符"}</small></label>
         <label>环境类型<select value={kind} disabled={mode === "edit" || readOnly} onChange={(event) => setKind(event.target.value as EnvironmentKind)}>{(["development", "staging", "production", "custom"] as EnvironmentKind[]).map((value) => <option value={value} key={value}>{kindLabel(value)}</option>)}</select><small>{mode === "edit" ? "类型由服务端保留，无法修改" : "只有 Production 会触发持续风险标识"}</small></label>
-        <label>Firebase 项目<input value={projectId} maxLength={128} disabled={readOnly} onChange={(event) => setProjectId(event.target.value)} required /></label>
-        <div className="policy-info-card"><ShieldCheck size={18} /><span><strong>发布确认强度</strong><b>遵循项目级策略</b><small>Provider 发布能力尚未接入。</small></span></div>
+        <label>Firebase 项目<input value={projectId} maxLength={128} disabled={readOnly} onChange={(event) => setProjectId(event.target.value)} /><small>可在初始化时留空；连接或拉取前必须填写。</small></label>
+        <div className="policy-info-card"><ShieldCheck size={18} /><span><strong>发布确认强度</strong><b>遵循项目级策略</b><small>连接与发布操作会按此环境单独校验。</small></span></div>
         <div className="form-actions">{mode === "create" ? <Button type="button" onClick={onCancel}>取消</Button> : environment ? <Button type="button" variant="ghost" disabled={!canDelete || readOnly} icon={<Trash2 size={16} />} onClick={() => onRequestDelete(environment)}>删除</Button> : null}<Button type="submit" variant="primary" disabled={!valid || busy || readOnly} icon={<Save size={16} />}>{busy ? "保存中…" : "保存环境"}</Button></div>
       </form>
     </aside>

@@ -24,6 +24,19 @@ import (
 	"github.com/spf13/pflag"
 )
 
+func nonInteractiveInitArgs(workspace string) []string {
+	return []string{"init", "--non-interactive", "--dir", workspace, "--project-id", "photo-editor", "--project-name", "Photo Editor"}
+}
+
+func initWorkspace(t *testing.T, workspace string) {
+	t.Helper()
+	command := New("test")
+	command.SetArgs(nonInteractiveInitArgs(workspace))
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateListenAddress(t *testing.T) {
 	for _, address := range []string{"127.0.0.1:9010", "[::1]:9010", "localhost:9010"} {
 		if err := validateListenAddress(address); err != nil {
@@ -39,11 +52,7 @@ func TestValidateListenAddress(t *testing.T) {
 
 func TestValidateEnvironmentJSONUsesCompleteValidation(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
-		t.Fatal(err)
-	}
+	initWorkspace(t, workspace)
 	output := &bytes.Buffer{}
 	command := New("test")
 	command.SetOut(output)
@@ -76,11 +85,7 @@ func TestExitErrorPreservesValidationStatus(t *testing.T) {
 
 func TestValidateCompleteValidationReturnsSeverityExitCode(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
-		t.Fatal(err)
-	}
+	initWorkspace(t, workspace)
 	service, err := app.Open(workspace)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +129,7 @@ func TestInitAndValidateCommands(t *testing.T) {
 	initOutput := &bytes.Buffer{}
 	initCommand := New("test")
 	initCommand.SetOut(initOutput)
-	initCommand.SetArgs([]string{"init", "--dir", workspace})
+	initCommand.SetArgs(nonInteractiveInitArgs(workspace))
 	if err := initCommand.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -144,13 +149,182 @@ func TestInitAndValidateCommands(t *testing.T) {
 	}
 }
 
-func TestPlanCommandWritesArtifactsToOutputDirectory(t *testing.T) {
+func TestInitJSONIncludesNextSteps(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	args := append(nonInteractiveInitArgs(workspace), "--json")
+	command.SetArgs(args)
+	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
+	var result struct {
+		Data initResult `json:"data"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Data.ProjectPath == "" || len(result.Data.NextSteps) != 3 || !strings.Contains(result.Data.NextSteps[0], "conflow serve --workspace") {
+		t.Fatalf("init JSON = %s", output.String())
+	}
+}
+
+func TestInitWizardAndNonInteractiveValidation(t *testing.T) {
+	workspace := t.TempDir()
+	wizard := New("test")
+	wizardOutput := &bytes.Buffer{}
+	wizard.SetOut(wizardOutput)
+	wizard.SetIn(strings.NewReader("Sample App\n\n\n\n\n"))
+	wizard.SetArgs([]string{"init", "--dir", workspace})
+	if err := wizard.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := project.Load(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Project.ID != "sample-app" || len(manifest.Environments) != 2 || manifest.Environments[0].Provider.ProjectID != "" {
+		t.Fatalf("wizard manifest = %#v", manifest)
+	}
+	if !strings.Contains(wizardOutput.String(), "项目名称（显示用") || !strings.Contains(wizardOutput.String(), "项目 ID（小写字母/数字/连字符，字母开头） [sample-app]") || !strings.Contains(wizardOutput.String(), "下一步：") {
+		t.Fatalf("wizard output = %q", wizardOutput.String())
+	}
+
+	invalidWorkspace := t.TempDir()
+	invalidOutput := &bytes.Buffer{}
+	invalid := New("test")
+	invalid.SetOut(invalidOutput)
+	invalid.SetIn(strings.NewReader("Sample App\nINVALID\nsample-app\n\ninvalid project\nsample-dev\n\n"))
+	invalid.SetArgs([]string{"init", "--dir", invalidWorkspace})
+	if err := invalid.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(invalidOutput.String(), "项目 ID 必须以小写字母开头") || !strings.Contains(invalidOutput.String(), "Firebase 项目 ID 必须以小写字母开头") {
+		t.Fatalf("invalid wizard output = %q", invalidOutput.String())
+	}
+	if got := deriveProjectID("记账应用"); got != "" {
+		t.Fatalf("Chinese display name derived unexpected project ID %q", got)
+	}
+
+	adjustedWorkspace := t.TempDir()
+	adjustedOutput := &bytes.Buffer{}
+	adjusted := New("test")
+	adjusted.SetOut(adjustedOutput)
+	adjusted.SetIn(strings.NewReader("Custom App\n\ny\nd\ndevelopment\nd\na\nstaging\nStaging\nstaging\n\n\n"))
+	adjusted.SetArgs([]string{"init", "--dir", adjustedWorkspace})
+	if err := adjusted.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	adjustedManifest, err := project.Load(adjustedWorkspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adjustedManifest.Environments) != 2 || !hasEnvironment(adjustedManifest.Environments, "production") || !hasEnvironment(adjustedManifest.Environments, "staging") || !strings.Contains(adjustedOutput.String(), "至少保留一个环境") {
+		t.Fatalf("adjusted manifest = %#v, output = %q", adjustedManifest, adjustedOutput.String())
+	}
+
+	eofOutput := &bytes.Buffer{}
+	eof := New("test")
+	eof.SetOut(eofOutput)
+	eof.SetIn(strings.NewReader("Sample App\n"))
+	eof.SetArgs([]string{"init", "--dir", t.TempDir()})
+	err = eof.Execute()
+	var eofExit *ExitError
+	if !errors.As(err, &eofExit) || eofExit.Code != ExitUsage {
+		t.Fatalf("EOF error = %#v", err)
+	}
+
+	reader, writer, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatal(pipeErr)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	nonTTYOutput := &bytes.Buffer{}
+	nonTTY := New("test")
+	nonTTY.SetIn(reader)
+	nonTTY.SetOut(nonTTYOutput)
+	nonTTY.SetArgs([]string{"init", "--dir", t.TempDir()})
+	err = nonTTY.Execute()
+	var nonTTYExit *ExitError
+	if !errors.As(err, &nonTTYExit) || nonTTYExit.Code != ExitUsage || nonTTYOutput.Len() != 0 {
+		t.Fatalf("non-TTY error = %#v, output = %q", err, nonTTYOutput.String())
+	}
+
+	command := New("test")
+	command.SetArgs([]string{"init", "--non-interactive", "--project-id", "sample-app"})
+	err = command.Execute()
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitUsage {
+		t.Fatalf("error = %#v, want usage exit", err)
+	}
+}
+
+func TestProviderConnectCommandReportsLocalCredentialFailuresAndSuccess(t *testing.T) {
+	workspace := t.TempDir()
+	initWorkspace(t, workspace)
+	service, err := app.Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, production, err := service.GetEnvironment(context.Background(), "production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	production.Provider.ProjectID = "photo-editor-prod"
+	if _, _, err := service.UpdateEnvironment(context.Background(), snapshot.Revision, "production", production); err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	validPath := filepath.Join(directory, "sa.json")
+	if err := os.WriteFile(validPath, []byte(`{"type":"service_account","client_email":"bot@example.invalid","private_key":"test-private-key","project_id":"photo-editor-prod"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	output := &bytes.Buffer{}
+	command := New("test")
+	command.SetOut(output)
+	command.SetArgs([]string{"provider", "connect", "--workspace", workspace, "--environment", "production", "--path", validPath})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "已连接 production 环境的 Firebase（photo-editor-prod）") || !strings.Contains(output.String(), "凭据引用：…/sa.json") || !strings.Contains(output.String(), "conflow pull --environment production 拉取线上配置") || strings.Contains(output.String(), validPath) {
+		t.Fatalf("success output = %q", output.String())
+	}
+
+	tests := []struct {
+		name    string
+		path    string
+		content string
+		want    string
+	}{
+		{name: "missing path", path: filepath.Join(directory, "nope.json"), want: "错误：凭据文件不存在："},
+		{name: "bad JSON", path: filepath.Join(directory, "bad.json"), content: `{`, want: "错误：凭据文件不是有效的 JSON"},
+		{name: "missing fields", path: filepath.Join(directory, "partial.json"), content: `{"type":"service_account"}`, want: "错误：凭据文件缺少字段：client_email、private_key、project_id"},
+		{name: "wrong type", path: filepath.Join(directory, "wrong-type.json"), content: `{"type":"authorized_user"}`, want: "错误：凭据文件不是 Firebase 服务账号 JSON"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.content != "" {
+				if err := os.WriteFile(test.path, []byte(test.content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			failed := New("test")
+			failed.SetArgs([]string{"provider", "connect", "--workspace", workspace, "--environment", "production", "--path", test.path})
+			err := failed.Execute()
+			var exit *ExitError
+			if !errors.As(err, &exit) || exit.Code != ExitValidation || !strings.Contains(exit.Message, test.want) {
+				t.Fatalf("error = %#v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestPlanCommandWritesArtifactsToOutputDirectory(t *testing.T) {
+	workspace := t.TempDir()
+	initWorkspace(t, workspace)
 	outputDirectory := filepath.Join(t.TempDir(), "plan-output")
 	output := &bytes.Buffer{}
 	command := New("test")
@@ -180,11 +354,7 @@ func TestPlanCommandWritesArtifactsToOutputDirectory(t *testing.T) {
 
 func TestSourceStatusAndSaveCommands(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
-		t.Fatal(err)
-	}
+	initWorkspace(t, workspace)
 	statusOutput := &bytes.Buffer{}
 	status := New("test")
 	status.SetOut(statusOutput)
@@ -294,11 +464,7 @@ func cliRunGit(t *testing.T, workspace string, args ...string) {
 
 func TestProjectAndEnvironmentCommandsUseManifestRevisions(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
-		t.Fatal(err)
-	}
+	initWorkspace(t, workspace)
 
 	projectOutput := executeCLI(t, "project", "get", "--workspace", workspace, "--json")
 	var gotProject struct {
@@ -449,11 +615,7 @@ func TestAllCommandHelpIncludesAnExample(t *testing.T) {
 
 func TestValidationJSONMatchesAPIGoldenFixture(t *testing.T) {
 	workspace := t.TempDir()
-	init := New("test")
-	init.SetArgs([]string{"init", "--dir", workspace})
-	if err := init.Execute(); err != nil {
-		t.Fatal(err)
-	}
+	initWorkspace(t, workspace)
 	service, err := app.Open(workspace)
 	if err != nil {
 		t.Fatal(err)

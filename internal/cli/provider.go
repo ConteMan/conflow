@@ -3,11 +3,13 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/operation"
+	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/spf13/cobra"
 )
 
@@ -28,8 +30,66 @@ func newProviderCommand() *cobra.Command {
 	status.Flags().StringVar(&workspace, "workspace", ".", "project workspace")
 	status.Flags().StringVar(&environment, "environment", "", "environment ID")
 	_ = status.MarkFlagRequired("environment")
-	command.AddCommand(status)
+	var connectWorkspace, connectEnvironment, credentialsPath string
+	connect := &cobra.Command{Use: "connect", Short: "Validate and save a local provider credential reference", RunE: func(command *cobra.Command, _ []string) error {
+		if credentialsPath == "" {
+			return usageError("usage_error", "--path is required")
+		}
+		service, err := app.Open(connectWorkspace)
+		if err != nil {
+			return err
+		}
+		op, err := service.StartProviderConnect(context.Background(), connectEnvironment, credentialsPath)
+		if err != nil {
+			return providerConnectError(err)
+		}
+		if op.Status != "succeeded" {
+			if op.Failure != nil {
+				return &providerOperationError{Code: op.Failure.Code}
+			}
+			return &providerOperationError{Code: "unknown"}
+		}
+		_, environmentInfo, err := service.GetEnvironment(context.Background(), connectEnvironment)
+		if err != nil {
+			return err
+		}
+		result := providerConnectResult{
+			EnvironmentID:          connectEnvironment,
+			FirebaseProjectID:      environmentInfo.Provider.ProjectID,
+			CredentialsPathDisplay: provider.CredentialPathDisplay(credentialsPath),
+			NextStep:               "conflow pull --environment " + connectEnvironment + " 拉取线上配置",
+		}
+		if jsonMode(command) {
+			return json.NewEncoder(command.OutOrStdout()).Encode(result)
+		}
+		fmt.Fprintf(command.OutOrStdout(), "已连接 %s 环境的 Firebase（%s）\n", result.EnvironmentID, result.FirebaseProjectID)
+		fmt.Fprintf(command.OutOrStdout(), "凭据引用：%s（只保存路径，不复制文件内容）\n", result.CredentialsPathDisplay)
+		fmt.Fprintf(command.OutOrStdout(), "下一步：%s\n", result.NextStep)
+		return nil
+	}}
+	connect.Flags().StringVar(&connectWorkspace, "workspace", ".", "project workspace")
+	connect.Flags().StringVar(&connectEnvironment, "environment", "", "environment ID")
+	connect.Flags().StringVar(&credentialsPath, "path", "", "local service account JSON path")
+	_ = connect.MarkFlagRequired("environment")
+	command.AddCommand(status, connect)
 	return command
+}
+
+type providerConnectResult struct {
+	EnvironmentID          string `json:"environment_id"`
+	FirebaseProjectID      string `json:"firebase_project_id"`
+	CredentialsPathDisplay string `json:"credentials_path_display"`
+	NextStep               string `json:"next_step"`
+}
+
+func providerConnectError(err error) error {
+	if errors.Is(err, app.ErrProviderProjectIDMissing) {
+		return &ExitError{Code: ExitValidation, ErrorCode: "provider_project_id_required", Message: "错误：先在环境管理中填写 Firebase 项目 ID"}
+	}
+	if errors.Is(err, provider.ErrCredentialFileMissing) || errors.Is(err, provider.ErrCredentialFileUnreadable) || errors.Is(err, provider.ErrCredentialJSONInvalid) || errors.Is(err, provider.ErrCredentialServiceAccount) || errors.Is(err, provider.ErrCredentialFieldsMissing) {
+		return &ExitError{Code: ExitValidation, ErrorCode: "credential_validation_failed", Message: "错误：" + provider.CredentialErrorMessage(err)}
+	}
+	return err
 }
 
 func newPullCommand() *cobra.Command {

@@ -25,8 +25,9 @@ import (
 )
 
 var (
-	ErrLastEnvironment         = errors.New("cannot delete the last environment")
-	ErrPackRegistryUnavailable = errors.New("pack registry is unavailable")
+	ErrLastEnvironment          = errors.New("cannot delete the last environment")
+	ErrPackRegistryUnavailable  = errors.New("pack registry is unavailable")
+	ErrProviderProjectIDMissing = errors.New("先在环境管理中填写 Firebase 项目 ID")
 )
 
 // PlanInvalidatedError is the 409 precondition domain for local inputs.
@@ -60,8 +61,8 @@ type Service struct {
 	providerFor  func(project.Environment) (provider.Adapter, error)
 }
 
-func Initialize(workspace string) (string, error) {
-	return project.CreateExample(workspace)
+func Initialize(workspace string, manifest project.Manifest) (string, error) {
+	return project.Create(workspace, manifest)
 }
 
 func Open(workspace string) (*Service, error) {
@@ -505,10 +506,11 @@ func (s *Service) Operation(_ context.Context, id string) (operation.Operation, 
 }
 
 type ProviderInfo struct {
-	EnvironmentID string                `json:"environment_id"`
-	ProviderType  string                `json:"provider_type"`
-	Status        string                `json:"status"`
-	Capabilities  provider.Capabilities `json:"capabilities"`
+	EnvironmentID          string                `json:"environment_id"`
+	ProviderType           string                `json:"provider_type"`
+	Status                 string                `json:"status"`
+	CredentialsPathDisplay string                `json:"credentials_path_display,omitempty"`
+	Capabilities           provider.Capabilities `json:"capabilities"`
 }
 
 func (s *Service) ProviderStatus(ctx context.Context, environmentID string) (ProviderInfo, error) {
@@ -516,44 +518,53 @@ func (s *Service) ProviderStatus(ctx context.Context, environmentID string) (Pro
 	if err != nil {
 		return ProviderInfo{}, err
 	}
+	credentialsPath, credentialErr := provider.LoadCredentialReference(s.workspace, environmentID)
+	if credentialErr != nil {
+		return ProviderInfo{}, credentialErr
+	}
+	display := provider.CredentialPathDisplay(credentialsPath)
+	if strings.TrimSpace(environment.Provider.ProjectID) == "" {
+		return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: "not_configured", CredentialsPathDisplay: display}, nil
+	}
 	adapter, err := s.providerFor(environment)
 	if err != nil || adapter == nil {
-		return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: "not_configured"}, nil
+		return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: "not_configured", CredentialsPathDisplay: display}, nil
 	}
 	status := adapter.Status(ctx)
-	return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: status.Status, Capabilities: status.Capabilities}, nil
+	return ProviderInfo{EnvironmentID: environmentID, ProviderType: environment.Provider.Type, Status: status.Status, CredentialsPathDisplay: display, Capabilities: status.Capabilities}, nil
 }
 
-func (s *Service) StartProviderConnect(ctx context.Context, environmentID string) (operation.Operation, error) {
-	if _, _, err := s.GetEnvironment(ctx, environmentID); err != nil {
+func (s *Service) StartProviderConnect(ctx context.Context, environmentID, credentialsPath string) (operation.Operation, error) {
+	_, environment, err := s.GetEnvironment(ctx, environmentID)
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	if strings.TrimSpace(environment.Provider.ProjectID) == "" {
+		return operation.Operation{}, ErrProviderProjectIDMissing
+	}
+	if err := provider.ValidateFirebaseServiceAccount(credentialsPath); err != nil {
+		return operation.Operation{}, err
+	}
+	if err := provider.SaveCredentialReference(s.workspace, environmentID, credentialsPath); err != nil {
 		return operation.Operation{}, err
 	}
 	op, err := s.operations.Create("provider_connect")
 	if err != nil {
 		return operation.Operation{}, err
 	}
-	go func() {
-		_, _ = s.operations.Update(op.OperationID, "running", "reading_remote", nil, nil, "unchanged")
-		_, environment, getErr := s.GetEnvironment(context.Background(), environmentID)
-		if getErr == nil {
-			var adapter provider.Adapter
-			adapter, getErr = s.providerFor(environment)
-			if getErr == nil {
-				getErr = adapter.Connect(context.Background())
-			}
-		}
-		if getErr != nil {
-			s.failProviderOperation(op.OperationID, "reading_remote", getErr)
-		} else {
-			_, _ = s.operations.Update(op.OperationID, "succeeded", "completed", nil, nil, "unchanged")
-		}
-	}()
-	return op, nil
+	// Connect validates and stores a local reference only. Remote verification
+	// happens during pull, so a valid local credential cannot fail as an
+	// unrelated provider_not_configured operation.
+	return s.operations.Update(op.OperationID, "succeeded", "completed", nil, nil, "unchanged")
 }
 
 func (s *Service) StartPull(ctx context.Context, environmentID string) (operation.Operation, error) {
-	if _, _, err := s.GetEnvironment(ctx, environmentID); err != nil {
+	_, environment, err := s.GetEnvironment(ctx, environmentID)
+	if err != nil {
 		return operation.Operation{}, err
+	}
+	if strings.TrimSpace(environment.Provider.ProjectID) == "" {
+		return operation.Operation{}, ErrProviderProjectIDMissing
 	}
 	op, err := s.operations.Create("remote_pull")
 	if err != nil {

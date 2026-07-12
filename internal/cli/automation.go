@@ -200,7 +200,7 @@ func classifyError(err error) (code, message string, exitCode int) {
 		errors.Is(err, release.ErrIdempotencyConflict), errors.Is(err, source.ErrGitWorkspaceDirty), errors.Is(err, gitreview.ErrBranchExists),
 		errors.Is(err, gitreview.ErrIdempotencyConflict), errors.Is(err, app.ErrRollbackPreviewInvalid):
 		return "conflict", message, ExitConflict
-	case errors.As(err, new(*providerOperationError)), errors.Is(err, provider.ErrUnauthorized), errors.Is(err, provider.ErrNotConfigured), errors.Is(err, provider.ErrValidation):
+	case errors.As(err, new(*providerOperationError)), errors.Is(err, app.ErrProviderProjectIDMissing), errors.Is(err, provider.ErrUnauthorized), errors.Is(err, provider.ErrNotConfigured), errors.Is(err, provider.ErrValidation):
 		return "provider_failed", message, ExitProvider
 	case errors.Is(err, project.ErrInvalidManifest), errors.As(err, new(*draft.ValidationError)), errors.Is(err, source.ErrRoundTripBlocked):
 		return "validation_failed", message, ExitValidation
@@ -226,7 +226,7 @@ func ensureExamples(command *cobra.Command) {
 var commandExamples = map[string]string{
 	"conflow":                     "conflow validate --workspace . --environment production --json",
 	"conflow version":             "conflow version --json",
-	"conflow init":                "conflow init --dir ./photo-editor --json",
+	"conflow init":                "conflow init --non-interactive --dir ./photo-editor --project-id photo-editor --project-name 'Photo Editor' --environment-id development --environment-name Development --environment-kind development --json",
 	"conflow validate":            "conflow validate --workspace . --environment production --json",
 	"conflow plan":                "conflow plan --workspace . --environment production --output plan-artifacts --json",
 	"conflow source":              "conflow source status --workspace . --json",
@@ -242,6 +242,7 @@ var commandExamples = map[string]string{
 	"conflow save":                "conflow save --workspace . --environment production --json",
 	"conflow serve":               "conflow serve --workspace . --address 127.0.0.1:9010",
 	"conflow provider":            "conflow provider status --workspace . --environment production --json",
+	"conflow provider connect":    "conflow provider connect --workspace . --environment production --path ~/.config/conflow/firebase.json --json",
 	"conflow provider status":     "conflow provider status --workspace . --environment production --json",
 	"conflow pull":                "conflow pull --workspace . --environment production --json",
 	"conflow remote":              "conflow remote validate --workspace . --environment production --plan plan_123 --json",

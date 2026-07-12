@@ -79,6 +79,12 @@ type remoteValidateInput struct {
 	PlanID string `json:"plan_id"`
 }
 
+type connectProviderInput struct {
+	CredentialsPath string `json:"credentials_path"`
+}
+
+func (input connectProviderInput) valid() bool { return input.CredentialsPath != "" }
+
 type createReleaseInput struct {
 	PlanID                string                 `json:"plan_id"`
 	ExpectedDraftRevision uint64                 `json:"expected_draft_revision"`
