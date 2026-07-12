@@ -53,7 +53,12 @@ func (a *api) getProviderStatus(writer http.ResponseWriter, request *http.Reques
 }
 
 func (a *api) connectProvider(writer http.ResponseWriter, request *http.Request) {
-	op, err := a.service.StartProviderConnect(request.Context(), request.PathValue("environment_id"))
+	var input connectProviderInput
+	if err := decodeJSON(writer, request, &input); err != nil || !input.valid() {
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "credentials_path 是必填项", 0)
+		return
+	}
+	op, err := a.service.StartProviderConnect(request.Context(), request.PathValue("environment_id"), input.CredentialsPath)
 	if err != nil {
 		a.writeProviderError(writer, request, err)
 		return
@@ -991,6 +996,8 @@ func (a *api) writePlanError(writer http.ResponseWriter, request *http.Request, 
 func (a *api) writeProviderError(writer http.ResponseWriter, request *http.Request, err error) {
 	var invalidated *app.PlanInvalidatedError
 	switch {
+	case errors.Is(err, app.ErrProviderProjectIDMissing):
+		writeAPIError(writer, request, http.StatusUnprocessableEntity, "provider_project_id_required", "先在环境管理中填写 Firebase 项目 ID", 0)
 	case errors.Is(err, app.ErrRemoteSnapshotUnavailable):
 		writeAPIError(writer, request, http.StatusNotFound, "remote_snapshot_not_found", "远端快照不可用", 0)
 	case errors.As(err, &invalidated):

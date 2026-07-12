@@ -28,7 +28,36 @@ func newProviderCommand() *cobra.Command {
 	status.Flags().StringVar(&workspace, "workspace", ".", "project workspace")
 	status.Flags().StringVar(&environment, "environment", "", "environment ID")
 	_ = status.MarkFlagRequired("environment")
-	command.AddCommand(status)
+	var connectWorkspace, connectEnvironment, credentialsPath string
+	connect := &cobra.Command{Use: "connect", Short: "Save and verify a local provider credential reference", RunE: func(command *cobra.Command, _ []string) error {
+		if credentialsPath == "" {
+			return usageError("usage_error", "--path is required")
+		}
+		service, err := app.Open(connectWorkspace)
+		if err != nil {
+			return err
+		}
+		op, err := service.StartProviderConnect(context.Background(), connectEnvironment, credentialsPath)
+		if err != nil {
+			return err
+		}
+		final, err := waitOperation(service, op.OperationID)
+		if err != nil {
+			return err
+		}
+		if final.Status != "succeeded" {
+			if final.Failure != nil {
+				return &providerOperationError{Code: final.Failure.Code}
+			}
+			return &providerOperationError{Code: "unknown"}
+		}
+		return json.NewEncoder(command.OutOrStdout()).Encode(final)
+	}}
+	connect.Flags().StringVar(&connectWorkspace, "workspace", ".", "project workspace")
+	connect.Flags().StringVar(&connectEnvironment, "environment", "", "environment ID")
+	connect.Flags().StringVar(&credentialsPath, "path", "", "local service account JSON path")
+	_ = connect.MarkFlagRequired("environment")
+	command.AddCommand(status, connect)
 	return command
 }
 

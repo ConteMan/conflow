@@ -2,21 +2,9 @@
 
 **中文** | [English](README.en.md)
 
-> 本地优先的 ConfigOps 工作台：用业务表单、校验、差异和安全发布流程管理应用配置。
+> 本地优先的 ConfigOps 工作台：通过业务表单、校验、差异和受控发布管理应用配置。
 
-Conflow 是一个 Go 单二进制工具，同时提供 CLI 和本地 Web GUI。它让 PM、运营和研发以广告位、频控策略、功能开关等业务对象管理配置，而不是直接复制 Firebase Remote Config 的长 JSON。
-
-## 核心能力
-
-- **项目与环境**：一个 App 下管理开发、测试、生产环境及其发布保护。
-- **配置包**：用受版本管理的业务模型定义字段、规则、风险和编译方式。
-- **源适配器**：兼容 Git JSON、Conflow 托管文件和导入迁移；Git 仍可作为事实源。
-- **发布适配器**：以 Firebase Remote Config 为首个目标，使用模板合并、ETag、预校验和回滚记录。
-- **本地 GUI + CLI**：浏览器完成日常操作，CLI 可进入 Git、CI 和自动化流程。
-
-## 当前状态
-
-项目处于 M2 配置核心阶段：基础骨架、项目/环境 API 与版本化 Config Pack 契约已完成。首个配置包为 `mobile-ad-monetization/v1`，首个发布目标为 Firebase Remote Config。详细范围见 [路线图](docs/roadmap.md)。
+Conflow 是一个 Go 单二进制工具，同时提供 CLI 和本地 Web GUI。它将配置表达为广告位、频控策略和功能开关等业务对象，而不是让团队直接复制 Firebase Remote Config 的长 JSON。
 
 ## 快速开始
 
@@ -26,10 +14,32 @@ cd conflow
 make bootstrap
 make check
 
-# 创建一个本地管理项目，然后打开 GUI
+# 交互式创建项目、首个环境，并可选择稍后填写 Firebase 项目 ID
 go run ./cmd/conflow init --dir ./examples/photo-editor
+
+# 自动化场景必须显式提供创建参数；缺少必填参数会以 exit 64 结束
+go run ./cmd/conflow init --non-interactive --dir ./examples/photo-editor \
+  --project-id photo-editor --project-name "Photo Editor" \
+  --environment-id development --environment-name Development \
+  --environment-kind development --provider-project-id photo-editor-dev
+
 go run ./cmd/conflow serve --workspace ./examples/photo-editor
 ```
+
+打开终端输出的本地地址。概览页可创建更多环境；Firebase 项目 ID 可先留空，但连接或拉取前必须在环境管理中补齐。
+
+## 连接 Firebase
+
+服务账号 JSON 永远保留在本机路径，Conflow 只在已忽略的 `.conflow/` 本地状态中保存路径引用。GUI 的 Firebase 连接卡会在提交后清空输入，并仅显示 `…/firebase.json` 一类脱敏尾部。
+
+```sh
+go run ./cmd/conflow provider connect --workspace ./examples/photo-editor \
+  --environment development --path "$HOME/.config/conflow/firebase.json"
+
+go run ./cmd/conflow pull --workspace ./examples/photo-editor --environment development
+```
+
+不要把服务账号 JSON、访问令牌或绝对凭据路径提交到仓库或写入日志。
 
 ## 开发
 
@@ -40,7 +50,7 @@ make test
 make check
 ```
 
-前端使用 React、TypeScript、Tailwind 与 shadcn/ui 的 Base UI primitives；Node 只用于开发构建，最终发布物是单一 Go 二进制。
+前端使用 React、TypeScript、Tailwind 与 shadcn/ui 的 Base UI primitives；Node 只参与开发构建，发布物仍是单一 Go 二进制。
 
 ## 文档
 

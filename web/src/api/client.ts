@@ -37,6 +37,7 @@ export type ReleaseSummary = components["schemas"]["ReleaseSummary"];
 export type RollbackPreview = components["schemas"]["RollbackPreview"];
 export type ReleaseConfirmation = components["schemas"]["ReleaseConfirmation"];
 export type RemoteAuditState = components["schemas"]["RemoteAuditState"];
+export type ProviderStatus = components["schemas"]["ProviderStatus"];
 
 type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"] | components["schemas"]["RemoteETagMismatchResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
@@ -44,6 +45,7 @@ type ProjectResponse = components["schemas"]["ProjectResponse"];
 type EnvironmentResponse = components["schemas"]["EnvironmentResponse"];
 type DeleteEnvironmentResponse = components["schemas"]["DeleteEnvironmentResponse"];
 type PackMetadataResponse = components["schemas"]["PackMetadataResponse"];
+type ProviderStatusResponse = components["schemas"]["ProviderStatusResponse"];
 
 export class ConflowAPIError extends Error {
   readonly code: string;
@@ -130,6 +132,25 @@ export function updateEnvironment(id: string, revision: number, input: UpdateEnv
 
 export function deleteEnvironment(id: string, revision: number): Promise<DeleteEnvironmentResponse> {
   return request(`/environments/${encodeURIComponent(id)}`, mutationInit("DELETE", revision));
+}
+
+export function getProviderStatus(environmentID: string, signal?: AbortSignal): Promise<ProviderStatusResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/provider`, { signal });
+}
+
+export function connectProvider(environmentID: string, credentialsPath: string): Promise<OperationResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/provider:connect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credentials_path: credentialsPath }),
+  });
+}
+
+export function pullRemote(environmentID: string): Promise<OperationResponse> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/remote:pull`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 export function getPackMetadata(packRef: string, signal?: AbortSignal): Promise<PackMetadataResponse> {

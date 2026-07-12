@@ -575,7 +575,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Asynchronously verify the configured provider credential reference */
+        /** Save and asynchronously verify a local provider credential reference */
         post: operations["connectProvider"];
         delete?: never;
         options?: never;
@@ -1614,11 +1614,16 @@ export interface components {
             provider_type: "firebase-remote-config";
             /** @enum {string} */
             status: "connected" | "unavailable" | "unauthorized" | "not_configured";
+            /** @description Redacted local credential path showing only the final file name. */
+            credentials_path_display?: string;
             capabilities: components["schemas"]["ProviderCapabilities"];
         };
         ProviderStatusResponse: {
             data: components["schemas"]["ProviderStatus"];
             meta: components["schemas"]["ResponseMeta"];
+        };
+        ConnectProviderInput: {
+            credentials_path: string;
         };
         RemoteValidateInput: {
             plan_id: string;
@@ -3355,7 +3360,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectProviderInput"];
+            };
+        };
         responses: {
             /** @description Provider connection Operation */
             202: {

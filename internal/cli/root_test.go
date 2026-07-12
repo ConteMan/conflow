@@ -144,6 +144,31 @@ func TestInitAndValidateCommands(t *testing.T) {
 	}
 }
 
+func TestInitWizardAndNonInteractiveValidation(t *testing.T) {
+	workspace := t.TempDir()
+	wizard := New("test")
+	wizard.SetIn(strings.NewReader("sample-app\nSample App\ndevelopment\nDevelopment\ndevelopment\n\n"))
+	wizard.SetArgs([]string{"init", "--dir", workspace})
+	if err := wizard.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := project.Load(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Project.ID != "sample-app" || manifest.Environments[0].Provider.ProjectID != "" {
+		t.Fatalf("wizard manifest = %#v", manifest)
+	}
+
+	command := New("test")
+	command.SetArgs([]string{"init", "--non-interactive", "--project-id", "sample-app"})
+	err = command.Execute()
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitUsage {
+		t.Fatalf("error = %#v, want usage exit", err)
+	}
+}
+
 func TestPlanCommandWritesArtifactsToOutputDirectory(t *testing.T) {
 	workspace := t.TempDir()
 	init := New("test")

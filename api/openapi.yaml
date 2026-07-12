@@ -1053,7 +1053,13 @@ paths:
       - $ref: "#/components/parameters/EnvironmentID"
     post:
       operationId: connectProvider
-      summary: Asynchronously verify the configured provider credential reference
+      summary: Save and asynchronously verify a local provider credential reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectProviderInput"
       responses:
         "202":
           description: Provider connection Operation
@@ -3647,6 +3653,9 @@ components:
         status:
           type: string
           enum: [connected, unavailable, unauthorized, not_configured]
+        credentials_path_display:
+          type: string
+          description: Redacted local credential path showing only the final file name.
         capabilities:
           $ref: "#/components/schemas/ProviderCapabilities"
     ProviderStatusResponse:
@@ -3658,6 +3667,14 @@ components:
           $ref: "#/components/schemas/ProviderStatus"
         meta:
           $ref: "#/components/schemas/ResponseMeta"
+    ConnectProviderInput:
+      type: object
+      additionalProperties: false
+      required: [credentials_path]
+      properties:
+        credentials_path:
+          type: string
+          minLength: 1
     RemoteValidateInput:
       type: object
       additionalProperties: false

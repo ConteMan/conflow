@@ -16,7 +16,7 @@ export function LoadingState() {
 }
 
 export function EmptyState({ onRetry }: { onRetry: () => void }) {
-  return <main className="center-state"><AlertTriangle /><h1>还没有可用项目</h1><p>请先在工作目录初始化 Conflow 项目。</p><Button variant="primary" onClick={onRetry} icon={<RefreshCw size={16} />}>重新检查</Button></main>;
+  return <main className="center-state"><AlertTriangle /><h1>还没有可用项目</h1><p>在此工作目录运行 <code>conflow init</code> 启动创建向导；自动化场景请使用 <code>--non-interactive</code> 与项目、环境 flags。</p><Button variant="primary" onClick={onRetry} icon={<RefreshCw size={16} />}>重新检查</Button></main>;
 }
 
 export function ServiceUnavailable({ onRetry, requestId }: { onRetry: () => void; requestId?: string }) {

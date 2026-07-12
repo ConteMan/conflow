@@ -139,16 +139,16 @@ func Validate(manifest Manifest) error {
 			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.type must be firebase-remote-config", environment.ID))
 		}
 		providerProjectID := strings.TrimSpace(environment.Provider.ProjectID)
-		if providerProjectID == "" {
-			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.project_id is required", environment.ID))
-		} else if len([]rune(providerProjectID)) > 128 {
+		if providerProjectID != "" && len([]rune(providerProjectID)) > 128 {
 			validationErrors = append(validationErrors, fmt.Errorf("environment %q provider.project_id must be at most 128 characters", environment.ID))
 		}
 	}
 	return errors.Join(validationErrors...)
 }
 
-func CreateExample(workspace string) (string, error) {
+// Create initializes the manifest and its managed-file source state. Provider
+// project IDs may intentionally be empty during onboarding.
+func Create(workspace string, manifest Manifest) (string, error) {
 	path := ManifestPath(workspace)
 	if _, err := os.Stat(path); err == nil {
 		return "", fmt.Errorf("project manifest already exists: %s", path)
@@ -158,15 +158,9 @@ func CreateExample(workspace string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	manifest := Manifest{
-		Version: 1,
-		Project: Project{ID: "photo-editor", Name: "Photo Editor", ReleaseConfirmationPolicy: ReleaseConfirmationPolicy{ProductionLowRiskMode: "environment_id"}},
-		Pack:    PackReference{ID: "mobile-ad-monetization/v1"},
-		Source:  Source{Type: "managed-file"},
-		Environments: []Environment{
-			{ID: "development", Name: "Development", Kind: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
-			{ID: "production", Name: "Production", Kind: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
-		},
+	normalize(&manifest)
+	if err := Validate(manifest); err != nil {
+		return "", fmt.Errorf("%w: %w", ErrInvalidManifest, err)
 	}
 	content, err := yaml.Marshal(manifest)
 	if err != nil {
@@ -183,4 +177,17 @@ func CreateExample(workspace string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func CreateExample(workspace string) (string, error) {
+	return Create(workspace, Manifest{
+		Version: 1,
+		Project: Project{ID: "photo-editor", Name: "Photo Editor", ReleaseConfirmationPolicy: ReleaseConfirmationPolicy{ProductionLowRiskMode: "environment_id"}},
+		Pack:    PackReference{ID: "mobile-ad-monetization/v1"},
+		Source:  Source{Type: "managed-file"},
+		Environments: []Environment{
+			{ID: "development", Name: "Development", Kind: "development", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-dev"}},
+			{ID: "production", Name: "Production", Kind: "production", Provider: Provider{Type: "firebase-remote-config", ProjectID: "photo-editor-prod"}, Publish: Publish{RequiresConfirmation: true}},
+		},
+	})
 }

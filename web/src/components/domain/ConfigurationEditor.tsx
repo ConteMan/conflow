@@ -34,6 +34,7 @@ type EntityConflict = { local: EntityRecord; state: DraftView; revision: number;
 type BindingLoad = Record<string, EntityView[]>;
 type DeleteTarget = { entity: EntityView; entityType: "placement" | "frequency_policy" };
 type DiagnosticCategory = "blocking" | "warning" | "info";
+type FrequencyDrawerState = { mode: "edit"; policy: EntityView } | { mode: "create"; returnToPlacement: boolean };
 
 export function ConfigurationEditor({ environment, environments, revision, packRef, focusEntityRef, onRevision, onValidation }: {
   environment: Environment;
@@ -52,7 +53,9 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   const [draft, setDraft] = useState<DraftView | null>(null);
   const [bindings, setBindings] = useState<BindingLoad>({});
   const [tab, setTab] = useState<EditorTab>("placement");
-  const [editingPolicy, setEditingPolicy] = useState<EntityView | null>(null);
+  const [frequencyDrawer, setFrequencyDrawer] = useState<FrequencyDrawerState | null>(null);
+  const [creatingSwitch, setCreatingSwitch] = useState(false);
+  const [createdPolicy, setCreatedPolicy] = useState<EntityView | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [blockedReferences, setBlockedReferences] = useState<{ target: DeleteTarget; references: EntityReference[] } | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -91,7 +94,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
     if (!focusEntityRef) return;
     const [, , entityType, entityID] = focusEntityRef.split(":");
     if (entityType === "placement") setRoute({ mode: "detail", id: entityID });
-    else if (entityType === "frequency_policy") { setTab("frequency_policy"); setEditingPolicy(policies.find((item) => item.entity_id === entityID) ?? null); }
+    else if (entityType === "frequency_policy") { setTab("frequency_policy"); const policy = policies.find((item) => item.entity_id === entityID); if (policy) setFrequencyDrawer({ mode: "edit", policy }); }
     else if (entityType === "feature_switch") setTab("feature_switch");
     else if (entityType === "unit_binding") setTab("unit_binding");
   }, [focusEntityRef, policies]);
@@ -104,22 +107,26 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   };
 
   if (route.mode === "detail") {
-    return <PlacementDetail key={`${environment.id}:${route.id ?? "new"}`} environment={environment} environments={environments} revision={revision} schema={schema} validation={validation} placementID={route.id} focusBindings={route.section === "bindings"} onBack={() => { setRoute({ mode: "list" }); void loadList(); }} onSaved={(nextRevision, dirty) => { onRevision(nextRevision, dirty); void loadList(); }} />;
+    return <>
+      <PlacementDetail key={`${environment.id}:${route.id ?? "new"}`} environment={environment} environments={environments} revision={revision} schema={schema} validation={validation} placementID={route.id} focusBindings={route.section === "bindings"} createdPolicy={createdPolicy} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: true })} onBack={() => { setCreatedPolicy(null); setRoute({ mode: "list" }); void loadList(); }} onSaved={(nextRevision, dirty) => { onRevision(nextRevision, dirty); void loadList(); }} />
+      <FrequencyDrawer state={frequencyDrawer} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setFrequencyDrawer(null)} onSaved={(policy) => { if (frequencyDrawer?.mode === "create" && frequencyDrawer.returnToPlacement) setCreatedPolicy(policy); setFrequencyDrawer(null); void loadList(); }} onDelete={(entity) => { setFrequencyDrawer(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={(reference) => { setFrequencyDrawer(null); if (reference.entity_type === "placement") setRoute({ mode: "detail", id: reference.entity_id }); }} />
+    </>;
   }
 
   const openReference = (reference: EntityReference) => {
-    setBlockedReferences(null); setEditingPolicy(null);
+    setBlockedReferences(null); setFrequencyDrawer(null);
     if (reference.entity_type === "placement") setRoute({ mode: "detail", id: reference.entity_id });
   };
   return <>
-    <ConfigurationList tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} draft={draft} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onOpenPolicy={setEditingPolicy} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} />
-    <FrequencyDrawer policy={editingPolicy} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setEditingPolicy(null)} onSaved={() => { setEditingPolicy(null); void loadList(); }} onDelete={(entity) => { setEditingPolicy(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={openReference} />
+    <ConfigurationList tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} draft={draft} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: false })} onOpenPolicy={(policy) => setFrequencyDrawer({ mode: "edit", policy })} onCreateSwitch={() => setCreatingSwitch(true)} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} />
+    <FrequencyDrawer state={frequencyDrawer} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setFrequencyDrawer(null)} onSaved={() => { setFrequencyDrawer(null); void loadList(); }} onDelete={(entity) => { setFrequencyDrawer(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={openReference} />
+    <FeatureSwitchDrawer open={creatingSwitch} environment={environment} revision={revision} draft={draft} onClose={() => setCreatingSwitch(false)} onSaved={() => { setCreatingSwitch(false); void loadList(); }} />
     <DeleteEntityDialog target={deleting} environment={environment} revision={revision} draft={draft} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); void loadList(); }} onBlocked={(target, references) => { setDeleting(null); setBlockedReferences({ target, references }); }} />
     <ReferencedDeleteDialog blocked={blockedReferences} onClose={() => setBlockedReferences(null)} onOpenReference={openReference} />
   </>;
 }
 
-function ConfigurationList({ tab, onTabChange, placements, policies, switches, draft, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onOpenPolicy, onDelete, onSwitchSaved }: {
+function ConfigurationList({ tab, onTabChange, placements, policies, switches, draft, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onCreatePolicy, onOpenPolicy, onCreateSwitch, onDelete, onSwitchSaved }: {
   tab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
   placements: EntityView[];
@@ -140,14 +147,17 @@ function ConfigurationList({ tab, onTabChange, placements, policies, switches, d
   onOpenPlacement: (id: string) => void;
   onOpenBinding: (id: string) => void;
   onCreate: () => void;
+  onCreatePolicy: () => void;
   onOpenPolicy: (policy: EntityView) => void;
+  onCreateSwitch: () => void;
   onDelete: (entity: EntityView, entityType: "placement" | "frequency_policy") => void;
   onSwitchSaved: () => void;
 }) {
   const title = ({ placement: "配置", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "环境绑定" } as Record<EditorTab, string>)[tab];
   const description = ({ placement: "按业务对象维护广告位配置。", frequency_policy: "通用频控值会影响引用它的广告位。", feature_switch: "开关默认值的风险与回滚方式由配置包定义。", unit_binding: "跨广告位查看各环境的广告单元绑定。" } as Record<EditorTab, string>)[tab];
+  const allEntitiesEmpty = !loading && placements.length === 0 && policies.length === 0 && switches.length === 0 && Object.values(bindings).every((items) => items.length === 0);
   return <main className="page-container configuration-page">
-    <header className="page-heading configuration-heading"><div><h1>{title}</h1><p>{description}</p></div><div className="configuration-actions"><Button icon={validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} disabled={validating || loading} onClick={onValidate}>{validating ? "正在校验" : validation?.status === "stale" ? "重新运行校验" : "运行校验"}</Button>{tab === "placement" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreate}>新建广告位</Button> : null}</div></header>
+    <header className="page-heading configuration-heading"><div><h1>{title}</h1><p>{description}</p></div><div className="configuration-actions"><Button icon={validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} disabled={validating || loading} onClick={onValidate}>{validating ? "正在校验" : validation?.status === "stale" ? "重新运行校验" : "运行校验"}</Button>{tab === "placement" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreate}>新建广告位</Button> : null}{tab === "frequency_policy" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreatePolicy}>新建频控策略</Button> : null}{tab === "feature_switch" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreateSwitch}>新建开关</Button> : null}</div></header>
     <div className="entity-tabs" role="tablist" aria-label="配置对象">
       <TabButton active={tab === "placement"} onClick={() => onTabChange("placement")}>广告位</TabButton>
       <TabButton active={tab === "frequency_policy"} onClick={() => onTabChange("frequency_policy")}>频控策略</TabButton>
@@ -157,11 +167,16 @@ function ConfigurationList({ tab, onTabChange, placements, policies, switches, d
     {validation ? <ValidationSummary result={validation} validating={validating} onValidate={onValidate} /> : null}
     {error ? <RequestError {...error} onDismiss={onRetry} /> : null}
     {validationError ? <RequestError {...validationError} onDismiss={onDismissValidationError} /> : null}
+    {allEntitiesEmpty ? <ConfigurationEmptyGuide onCreatePolicy={onCreatePolicy} onCreatePlacement={onCreate} /> : null}
     {tab === "placement" ? <PlacementTable placements={placements} draft={draft} bindings={bindings} environmentCount={environments.length} diagnostics={validation?.diagnostics ?? []} loading={loading} onOpen={onOpenPlacement} onCreate={onCreate} onDelete={onDelete} /> : null}
     {tab === "frequency_policy" ? <FrequencyTable policies={policies} diagnostics={validation?.diagnostics ?? []} loading={loading} onOpen={onOpenPolicy} onDelete={onDelete} /> : null}
     {tab === "feature_switch" ? <FeatureSwitchTable switches={switches} diagnostics={validation?.diagnostics ?? []} environment={environments.find((item) => item.id === draft?.environment_id) ?? environments[0]} revision={revision} draft={draft} loading={loading} onSaved={onSwitchSaved} /> : null}
     {tab === "unit_binding" ? <BindingOverview placements={placements} bindings={bindings} diagnostics={validation?.diagnostics ?? []} environments={environments} loading={loading} onOpen={onOpenBinding} /> : null}
   </main>;
+}
+
+function ConfigurationEmptyGuide({ onCreatePolicy, onCreatePlacement }: { onCreatePolicy: () => void; onCreatePlacement: () => void }) {
+  return <section className="configuration-empty-guide" aria-label="配置创建引导"><header><SlidersHorizontal size={23} /><div><h2>从第一条配置开始</h2><p>先建立可复用的频控策略，再创建广告位并补全环境单元绑定。</p></div></header><ol><li><span>1</span><div><strong>创建频控策略</strong><p>广告位必须引用一个频控策略。</p></div><Button variant="primary" icon={<Plus size={16} />} onClick={onCreatePolicy}>创建频控策略</Button></li><li><span>2</span><div><strong>创建广告位并引用它</strong><p>选择广告类型、稳定 ID 和刚创建的频控策略。</p></div><Button icon={<Plus size={16} />} onClick={onCreatePlacement}>创建广告位</Button></li><li><span>3</span><div><strong>在详情页配置环境绑定</strong><p>保存广告位后，按环境填写 iOS 和 Android 单元 ID。</p></div><Button icon={<Link2 size={16} />} disabled>配置环境绑定</Button></li></ol></section>;
 }
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
@@ -211,7 +226,7 @@ function PlacementTable({ placements, draft, bindings, environmentCount, diagnos
       <label className="toolbar-search"><Search size={16} aria-hidden="true" /><span className="sr-only">搜索名称或 key</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名称或 key" /></label>
       <label className="dirty-filter"><input type="checkbox" checked={dirtyOnly} onChange={(event) => setDirtyOnly(event.target.checked)} />仅看未发布修改</label>
     </div>
-    {loading ? <TableSkeleton /> : placements.length === 0 ? <section className="inline-empty"><SlidersHorizontal size={24} /><h2>还没有广告位</h2><p>广告位定义应用内稳定的广告展示位置。</p><Button variant="primary" icon={<Plus size={16} />} onClick={onCreate}>新建广告位</Button></section> : <section className="table-panel entity-table-panel">
+    {loading ? <TableSkeleton /> : placements.length === 0 ? <section className="inline-empty"><SlidersHorizontal size={24} /><h2>还没有广告位</h2><p>广告位定义应用内稳定的广告展示位置。</p><Button variant="primary" icon={<Plus size={16} />} onClick={onCreate}>创建第一个广告位</Button></section> : <section className="table-panel entity-table-panel">
       <table className="entity-table"><thead><tr><th>广告位 key</th><th>类型</th><th>启用状态</th><th>频控策略</th><th>加载超时</th><th>绑定完整度</th><th>未发布修改</th><th><span className="sr-only">打开详情</span></th></tr></thead>
         <tbody>{rows.map((placement) => <PlacementRow key={placement.entity_id} placement={placement} bindings={bindings} environmentCount={environmentCount} diagnostics={diagnosticsForEntity(diagnostics, placement)} onOpen={onOpen} onDelete={onDelete} />)}</tbody>
       </table>
@@ -251,8 +266,9 @@ function BindingOverview({ placements, bindings, diagnostics, environments, load
   return loading ? <TableSkeleton /> : <section className="table-panel binding-overview"><table><thead><tr><th>广告位</th>{environments.flatMap((environment) => [<th key={`${environment.id}-ios`}>{environment.name} iOS</th>, <th key={`${environment.id}-android`}>{environment.name} Android</th>])}</tr></thead><tbody>{placements.map((placement) => <tr key={placement.entity_id} onClick={() => onOpen(placement.entity_id)}><td><strong>{String(placement.effective.value.fields.key ?? placement.entity_id)}</strong><code>{placement.entity_id}</code><DiagnosticAnchor diagnostics={diagnosticsForEntity(diagnostics, placement)} /></td>{environments.flatMap((environment) => (["ios", "android"] as const).map((platform) => { const binding = bindings[environment.id]?.find((item) => item.effective.value.fields.placement_id === placement.entity_id && item.effective.value.fields.platform === platform); const value = binding?.effective.value.fields.unit_id_ref; return <td key={`${environment.id}-${platform}`} className={value ? "binding-overview-cell" : "binding-overview-cell binding-overview-cell--missing"}><code>{String(value ?? "未绑定")}</code>{binding ? <DiagnosticAnchor diagnostics={diagnosticsForEntity(diagnostics, binding)} /> : null}</td>; }))}</tr>)}</tbody></table><footer className="table-footer">点击广告位进入详情中的环境绑定区。</footer></section>;
 }
 
-function FrequencyDrawer({ policy, environment, revision, draft, diagnostics, onClose, onSaved, onDelete, onOpenReference }: { policy: EntityView | null; environment: Environment; revision: number; draft: DraftView | null; diagnostics: Diagnostic[]; onClose: () => void; onSaved: () => void; onDelete: (entity: EntityView) => void; onOpenReference: (reference: EntityReference) => void }) {
+function FrequencyDrawer({ state, environment, revision, draft, diagnostics, onClose, onSaved, onDelete, onOpenReference }: { state: FrequencyDrawerState | null; environment: Environment; revision: number; draft: DraftView | null; diagnostics: Diagnostic[]; onClose: () => void; onSaved: (policy: EntityView) => void; onDelete: (entity: EntityView) => void; onOpenReference: (reference: EntityReference) => void }) {
   const [fields, setFields] = useState<Record<string, unknown>>({});
+  const [newID, setNewID] = useState("");
   const [references, setReferences] = useState<EntityReference[]>([]);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -260,28 +276,60 @@ function FrequencyDrawer({ policy, environment, revision, draft, diagnostics, on
   const [systemError, setSystemError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<EntityConflict | null>(null);
   useEffect(() => {
-    if (!policy) return;
-    setFields(policy.effective.value.fields); setReferences([]); setErrors({}); setSystemError(null); setLoadingReferences(true);
+    if (!state) return;
+    const policy = state.mode === "edit" ? state.policy : null;
+    setFields(policy?.effective.value.fields ?? { cooldown_ms: 60000, interval_ms: 3600000, max_count: 1, shift_count: 0, positions: [] }); setNewID(""); setReferences([]); setErrors({}); setSystemError(null);
+    if (!policy) { setLoadingReferences(false); return; }
+    setLoadingReferences(true);
     const controller = new AbortController();
     void getDraftEntityReferences(environment.id, "frequency_policy", policy.entity_id, controller.signal).then((response) => setReferences(response.data.referenced_by)).catch((cause) => { if (!(cause instanceof DOMException && cause.name === "AbortError")) setSystemError(cause instanceof ConflowAPIError ? cause.message : "无法载入引用广告位。"); }).finally(() => { if (!controller.signal.aborted) setLoadingReferences(false); });
     return () => controller.abort();
-  }, [environment.id, policy]);
-  if (!policy) return null;
+  }, [environment.id, state]);
+  if (!state) return null;
+  const policy = state.mode === "edit" ? state.policy : null;
+  const creating = state.mode === "create";
+  const entityID = policy?.entity_id ?? newID;
   const update = (name: string, value: unknown) => setFields((current) => ({ ...current, [name]: value }));
   const save = async () => {
     setSaving(true); setErrors({}); setSystemError(null);
-    const entity = { id: policy.entity_id, fields };
-    try { await replaceDraftEntity(environment.id, "frequency_policy", policy.entity_id, revision, { expected_source_revision: draft?.source_revision ?? policy.source_revision, write_scope: "baseline", entity }); onSaved(); }
+    const entity = { id: entityID, fields };
+    try {
+      const response = creating
+        ? await createDraftEntity(environment.id, revision, { expected_source_revision: draft?.source_revision ?? "", write_scope: "baseline", entity_type: "frequency_policy", entity })
+        : await replaceDraftEntity(environment.id, "frequency_policy", policy!.entity_id, revision, { expected_source_revision: draft?.source_revision ?? policy!.source_revision, write_scope: "baseline", entity });
+      onSaved(response.data);
+    }
     catch (cause) {
       if (cause instanceof ConflowAPIError && (cause.code === "revision_mismatch" || cause.code === "source_revision_mismatch") && cause.currentState && isDraftView(cause.currentState)) setConflict({ local: entity, state: cause.currentState, revision: cause.currentRevision ?? revision, entityType: "frequency_policy" });
-      else if (cause instanceof ConflowAPIError && cause.code === "validation_failed") setErrors(errorsForEntity(cause.details ?? [], policy.entity_ref, policy.entity_id));
+      else if (cause instanceof ConflowAPIError && cause.code === "validation_failed") setErrors(errorsForEntity(cause.details ?? [], policy?.entity_ref, entityID));
       else setSystemError(cause instanceof ConflowAPIError ? cause.message : "保存频控策略失败，请重试。");
     } finally { setSaving(false); }
   };
-  return <aside className="frequency-drawer" role="dialog" aria-modal="true" aria-label={`编辑频控策略 ${policy.entity_id}`}><header><div><h2>编辑频控策略</h2><code>{policy.entity_id}</code></div><button className="icon-button" aria-label="关闭频控策略编辑" onClick={onClose}><X size={18} /></button></header><div className="frequency-drawer-body"><p className="drawer-scope"><Link2 size={15} />通用值，改动会影响引用此策略的广告位。</p><EntityDiagnostics diagnostics={diagnosticsForEntity(diagnostics, policy)} title="此频控策略的校验问题" /><div className="frequency-fields"><NumberField label="冷却时间（毫秒）" name="cooldown_ms" value={fields.cooldown_ms} error={errors.cooldown_ms} onChange={update} /><NumberField label="统计周期（毫秒）" name="interval_ms" value={fields.interval_ms} error={errors.interval_ms} onChange={update} /><NumberField label="周期内最大次数" name="max_count" value={fields.max_count} error={errors.max_count} onChange={update} /><NumberField label="起始偏移次数" name="shift_count" value={fields.shift_count} error={errors.shift_count} onChange={update} /><label className={errors.positions ? "form-field form-field--error" : "form-field"}><span>适用位置</span><input aria-label="适用位置" value={arrayValue(fields.positions).join(", ")} onChange={(event) => update("positions", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /><small>通用值 · 以逗号分隔</small>{errors.positions ? <span className="field-error">{errors.positions}</span> : null}</label></div>{systemError ? <p className="binding-error" role="alert">{systemError}</p> : null}<section className="affected-entities"><header><h3>引用此策略的广告位</h3><span>{loadingReferences ? "载入中" : `${references.length} 个`}</span></header>{!loadingReferences && references.length === 0 ? <p>未被引用</p> : references.slice(0, 6).map((reference) => <button key={reference.entity_ref} onClick={() => onOpenReference(reference)}><span>{reference.entity_id}</span><ChevronRight size={16} /></button>)}{references.length > 6 ? <p className="more-references">还有 {references.length - 6} 个广告位</p> : null}</section></div><footer><Button icon={<Trash2 size={16} />} onClick={() => onDelete(policy)}>删除策略</Button><Button onClick={onClose}>取消</Button><Button variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void save()}>{saving ? "正在保存" : "保存策略"}</Button></footer><EntityConflictDialog conflict={conflict} onClose={() => setConflict(null)} onReload={() => { setConflict(null); onSaved(); }} /></aside>;
+  return <aside className="frequency-drawer" role="dialog" aria-modal="true" aria-label={creating ? "新建频控策略" : `编辑频控策略 ${policy!.entity_id}`}><header><div><h2>{creating ? "新建频控策略" : "编辑频控策略"}</h2><code>{creating ? "创建后不可修改稳定 ID" : policy!.entity_id}</code></div><button className="icon-button" aria-label="关闭频控策略编辑" onClick={onClose}><X size={18} /></button></header><div className="frequency-drawer-body"><p className="drawer-scope"><Link2 size={15} />通用值，改动会影响引用此策略的广告位。</p>{creating ? <label className={errors.id ? "form-field form-field--error" : "form-field"}><span>稳定 ID</span><input aria-label="频控策略稳定 ID" value={newID} onChange={(event) => setNewID(event.target.value)} placeholder="例如 inter_global_cap" /><small>创建后不可修改</small>{errors.id ? <span className="field-error" role="alert">{errors.id}</span> : null}</label> : <EntityDiagnostics diagnostics={diagnosticsForEntity(diagnostics, policy!)} title="此频控策略的校验问题" />}<div className="frequency-fields"><NumberField label="冷却时间（毫秒）" name="cooldown_ms" value={fields.cooldown_ms} error={errors.cooldown_ms} onChange={update} /><NumberField label="统计周期（毫秒）" name="interval_ms" value={fields.interval_ms} error={errors.interval_ms} onChange={update} /><NumberField label="周期内最大次数" name="max_count" value={fields.max_count} error={errors.max_count} onChange={update} /><NumberField label="起始偏移次数" name="shift_count" value={fields.shift_count} error={errors.shift_count} onChange={update} /><label className={errors.positions ? "form-field form-field--error" : "form-field"}><span>适用位置</span><input aria-label="适用位置" value={arrayValue(fields.positions).join(", ")} onChange={(event) => update("positions", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /><small>通用值 · 以逗号分隔</small>{errors.positions ? <span className="field-error" role="alert">{errors.positions}</span> : null}</label></div>{systemError ? <p className="binding-error" role="alert">{systemError}</p> : null}{!creating ? <section className="affected-entities"><header><h3>引用此策略的广告位</h3><span>{loadingReferences ? "载入中" : `${references.length} 个`}</span></header>{!loadingReferences && references.length === 0 ? <p>未被引用</p> : references.slice(0, 6).map((reference) => <button key={reference.entity_ref} onClick={() => onOpenReference(reference)}><span>{reference.entity_id}</span><ChevronRight size={16} /></button>)}{references.length > 6 ? <p className="more-references">还有 {references.length - 6} 个广告位</p> : null}</section> : null}</div><footer>{!creating ? <Button icon={<Trash2 size={16} />} onClick={() => onDelete(policy!)}>删除策略</Button> : null}<Button onClick={onClose}>取消</Button><Button variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void save()}>{saving ? "正在保存" : creating ? "创建策略" : "保存策略"}</Button></footer><EntityConflictDialog conflict={conflict} onClose={() => setConflict(null)} onReload={() => { setConflict(null); onClose(); }} /></aside>;
 }
 
 function NumberField({ label, name, value, error, onChange }: { label: string; name: string; value: unknown; error?: string; onChange: (name: string, value: number) => void }) { return <label className={error ? "form-field form-field--error" : "form-field"}><span>{label}</span><input aria-label={label} type="number" value={String(value ?? "")} onChange={(event) => onChange(name, Number(event.target.value))} /><small>通用值</small>{error ? <span className="field-error">{error}</span> : null}</label>; }
+
+function FeatureSwitchDrawer({ open, environment, revision, draft, onClose, onSaved }: { open: boolean; environment: Environment; revision: number; draft: DraftView | null; onClose: () => void; onSaved: () => void }) {
+  const [newID, setNewID] = useState("");
+  const [fields, setFields] = useState<Record<string, unknown>>({ key: "", default_value: false, risk_level: "low", rollback_method: "disable" });
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [systemError, setSystemError] = useState<string | null>(null);
+  useEffect(() => { if (open) { setNewID(""); setFields({ key: "", default_value: false, risk_level: "low", rollback_method: "disable" }); setErrors({}); setSystemError(null); } }, [open]);
+  if (!open) return null;
+  const update = (name: string, value: unknown) => setFields((current) => ({ ...current, [name]: value }));
+  const save = async () => {
+    setSaving(true); setErrors({}); setSystemError(null);
+    const entity = { id: newID, fields };
+    try { await createDraftEntity(environment.id, revision, { expected_source_revision: draft?.source_revision ?? "", write_scope: "baseline", entity_type: "feature_switch", entity }); onSaved(); }
+    catch (cause) {
+      if (cause instanceof ConflowAPIError && cause.code === "validation_failed") setErrors(errorsForEntity(cause.details ?? [], undefined, newID));
+      else setSystemError(cause instanceof ConflowAPIError ? cause.message : "创建功能开关失败，请重试。");
+    } finally { setSaving(false); }
+  };
+  return <aside className="frequency-drawer" role="dialog" aria-modal="true" aria-label="新建开关"><header><div><h2>新建开关</h2><code>创建后不可修改稳定 ID</code></div><button className="icon-button" aria-label="关闭开关编辑" onClick={onClose}><X size={18} /></button></header><div className="frequency-drawer-body"><p className="drawer-scope"><Link2 size={15} />通用默认值，保存后会进入未发布修改。</p><div className="frequency-fields"><label className={errors.id ? "form-field form-field--error" : "form-field"}><span>稳定 ID</span><input aria-label="开关稳定 ID" value={newID} onChange={(event) => setNewID(event.target.value)} placeholder="例如 enable_new_entry" /><small>创建后不可修改</small>{errors.id ? <span className="field-error" role="alert">{errors.id}</span> : null}</label><label className={errors.key ? "form-field form-field--error" : "form-field"}><span>开关键</span><input aria-label="开关键" value={String(fields.key ?? "")} onChange={(event) => update("key", event.target.value)} /><small>用于 Remote Config 参数映射</small>{errors.key ? <span className="field-error" role="alert">{errors.key}</span> : null}</label><label className="form-field"><span>默认启用</span><button className={fields.default_value ? "switch-control switch-control--on" : "switch-control"} type="button" role="switch" aria-label="默认启用" aria-checked={Boolean(fields.default_value)} onClick={() => update("default_value", !fields.default_value)}><span /></button><small>通用默认值</small>{errors.default_value ? <span className="field-error" role="alert">{errors.default_value}</span> : null}</label><label className={errors.risk_level ? "form-field form-field--error" : "form-field"}><span>风险级别</span><select aria-label="风险级别" value={String(fields.risk_level ?? "low")} onChange={(event) => update("risk_level", event.target.value)}><option value="low">低风险</option><option value="medium">中风险</option><option value="high">高风险</option></select><small>影响发布确认要求</small>{errors.risk_level ? <span className="field-error" role="alert">{errors.risk_level}</span> : null}</label><label className={errors.rollback_method ? "form-field form-field--error" : "form-field"}><span>回滚方式</span><select aria-label="回滚方式" value={String(fields.rollback_method ?? "disable")} onChange={(event) => update("rollback_method", event.target.value)}><option value="disable">关闭开关</option><option value="disable_and_publish">关闭后发布</option><option value="disable_and_regenerate_plan">关闭后重新生成发布计划</option><option value="disable_and_clear_memory_cache">关闭并清理内存缓存</option><option value="remove_legacy_override_and_confirm_production">移除旧覆盖并确认 Production</option><option value="enable_and_publish">启用后发布</option></select><small>按运行手册选择默认处置方式</small>{errors.rollback_method ? <span className="field-error" role="alert">{errors.rollback_method}</span> : null}</label></div>{systemError ? <p className="binding-error" role="alert">{systemError}</p> : null}</div><footer><Button onClick={onClose}>取消</Button><Button variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void save()}>{saving ? "正在保存" : "创建开关"}</Button></footer></aside>;
+}
 
 function DeleteEntityDialog({ target, environment, revision, draft, onClose, onDeleted, onBlocked }: { target: DeleteTarget | null; environment: Environment; revision: number; draft: DraftView | null; onClose: () => void; onDeleted: () => void; onBlocked: (target: DeleteTarget, references: EntityReference[]) => void }) {
   const [deleting, setDeleting] = useState(false); const [error, setError] = useState<string | null>(null);
@@ -298,7 +346,7 @@ function switchName(key: string) { return ({ use_amazon_bidding: "启用 Amazon 
 function arrayValue(value: unknown) { return Array.isArray(value) ? value.map(String) : []; }
 function formatMilliseconds(value: unknown) { const number = Number(value ?? 0); return number >= 60000 && number % 60000 === 0 ? `${number / 60000} 分钟` : `${number / 1000} 秒`; }
 
-function PlacementDetail({ environment, environments, revision, schema, validation, placementID, focusBindings, onBack, onSaved }: {
+function PlacementDetail({ environment, environments, revision, schema, validation, placementID, focusBindings, createdPolicy, onCreatePolicy, onBack, onSaved }: {
   environment: Environment;
   environments: Environment[];
   revision: number;
@@ -306,6 +354,8 @@ function PlacementDetail({ environment, environments, revision, schema, validati
   validation: ValidationResult | null;
   placementID?: string;
   focusBindings: boolean;
+  createdPolicy: EntityView | null;
+  onCreatePolicy: () => void;
   onBack: () => void;
   onSaved: (revision: number, dirty: boolean) => void;
 }) {
@@ -342,6 +392,11 @@ function PlacementDetail({ environment, environments, revision, schema, validati
 
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
   useEffect(() => { if (!loading && focusBindings) document.getElementById("environment-bindings")?.scrollIntoView({ block: "start" }); }, [focusBindings, loading]);
+  useEffect(() => {
+    if (!createdPolicy) return;
+    setPolicies((current) => current.some((item) => item.entity_id === createdPolicy.entity_id) ? current : [...current, createdPolicy]);
+    setFields((current) => ({ ...current, frequency_policy_id: createdPolicy.entity_id }));
+  }, [createdPolicy]);
 
   const save = async () => {
     if (!draft || !placementSchema) return;
@@ -374,19 +429,20 @@ function PlacementDetail({ environment, environments, revision, schema, validati
     {systemError ? <RequestError {...systemError} onDismiss={() => setSystemError(null)} /> : null}
     {loading ? <DetailSkeleton /> : <div className="detail-layout"><div className="detail-main">
       <EntityDiagnostics diagnostics={diagnostics} title="此广告位的校验问题" />
-      {groups.map(([group, names]) => { const groupFields = allFields.filter((field) => (names as readonly string[]).includes(field.name)); return groupFields.length ? <section className="editor-section" key={group}><h2>{group}</h2><div className="field-grid">{group === "基础信息" && !placementID ? <label className={fieldErrors.id ? "form-field form-field--error" : "form-field"} htmlFor="placement-id"><span>稳定 ID</span><input id="placement-id" aria-label="稳定 ID" value={newID} onChange={(event) => setNewID(event.target.value)} placeholder="例如 ad_interstitial_011" /><small>创建后不可修改</small>{fieldErrors.id ? <span className="field-error" role="alert">{fieldErrors.id}</span> : null}</label> : null}{group === "基础信息" && placementID ? <div className="form-field immutable-field"><span>稳定 ID</span><code>{placementID}</code><small>所有环境一致，不可修改</small></div> : null}{groupFields.map((field) => <PlacementField key={field.name} field={field} value={fields[field.name]} readOnly={Boolean(placementID && (field.name === "key" || field.name === "ad_type"))} policies={policies} caption={field.name === "key" && placementID ? "所有环境一致，不可修改" : fieldCaption(draft, placementID, field.name)} error={fieldErrors[field.name]} onChange={updateField} />)}</div></section> : null; })}
+      {groups.map(([group, names]) => { const groupFields = allFields.filter((field) => (names as readonly string[]).includes(field.name)); return groupFields.length ? <section className="editor-section" key={group}><h2>{group}</h2><div className="field-grid">{group === "基础信息" && !placementID ? <label className={fieldErrors.id ? "form-field form-field--error" : "form-field"} htmlFor="placement-id"><span>稳定 ID</span><input id="placement-id" aria-label="稳定 ID" value={newID} onChange={(event) => setNewID(event.target.value)} placeholder="例如 ad_interstitial_011" /><small>创建后不可修改</small>{fieldErrors.id ? <span className="field-error" role="alert">{fieldErrors.id}</span> : null}</label> : null}{group === "基础信息" && placementID ? <div className="form-field immutable-field"><span>稳定 ID</span><code>{placementID}</code><small>所有环境一致，不可修改</small></div> : null}{groupFields.map((field) => <PlacementField key={field.name} field={field} value={fields[field.name]} readOnly={Boolean(placementID && (field.name === "key" || field.name === "ad_type"))} policies={policies} caption={field.name === "key" && placementID ? "所有环境一致，不可修改" : fieldCaption(draft, placementID, field.name)} error={fieldErrors[field.name]} onCreatePolicy={onCreatePolicy} onChange={updateField} />)}</div></section> : null; })}
       <BindingMatrix environments={environments} bindings={bindings} diagnostics={validation?.diagnostics ?? []} placementID={placementID} revision={revision} sourceRevision={draft?.source_revision ?? ""} onSaved={(nextRevision) => { onSaved(nextRevision, true); void load(); }} />
     </div><aside className="detail-sidebar"><section className="change-summary"><h2>修改摘要</h2><dl><div><dt>当前环境</dt><dd>{environment.name}</dd></div><div><dt>字段错误</dt><dd>{fieldErrorCount(fieldErrors) ? `${fieldErrorCount(fieldErrors)} 项` : "无"}</dd></div></dl></section><details className="advanced-info"><summary>高级信息与源映射</summary><code>{placement?.entity_ref ?? "将在创建后生成"}</code></details></aside></div>}
     <EntityConflictDialog conflict={conflict} onClose={() => setConflict(null)} onReload={() => { setConflict(null); void load(); }} />
   </main>;
 }
 
-function PlacementField({ field, value, readOnly, policies, caption, error, onChange }: { field: FieldSchema; value: unknown; readOnly: boolean; policies: EntityView[]; caption: string; error?: string; onChange: (name: string, value: unknown) => void }) {
+function PlacementField({ field, value, readOnly, policies, caption, error, onCreatePolicy, onChange }: { field: FieldSchema; value: unknown; readOnly: boolean; policies: EntityView[]; caption: string; error?: string; onCreatePolicy: () => void; onChange: (name: string, value: unknown) => void }) {
   const id = `placement-${field.name}`;
   const options = field.type === "reference" ? policies.map((policy) => policy.entity_id) : field.validation.enum.map(String);
   return <label className={error ? "form-field form-field--error" : "form-field"} htmlFor={id}><span>{field.ui.label}</span>
     {field.type === "boolean" ? <button id={id} type="button" className={value ? "switch-control switch-control--on" : "switch-control"} role="switch" aria-checked={Boolean(value)} disabled={readOnly} onClick={() => onChange(field.name, !value)}><span aria-hidden="true" /></button>
-      : field.type === "reference" || field.validation.enum.length > 0 ? <select id={id} aria-label={field.ui.label} value={String(value ?? "")} disabled={readOnly} onChange={(event) => onChange(field.name, event.target.value)}>{options.map((option) => <option key={option} value={option}>{field.type === "reference" ? option : enumLabel(field.name, option)}</option>)}</select>
+      : field.type === "reference" && policies.length === 0 ? <div className="reference-empty"><span>还没有频控策略——先创建一个</span><Button type="button" variant="secondary" icon={<Plus size={15} />} disabled={readOnly} onClick={onCreatePolicy}>新建频控策略</Button></div>
+        : field.type === "reference" || field.validation.enum.length > 0 ? <select id={id} aria-label={field.ui.label} value={String(value ?? "")} disabled={readOnly} onChange={(event) => onChange(field.name, event.target.value)}>{options.map((option) => <option key={option} value={option}>{field.type === "reference" ? option : enumLabel(field.name, option)}</option>)}</select>
         : <input id={id} aria-label={field.ui.label} type={field.type === "integer" || field.type === "number" ? "number" : "text"} value={String(value ?? "")} readOnly={readOnly} onChange={(event) => onChange(field.name, field.type === "integer" || field.type === "number" ? Number(event.target.value) : event.target.value)} />}
     <small>{caption}{field.ui.description ? ` · ${field.ui.description}` : ""}</small>{error ? <span className="field-error" role="alert">{error}</span> : null}
   </label>;
