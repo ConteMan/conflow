@@ -23,12 +23,20 @@ type RestrictedDelete struct {
 	EntityID   string
 }
 
-// Validate validates the currently supported mobile advertising Pack. Other
-// Pack versions have no domain rules until their Pack-specific validator exists.
+// Validate dispatches to the validator for the selected mobile advertising
+// Pack version. Other Pack versions have no domain rules yet.
 func Validate(input Input) []Diagnostic {
-	if input.PackRef != "mobile-ad-monetization/v1" {
+	switch input.PackRef {
+	case "mobile-ad-monetization/v1":
+		return validateV1(input)
+	case "mobile-ad-monetization/v2":
+		return validateV2(input)
+	default:
 		return []Diagnostic{}
 	}
+}
+
+func validateV1(input Input) []Diagnostic {
 	placements := records(input.Effective, "placements")
 	policies := records(input.Effective, "frequency_policies")
 	switches := records(input.Effective, "feature_switches")

@@ -85,6 +85,7 @@ type ConfirmationRequirements struct {
 type Plan struct {
 	PlanID                   string                   `json:"plan_id"`
 	EnvironmentID            string                   `json:"environment_id"`
+	PackRef                  string                   `json:"pack_ref"`
 	Status                   string                   `json:"status"`
 	SnapshotToken            string                   `json:"snapshot_token"`
 	DraftRevision            uint64                   `json:"draft_revision"`
@@ -132,7 +133,7 @@ func Build(in Input) (BuildResult, error) {
 	if in.TTL == 0 {
 		in.TTL = DefaultTTL
 	}
-	p := Plan{PlanID: "plan_" + id(in.EnvironmentID, fmt.Sprintf("%d", in.Now.UnixNano())), EnvironmentID: in.EnvironmentID, Status: "ready", DraftRevision: in.DraftRevision, SourceDigest: in.SourceDigest, CreatedAt: in.Now.UTC(), ExpiresAt: in.Now.UTC().Add(in.TTL), RemoteSnapshot: in.RemoteSnapshot, SemanticChanges: []SemanticChange{}, AffectedEntities: []AffectedEntity{}, RemoteParameterChanges: []RemoteParameterChange{}, ArtifactMetadata: []ArtifactMetadata{}, RiskItems: []RiskItem{}, BlockingReasons: []BlockingReason{}}
+	p := Plan{PlanID: "plan_" + id(in.EnvironmentID, fmt.Sprintf("%d", in.Now.UnixNano())), EnvironmentID: in.EnvironmentID, PackRef: in.PackRef, Status: "ready", DraftRevision: in.DraftRevision, SourceDigest: in.SourceDigest, CreatedAt: in.Now.UTC(), ExpiresAt: in.Now.UTC().Add(in.TTL), RemoteSnapshot: in.RemoteSnapshot, SemanticChanges: []SemanticChange{}, AffectedEntities: []AffectedEntity{}, RemoteParameterChanges: []RemoteParameterChange{}, ArtifactMetadata: []ArtifactMetadata{}, RiskItems: []RiskItem{}, BlockingReasons: []BlockingReason{}}
 	if in.RemoteSnapshot.Status != "available" {
 		p.Status = "preview_only"
 	} else {
@@ -187,6 +188,16 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 		comparison = in.BaseLayer
 	}
 	collections := map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"}
+	if in.PackRef == "mobile-ad-monetization/v2" {
+		collections = map[string]string{
+			"remote_config_layouts": "remote_config_layout",
+			"network_settings":      "network_settings",
+			"frequency_policies":    "frequency_policy",
+			"placements":            "placement",
+			"unit_bindings":         "unit_binding",
+			"feature_switches":      "feature_switch",
+		}
+	}
 	for collection, entityType := range collections {
 		oldRecords := records(in.Baseline[collection])
 		newRecords := records(comparison[collection])
@@ -233,9 +244,20 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 				if in.RemoteSnapshot.Status == "available" {
 					remoteNode := "node_" + id("remote", scope, entityType, entityID, field)
 					key := parameterKey(entityType, entityID, field)
+					if in.PackRef == "mobile-ad-monetization/v2" {
+						key = affectedParameterKey(in.PackRef, entityType, entityID, in.Desired)
+					}
 					remoteBefore := bv
 					if value, ok := in.RemoteSnapshot.Parameters[key]; ok {
 						remoteBefore = value
+					}
+					if in.PackRef == "mobile-ad-monetization/v2" {
+						if value, exists := compileV2Parameters(in.Desired)[key]; exists {
+							if changeKind == "deleted" {
+								changeKind = "updated"
+							}
+							av = value
+						}
 					}
 					p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(av), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
 					c.RemoteParameterNodeIDs = []string{remoteNode}
@@ -260,17 +282,31 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterChange) []RiskItem {
 	result := []RiskItem{}
 	for _, c := range changes {
-		if strings.Contains(c.DirectEntityRef, ":frequency_policy:") && c.FieldPath == "/cooldown_ms" {
+		if in.PackRef != "mobile-ad-monetization/v2" && strings.Contains(c.DirectEntityRef, ":frequency_policy:") && c.FieldPath == "/cooldown_ms" {
 			result = append(result, RiskItem{RiskItemID: "risk_" + id("shared_frequency", c.NodeID), Severity: "high", ReasonCode: "shared_frequency_policy_relaxed", Summary: "共享频控已放宽", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 		}
-		if in.EnvironmentKind == "production" && strings.Contains(c.DirectEntityRef, ":feature_switch:") {
+		if in.PackRef != "mobile-ad-monetization/v2" && in.EnvironmentKind == "production" && strings.Contains(c.DirectEntityRef, ":feature_switch:") {
 			result = append(result, RiskItem{RiskItemID: "risk_" + id("switch", c.NodeID), Severity: "high", ReasonCode: "global_feature_switch_changed", Summary: "全局功能开关已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 		}
-		if in.EnvironmentKind == "production" && strings.Contains(c.DirectEntityRef, ":placement:") && c.FieldPath == "/network_mode" {
+		if in.PackRef != "mobile-ad-monetization/v2" && in.EnvironmentKind == "production" && strings.Contains(c.DirectEntityRef, ":placement:") && c.FieldPath == "/network_mode" {
 			result = append(result, RiskItem{RiskItemID: "risk_" + id("network_mode", c.NodeID), Severity: "high", ReasonCode: "production_network_mode_changed", Summary: "生产环境网络模式已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 		}
-		if strings.Contains(c.DirectEntityRef, ":unit_binding:") {
+		if in.PackRef != "mobile-ad-monetization/v2" && strings.Contains(c.DirectEntityRef, ":unit_binding:") {
 			result = append(result, RiskItem{RiskItemID: "risk_" + id("unit_binding", c.NodeID), Severity: "medium", ReasonCode: "unit_binding_changed", Summary: "广告单元绑定已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+		}
+		if in.PackRef == "mobile-ad-monetization/v2" {
+			switch {
+			case strings.Contains(c.DirectEntityRef, ":frequency_policy:"):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_frequency_policy", c.NodeID), Severity: "high", ReasonCode: "frequency_policy_changed", Summary: "频控策略已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case strings.Contains(c.DirectEntityRef, ":feature_switch:") && c.FieldPath == "/default_value":
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_switch", c.NodeID), Severity: "high", ReasonCode: "global_feature_switch_changed", Summary: "全局功能开关默认值已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case in.EnvironmentKind == "production" && strings.Contains(c.DirectEntityRef, ":network_settings:"):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_network_settings", c.NodeID), Severity: "high", ReasonCode: "production_network_settings_changed", Summary: "生产网络设置已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case strings.Contains(c.DirectEntityRef, ":unit_binding:"):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_unit_binding", c.NodeID), Severity: "medium", ReasonCode: "unit_binding_changed", Summary: "广告单元绑定已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case strings.Contains(c.DirectEntityRef, ":remote_config_layout:") && strings.HasSuffix(c.FieldPath, "_parameter_key"):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_layout_key", c.NodeID), Severity: "high", ReasonCode: "remote_parameter_key_changed", Summary: "远端参数键已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			}
 		}
 	}
 	changesByID := make(map[string]SemanticChange, len(changes))
@@ -382,6 +418,36 @@ func parameterKey(typ, id, field string) string {
 		return "ad_frequency_" + id
 	}
 	return typ + "_" + id + "_" + field
+}
+func affectedParameterKey(packRef, entityType, entityID string, desired map[string]any) string {
+	if packRef != "mobile-ad-monetization/v2" {
+		return parameterKey(entityType, entityID, "")
+	}
+	layout, found := records(desired["remote_config_layouts"])["default"]
+	if !found {
+		return "remote_config_layout_changed"
+	}
+	key := func(field string) string {
+		value, _ := layout.Fields[field].(string)
+		return value
+	}
+	switch entityType {
+	case "feature_switch":
+		if featureSwitch, found := records(desired["feature_switches"])[entityID]; found {
+			if value, ok := featureSwitch.Fields["key"].(string); ok && value != "" {
+				return value
+			}
+		}
+	case "frequency_policy":
+		return key("frequency_policies_parameter_key")
+	case "placement", "unit_binding":
+		return key("placements_parameter_key")
+	case "network_settings":
+		return key("active_network_parameter_key")
+	case "remote_config_layout":
+		return "remote_config_layout_changed"
+	}
+	return entityType + "_" + entityID
 }
 func summary(v any) string {
 	if f, ok := v.(float64); ok && strings.Contains(fmt.Sprint(f), "000") {

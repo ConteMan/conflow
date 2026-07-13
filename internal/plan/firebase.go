@@ -10,7 +10,7 @@ import (
 // MergeFirebaseTemplate changes only managed default values selected by the
 // immutable Plan. It keeps every unselected parameter, condition, and
 // conditional value exactly as Firebase returned it.
-func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteParameterChange) ([]byte, error) {
+func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteParameterChange, packRef string) ([]byte, error) {
 	var document map[string]any
 	if err := json.Unmarshal(remoteTemplate, &document); err != nil {
 		return nil, fmt.Errorf("parse remote template: %w", err)
@@ -24,16 +24,31 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	if err := json.Unmarshal(desiredJSON, &desired); err != nil {
 		return nil, fmt.Errorf("parse provider input: %w", err)
 	}
-	values := desiredParameterValues(desired)
+	values := desiredParameterValues(desired, packRef)
+	keys := make([]string, 0, len(changes))
+	allV2Parameters := false
 	for _, change := range changes {
-		value, exists := values[change.ParameterKey]
-		if !exists {
-			return nil, fmt.Errorf("managed parameter %q has no desired value", change.ParameterKey)
+		if packRef == "mobile-ad-monetization/v2" && change.ParameterKey == "remote_config_layout_changed" {
+			allV2Parameters = true
+			continue
 		}
-		parameter, ok := parameters[change.ParameterKey].(map[string]any)
+		keys = append(keys, change.ParameterKey)
+	}
+	if allV2Parameters {
+		keys = keys[:0]
+		for key := range values {
+			keys = append(keys, key)
+		}
+	}
+	for _, key := range keys {
+		value, exists := values[key]
+		if !exists {
+			return nil, fmt.Errorf("managed parameter %q has no desired value", key)
+		}
+		parameter, ok := parameters[key].(map[string]any)
 		if !ok {
 			parameter = map[string]any{}
-			parameters[change.ParameterKey] = parameter
+			parameters[key] = parameter
 		}
 		parameter["defaultValue"] = map[string]any{"value": firebaseValue(value)}
 	}
@@ -44,7 +59,10 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	return merged, nil
 }
 
-func desiredParameterValues(desired map[string]any) map[string]any {
+func desiredParameterValues(desired map[string]any, packRef string) map[string]any {
+	if packRef == "mobile-ad-monetization/v2" {
+		return compileV2Parameters(desired)
+	}
 	values := map[string]any{}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {
 		for _, record := range entities.Records(desired, collection) {

@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "pack_ref": "mobile-ad-monetization/v2",
+  "description": "Minimal valid v2 configuration for validator and compiler tests.",
+  "entities": {
+    "remote_config_layouts": [
+      {"id": "default", "active_network_parameter_key": "ad_active_network", "mediation_strategy_parameter_key": null, "frequency_policies_parameter_key": "ad_frequency_policies_config", "placements_parameter_key": "ad_placements_config", "payload_version": 2}
+    ],
+    "feature_switches": [
+      {"id": "ads_enabled", "key": "ads_enabled", "default_value": true, "risk_level": "high", "rollback_method": "disable"}
+    ],
+    "network_settings": [
+      {"id": "default", "active_network": "admob", "mediation_strategy": null, "platforms": ["ios", "android"]}
+    ],
+    "frequency_policies": [
+      {"id": "global_cap", "cooldown": {"unit": "seconds", "value": 30}, "interval": null, "max_count": {"unit": "day", "value": 4}, "shift_count": null, "positions": null}
+    ],
+    "placements": [
+      {"id": "interstitial_main", "client_id": "interstitial_main", "key": "main_interstitial", "ad_type": "interstitial", "enabled_switch_id": "ads_enabled", "frequency_policy_type": "preset", "frequency_policy_id": "global_cap", "custom_frequency_policy": null, "load_timeout_ms": 4000, "cache_policy": "memory", "cache_ttl": null, "fallback_behavior": "continue"}
+    ],
+    "unit_bindings": [
+      {"id": "ub_dev_ios_interstitial_main", "placement_id": "interstitial_main", "environment_id": "development", "platform": "ios", "network": "admob", "unit_id_ref": "ca-app-pub-xxx/ios", "status": "configured"}
+    ]
+  }
+}

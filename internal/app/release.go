@@ -186,7 +186,7 @@ func (s *Service) preflightRelease(ctx context.Context, environmentID string, re
 	if err != nil {
 		return releasePreflight{}, err
 	}
-	merged, err := plan.MergeFirebaseTemplate(pulled.Raw, input, p.RemoteParameterChanges)
+	merged, err := plan.MergeFirebaseTemplate(pulled.Raw, input, p.RemoteParameterChanges, p.PackRef)
 	if err != nil {
 		return releasePreflight{}, err
 	}
