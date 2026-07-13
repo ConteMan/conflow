@@ -15,7 +15,10 @@ builds:
     goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
 
 archives:
   - id: archive
@@ -30,6 +33,9 @@ archives:
 checksum:
   name_template: checksums.txt
 
+sboms:
+  - artifacts: archive
+
 changelog:
   use: git
   sort: desc
@@ -40,3 +46,38 @@ release:
     name: conflow
   name_template: "{{ .Tag }}"
   prerelease: auto
+
+# GoReleaser 2.10+ 弃用 brews，CLI 二进制走 homebrew_casks。
+homebrew_casks:
+  - name: conflow
+    ids:
+      - archive
+    repository:
+      owner: ConteMan
+      name: homebrew-tap
+      token: "{{ .Env.GH_PAT }}"
+    homepage: https://github.com/ConteMan/conflow
+    description: Local-first ConfigOps workbench for Firebase Remote Config
+    license: MIT
+    # 二进制未做 Apple 签名/公证：cask 安装会带 com.apple.quarantine。
+    # 装后钩子去隔离属性，避免 Gatekeeper 拦截。
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/conflow"]
+          end
+
+# Scoop bucket 寄宿在 homebrew-tap 仓的 bucket/ 目录。
+scoops:
+  - name: conflow
+    ids:
+      - archive
+    repository:
+      owner: ConteMan
+      name: homebrew-tap
+      token: "{{ .Env.GH_PAT }}"
+    directory: bucket
+    homepage: https://github.com/ConteMan/conflow
+    description: Local-first ConfigOps workbench for Firebase Remote Config
+    license: MIT

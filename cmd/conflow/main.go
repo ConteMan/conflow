@@ -8,10 +8,18 @@ import (
 	"github.com/ConteMan/conflow/internal/cli"
 )
 
-var version = "dev"
+var (
+	version   = "dev"
+	commit    = ""
+	buildTime = ""
+)
 
 func main() {
-	if err := cli.New(version).Execute(); err != nil {
+	if err := cli.NewWithBuildInfo(cli.BuildInfo{
+		Version:   version,
+		Commit:    commit,
+		BuildTime: buildTime,
+	}).Execute(); err != nil {
 		var exitError *cli.ExitError
 		if errors.As(err, &exitError) {
 			if !exitError.JSON && exitError.Error() != "" {

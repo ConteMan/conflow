@@ -263,4 +263,5 @@ var commandExamples = map[string]string{
 	"conflow environment create":  "conflow environment create --workspace . --id staging --name Staging --kind staging --provider-project-id photo-editor-staging --json",
 	"conflow environment update":  "conflow environment update --workspace . --id production --name Production --json",
 	"conflow environment delete":  "conflow environment delete --workspace . --id staging --json",
+	"conflow update":              "conflow update --check",
 }

@@ -6,6 +6,39 @@
 
 Conflow is a single Go binary with both a CLI and a local web GUI. It represents configuration as business entities such as ad placements, frequency policies, and feature flags, rather than asking teams to copy long Firebase Remote Config JSON values directly.
 
+## Installation
+
+**macOS (Homebrew)**
+
+```sh
+brew install ConteMan/tap/conflow
+```
+
+**Windows (Scoop)**
+
+```sh
+scoop bucket add conflow https://github.com/ConteMan/homebrew-tap
+scoop install conflow
+```
+
+**Direct download**
+
+Download the archive for your platform from [GitHub Releases](https://github.com/ConteMan/conflow/releases/latest), extract, and place `conflow` in your `$PATH`.
+
+> macOS unsigned binary: downloads are quarantined by Gatekeeper. Run once before first use:
+> ```sh
+> xattr -dr com.apple.quarantine conflow
+> ```
+> Homebrew installation handles this automatically.
+
+**Updating**
+
+```sh
+conflow update          # direct install
+brew upgrade conflow    # Homebrew
+scoop update conflow    # Scoop
+```
+
 ## Quick Start
 
 ```sh

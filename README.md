@@ -6,6 +6,39 @@
 
 Conflow 是一个 Go 单二进制工具，同时提供 CLI 和本地 Web GUI。它将配置表达为广告位、频控策略和功能开关等业务对象，而不是让团队直接复制 Firebase Remote Config 的长 JSON。
 
+## 安装
+
+**macOS（Homebrew）**
+
+```sh
+brew install ConteMan/tap/conflow
+```
+
+**Windows（Scoop）**
+
+```sh
+scoop bucket add conflow https://github.com/ConteMan/homebrew-tap
+scoop install conflow
+```
+
+**直接下载**
+
+从 [GitHub Releases](https://github.com/ConteMan/conflow/releases/latest) 下载对应平台的 tar.gz/zip，解压后将 `conflow` 放入 `$PATH`。
+
+> macOS 未签名提示：直接下载的二进制会被 Gatekeeper 标记。首次运行前执行一次：
+> ```sh
+> xattr -dr com.apple.quarantine conflow
+> ```
+> Homebrew 安装会自动处理，无需手动操作。
+
+**更新**
+
+```sh
+conflow update          # 更新（直接安装方式）
+brew upgrade conflow    # Homebrew
+scoop update conflow    # Scoop
+```
+
 ## 快速开始
 
 ```sh

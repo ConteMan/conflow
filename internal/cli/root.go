@@ -7,6 +7,10 @@ import (
 )
 
 func New(version string) *cobra.Command {
+	return NewWithBuildInfo(BuildInfo{Version: version})
+}
+
+func NewWithBuildInfo(info BuildInfo) *cobra.Command {
 	var jsonOutput bool
 	root := &cobra.Command{
 		Use:   "conflow",
@@ -18,7 +22,7 @@ Automation exit codes: 0 success; 1 validation failure; 2 blocking validation;
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(newVersionCommand(version))
+	root.AddCommand(newVersionCommand(info))
 	root.AddCommand(newInitCommand())
 	root.AddCommand(newValidateCommand())
 	root.AddCommand(newPlanCommand())
@@ -35,6 +39,7 @@ Automation exit codes: 0 success; 1 validation failure; 2 blocking validation;
 	root.AddCommand(newDefaultsCommand())
 	root.AddCommand(newProjectCommand())
 	root.AddCommand(newEnvironmentCommand())
+	root.AddCommand(newUpdateCommand(info))
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "write a stable JSON automation envelope to stdout")
 	configureAutomation(root, &jsonOutput)
 	root.SetHelpFunc(func(command *cobra.Command, args []string) {
