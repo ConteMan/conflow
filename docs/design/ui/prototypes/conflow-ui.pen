@@ -451,7 +451,8 @@
                   "fill": "$color-ink",
                   "content": "本次修改会影响 10 个广告位。",
                   "fontFamily": "$font-ui",
-                  "fontSize": 14
+                  "fontSize": 14,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "text",
@@ -460,7 +461,8 @@
                   "fill": "$color-muted",
                   "content": "通用值 · 未发布（线上为 30 秒）",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12
+                  "fontSize": 12,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "text",
@@ -1594,7 +1596,8 @@
                       "fill": "$color-muted",
                       "content": "频控策略",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1619,7 +1622,8 @@
                       "fill": "$color-muted",
                       "content": "功能开关",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1644,7 +1648,8 @@
                       "fill": "$color-muted",
                       "content": "环境绑定",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -1858,7 +1863,8 @@
                       "fill": "$color-muted",
                       "content": "配置",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1881,7 +1887,8 @@
                       "fill": "$color-muted",
                       "content": "校验",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1904,7 +1911,8 @@
                       "fill": "$color-muted",
                       "content": "发布计划",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1927,7 +1935,8 @@
                       "fill": "$color-muted",
                       "content": "发布记录",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -3993,7 +4002,8 @@
                               "fill": "$color-ink",
                               "content": "development",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -4034,7 +4044,8 @@
                               "fill": "$color-ink",
                               "content": "pdf-launcher-dev",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -4123,7 +4134,8 @@
                               "fill": "$color-ink",
                               "content": "staging",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -4164,7 +4176,8 @@
                               "fill": "$color-ink",
                               "content": "pdf-launcher-staging",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -4253,7 +4266,8 @@
                               "fill": "$color-ink",
                               "content": "production",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -4294,7 +4308,8 @@
                               "fill": "$color-ink",
                               "content": "pdf-launcher-prod",
                               "fontFamily": "$font-mono",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -6688,7 +6703,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_launch",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6708,7 +6724,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6728,7 +6745,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6818,7 +6836,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_resume",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6838,7 +6857,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6858,7 +6878,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6948,7 +6969,8 @@
                           "fill": "$color-ink",
                           "content": "pdf_export_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6968,7 +6990,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -6988,7 +7011,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7078,7 +7102,8 @@
                           "fill": "$color-ink",
                           "content": "scan_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7098,7 +7123,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7118,7 +7144,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7208,7 +7235,8 @@
                           "fill": "$color-ink",
                           "content": "merge_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7228,7 +7256,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7248,7 +7277,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7338,7 +7368,8 @@
                           "fill": "$color-ink",
                           "content": "compress_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7358,7 +7389,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7378,7 +7410,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7468,7 +7501,8 @@
                           "fill": "$color-ink",
                           "content": "home_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7488,7 +7522,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7508,7 +7543,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7598,7 +7634,8 @@
                           "fill": "$color-ink",
                           "content": "result_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7618,7 +7655,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7638,7 +7676,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7728,7 +7767,8 @@
                           "fill": "$color-ink",
                           "content": "tool_entry_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7748,7 +7788,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7768,7 +7809,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7858,7 +7900,8 @@
                           "fill": "$color-ink",
                           "content": "edit_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7878,7 +7921,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7898,7 +7942,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -7988,7 +8033,8 @@
                           "fill": "$color-ink",
                           "content": "share_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8008,7 +8054,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8028,7 +8075,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8118,7 +8166,8 @@
                           "fill": "$color-ink",
                           "content": "print_preview_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8138,7 +8187,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8158,7 +8208,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8248,7 +8299,8 @@
                           "fill": "$color-ink",
                           "content": "ocr_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8268,7 +8320,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -8288,7 +8341,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9827,7 +9881,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_launch",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9847,7 +9902,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9867,7 +9923,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9957,7 +10014,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_resume",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9977,7 +10035,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -9997,7 +10056,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10087,7 +10147,8 @@
                           "fill": "$color-ink",
                           "content": "pdf_export_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10107,7 +10168,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10127,7 +10189,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10217,7 +10280,8 @@
                           "fill": "$color-ink",
                           "content": "scan_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10237,7 +10301,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10257,7 +10322,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10347,7 +10413,8 @@
                           "fill": "$color-ink",
                           "content": "merge_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10367,7 +10434,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10387,7 +10455,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10477,7 +10546,8 @@
                           "fill": "$color-ink",
                           "content": "compress_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10497,7 +10567,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10517,7 +10588,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10607,7 +10679,8 @@
                           "fill": "$color-ink",
                           "content": "home_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10627,7 +10700,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10647,7 +10721,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10737,7 +10812,8 @@
                           "fill": "$color-ink",
                           "content": "result_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10757,7 +10833,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10777,7 +10854,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10867,7 +10945,8 @@
                           "fill": "$color-ink",
                           "content": "tool_entry_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10887,7 +10966,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10907,7 +10987,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -10997,7 +11078,8 @@
                           "fill": "$color-ink",
                           "content": "edit_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11017,7 +11099,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11037,7 +11120,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11127,7 +11211,8 @@
                           "fill": "$color-ink",
                           "content": "share_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11147,7 +11232,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11167,7 +11253,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11257,7 +11344,8 @@
                           "fill": "$color-ink",
                           "content": "print_preview_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11277,7 +11365,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11297,7 +11386,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11387,7 +11477,8 @@
                           "fill": "$color-ink",
                           "content": "ocr_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11407,7 +11498,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -11427,7 +11519,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14417,7 +14510,8 @@
                           "fill": "$color-ink",
                           "content": "启用",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14437,7 +14531,8 @@
                           "fill": "$color-ink",
                           "content": "停用",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14526,7 +14621,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14546,7 +14642,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14635,7 +14732,8 @@
                           "fill": "$color-ink",
                           "content": "跳过广告",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -14655,7 +14753,8 @@
                           "fill": "$color-ink",
                           "content": "继续但记录诊断",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15175,7 +15274,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_launch",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15195,7 +15295,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15215,7 +15316,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15305,7 +15407,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_resume",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15325,7 +15428,8 @@
                           "fill": "$color-ink",
                           "content": "App Open",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15345,7 +15449,8 @@
                           "fill": "$color-ink",
                           "content": "app_open_session_gate",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15435,7 +15540,8 @@
                           "fill": "$color-ink",
                           "content": "pdf_export_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15455,7 +15561,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15475,7 +15582,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15565,7 +15673,8 @@
                           "fill": "$color-ink",
                           "content": "scan_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15585,7 +15694,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15605,7 +15715,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15695,7 +15806,8 @@
                           "fill": "$color-ink",
                           "content": "merge_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15715,7 +15827,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15735,7 +15848,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15825,7 +15939,8 @@
                           "fill": "$color-ink",
                           "content": "compress_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15845,7 +15960,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15865,7 +15981,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15955,7 +16072,8 @@
                           "fill": "$color-ink",
                           "content": "home_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15975,7 +16093,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -15995,7 +16114,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16085,7 +16205,8 @@
                           "fill": "$color-ink",
                           "content": "result_feed_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16105,7 +16226,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16125,7 +16247,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16215,7 +16338,8 @@
                           "fill": "$color-ink",
                           "content": "tool_entry_native",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16235,7 +16359,8 @@
                           "fill": "$color-ink",
                           "content": "Native",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16255,7 +16380,8 @@
                           "fill": "$color-ink",
                           "content": "native_session_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16345,7 +16471,8 @@
                           "fill": "$color-ink",
                           "content": "edit_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16365,7 +16492,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16385,7 +16513,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16475,7 +16604,8 @@
                           "fill": "$color-ink",
                           "content": "share_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16495,7 +16625,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16515,7 +16646,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16605,7 +16737,8 @@
                           "fill": "$color-ink",
                           "content": "print_preview_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16625,7 +16758,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16645,7 +16779,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16735,7 +16870,8 @@
                           "fill": "$color-ink",
                           "content": "ocr_complete_interstitial",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16755,7 +16891,8 @@
                           "fill": "$color-ink",
                           "content": "Interstitial",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -16775,7 +16912,8 @@
                           "fill": "$color-ink",
                           "content": "inter_global_cap",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -23912,7 +24050,8 @@
                           "fill": "$color-ink",
                           "content": "今天 14:26",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -23932,7 +24071,8 @@
                           "fill": "$color-ink",
                           "content": "local-user",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -23952,7 +24092,8 @@
                           "fill": "$color-ink",
                           "content": "5 项修改 · 10 个受影响",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -23972,7 +24113,8 @@
                           "fill": "$color-ink",
                           "content": "v128",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24061,7 +24203,8 @@
                           "fill": "$color-ink",
                           "content": "今天 13:48",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24081,7 +24224,8 @@
                           "fill": "$color-ink",
                           "content": "local-user",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24101,7 +24245,8 @@
                           "fill": "$color-ink",
                           "content": "2 项修改 · 2 个受影响",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24121,7 +24266,8 @@
                           "fill": "$color-ink",
                           "content": "v127",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24210,7 +24356,8 @@
                           "fill": "$color-ink",
                           "content": "昨天 18:12",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24230,7 +24377,8 @@
                           "fill": "$color-ink",
                           "content": "release-bot",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24250,7 +24398,8 @@
                           "fill": "$color-ink",
                           "content": "1 项开关修改",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24270,7 +24419,8 @@
                           "fill": "$color-ink",
                           "content": "v126",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24359,7 +24509,8 @@
                           "fill": "$color-ink",
                           "content": "昨天 16:30",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24379,7 +24530,8 @@
                           "fill": "$color-ink",
                           "content": "local-user",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24399,7 +24551,8 @@
                           "fill": "$color-ink",
                           "content": "回滚到 2026.07.09.1",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24419,7 +24572,8 @@
                           "fill": "$color-ink",
                           "content": "v125",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24508,7 +24662,8 @@
                           "fill": "$color-ink",
                           "content": "昨天 15:05",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24528,7 +24683,8 @@
                           "fill": "$color-ink",
                           "content": "local-user",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24548,7 +24704,8 @@
                           "fill": "$color-ink",
                           "content": "3 项频控修改",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24568,7 +24725,8 @@
                           "fill": "$color-ink",
                           "content": "v124",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24657,7 +24815,8 @@
                           "fill": "$color-ink",
                           "content": "7 月 8 日 11:20",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24677,7 +24836,8 @@
                           "fill": "$color-ink",
                           "content": "release-bot",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24697,7 +24857,8 @@
                           "fill": "$color-ink",
                           "content": "初始 Production 发布",
                           "fontFamily": "$font-ui",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -24717,7 +24878,8 @@
                           "fill": "$color-ink",
                           "content": "v121",
                           "fontFamily": "$font-mono",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -27740,6 +27902,529 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "xd1bt",
+      "x": 40890,
+      "y": -180,
+      "name": "00 Foundations",
+      "width": 1440,
+      "height": 140,
+      "fill": "$surface",
+      "stroke": "#D0D7DE",
+      "gap": 24,
+      "padding": 24,
+      "children": [
+        {
+          "type": "text",
+          "id": "PHsQz",
+          "name": "Title",
+          "fill": "$text",
+          "content": "repolens UI · Foundations",
+          "fontFamily": "$font",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "M7n35",
+          "name": "Tokens",
+          "fill": "$muted",
+          "content": "Blue #0969DA · 16px rhythm · loopback-only local control",
+          "fontFamily": "$font",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "kJ6aB",
+      "x": 40890,
+      "y": 0,
+      "name": "M6 / Desktop config flow",
+      "clip": true,
+      "width": 1440,
+      "height": 1040,
+      "fill": "$bg",
+      "children": [
+        {
+          "type": "frame",
+          "id": "K7gFID",
+          "name": "Step navigation",
+          "width": 280,
+          "height": 940,
+          "fill": "#24292F",
+          "layout": "vertical",
+          "gap": 20,
+          "padding": 32,
+          "children": [
+            {
+              "type": "text",
+              "id": "Mj6RT",
+              "name": "Brand",
+              "fill": "#FFFFFF",
+              "content": "repolens",
+              "fontFamily": "$font",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "HryBC",
+              "name": "1 选择项目",
+              "fill": "#C9D1D9",
+              "content": "1 选择项目",
+              "fontFamily": "$font",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "X8iiy",
+              "name": "2 编辑配置",
+              "fill": "#58A6FF",
+              "content": "2 编辑配置",
+              "fontFamily": "$font",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "eiIcI",
+              "name": "3 确认 Diff",
+              "fill": "#C9D1D9",
+              "content": "3 确认 Diff",
+              "fontFamily": "$font",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "EG958",
+              "name": "4 构建与预览",
+              "fill": "#C9D1D9",
+              "content": "4 构建与预览",
+              "fontFamily": "$font",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "v5nWaS",
+          "name": "Config editor",
+          "width": "fill_container",
+          "height": 940,
+          "fill": "$bg",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": 48,
+          "children": [
+            {
+              "type": "text",
+              "id": "aml7N",
+              "name": "Heading",
+              "fill": "$text",
+              "content": "编辑基础配置",
+              "fontFamily": "$font",
+              "fontSize": 32,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "x1sVcq",
+              "name": "Repo",
+              "fill": "$muted",
+              "content": "/Users/maintainer/Projects/customer-documentation-platform-with-a-long-name",
+              "fontFamily": "$font",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "v7VQn",
+              "name": "Managed fields",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 8,
+              "stroke": "#D0D7DE",
+              "layout": "vertical",
+              "gap": 16,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "BXZ1B",
+                  "name": "站点标题",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "SCoTa",
+                      "name": "站点标题 label",
+                      "fill": "$text",
+                      "content": "站点标题",
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "niymq",
+                      "name": "站点标题 field",
+                      "width": "fill_container",
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 6,
+                      "stroke": "#8C959F",
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "s1yW0x",
+                          "name": "站点标题 value",
+                          "fill": "$text",
+                          "content": "2026 年客户交付与架构决策文档中心（内部预览）",
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "pfGjl",
+                  "name": "首页",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "LsJ4M",
+                      "name": "首页 label",
+                      "fill": "$text",
+                      "content": "首页",
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CXhgG",
+                      "name": "首页 field",
+                      "width": "fill_container",
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 6,
+                      "stroke": "#8C959F",
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "WaEZW",
+                          "name": "首页 value",
+                          "fill": "$text",
+                          "content": "docs/architecture/decisions/2026/q3/README.md",
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "yPS4H",
+                  "name": "语言",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ASg7R",
+                      "name": "语言 label",
+                      "fill": "$text",
+                      "content": "语言",
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "v4nvqX",
+                      "name": "语言 field",
+                      "width": "fill_container",
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 6,
+                      "stroke": "#8C959F",
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "AXEoH",
+                          "name": "语言 value",
+                          "fill": "$text",
+                          "content": "zh-CN",
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Df8hQ",
+                  "name": "站内搜索",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "xONhE",
+                      "name": "站内搜索 label",
+                      "fill": "$text",
+                      "content": "站内搜索",
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cFfw3",
+                      "name": "站内搜索 field",
+                      "width": "fill_container",
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 6,
+                      "stroke": "#8C959F",
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kYAUo",
+                          "name": "站内搜索 value",
+                          "fill": "$text",
+                          "content": "已启用",
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "c1fX5",
+              "name": "Actions",
+              "width": "fill_container",
+              "gap": 12,
+              "justifyContent": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "yM78X",
+                  "name": "Preview diff",
+                  "fill": "$accent",
+                  "cornerRadius": 6,
+                  "padding": [
+                    12,
+                    18
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "tf3HM",
+                      "name": "Preview diff label",
+                      "fill": "#FFFFFF",
+                      "content": "预览 YAML Diff",
+                      "fontFamily": "$font",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "XKVIY",
+      "x": 40890,
+      "y": 980,
+      "name": "M6 / Narrow build result",
+      "clip": true,
+      "width": 390,
+      "height": 940,
+      "fill": "$bg",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 20,
+      "children": [
+        {
+          "type": "text",
+          "id": "xJJo8",
+          "name": "Mobile title",
+          "fill": "$text",
+          "content": "构建与预览",
+          "fontFamily": "$font",
+          "fontSize": 22,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "m5CDC6",
+          "name": "Mobile path",
+          "fill": "$muted",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "customer-documentation-platform-with-a-long-name",
+          "fontFamily": "$font",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "N0f42",
+          "name": "Build status",
+          "width": "fill_container",
+          "height": 130,
+          "fill": "$surface",
+          "cornerRadius": 8,
+          "stroke": "#D0D7DE",
+          "layout": "vertical",
+          "gap": 10,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "nyn8P",
+              "name": "Success",
+              "fill": "#1A7F37",
+              "content": "构建完成 · 90 文件 / 158 页面",
+              "fontFamily": "$font",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Q1hfE",
+              "name": "Warnings",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "2 条 Warning：不可信 output.dir 已忽略；附件超过大小限制。",
+              "fontFamily": "$font",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "R74Ho",
+          "name": "Build log",
+          "width": "fill_container",
+          "height": 150,
+          "fill": "#24292F",
+          "cornerRadius": 8,
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "z26nL",
+              "name": "✓ Opening source",
+              "fill": "#C9D1D9",
+              "content": "✓ Opening source",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "bauOQ",
+              "name": "✓ Loading configuration",
+              "fill": "#C9D1D9",
+              "content": "✓ Loading configuration",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "nHoD1",
+              "name": "✓ Building static site",
+              "fill": "#C9D1D9",
+              "content": "✓ Building static site",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "daai0",
+              "name": "✓ Relative link check",
+              "fill": "#C9D1D9",
+              "content": "✓ Relative link check",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "MpNrX",
+          "name": "Open preview",
+          "width": "fill_container",
+          "fill": "$accent",
+          "cornerRadius": 6,
+          "padding": 14,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "KiXun",
+              "name": "Open preview label",
+              "fill": "#FFFFFF",
+              "content": "在新标签打开预览",
+              "fontFamily": "$font",
+              "fontSize": 15,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "mIQAK",
+          "name": "Failure hint",
+          "fill": "$danger",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "失败状态：保留日志与配置，不自动覆盖或重试。",
+          "fontFamily": "$font",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        }
+      ]
     }
   ],
   "variables": {
@@ -27874,6 +28559,38 @@
     "row-md": {
       "type": "number",
       "value": 48
+    },
+    "bg": {
+      "type": "color",
+      "value": "#F6F8FA"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#FFFFFF"
+    },
+    "text": {
+      "type": "color",
+      "value": "#1F2328"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#57606A"
+    },
+    "accent": {
+      "type": "color",
+      "value": "#0969DA"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#CF222E"
+    },
+    "space": {
+      "type": "number",
+      "value": 16
+    },
+    "font": {
+      "type": "string",
+      "value": "Inter"
     }
   },
   "fileToken": "eac7ee9e-2db5-421e-9286-03a66293ef4a"
