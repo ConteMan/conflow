@@ -1,6 +1,6 @@
 # Spec 019：跨平台发版、签名与更新
 
-> 状态：待实现  
+> 状态：已实现（v0.1.0）
 > 依赖：Spec 015、018
 
 ## 目标
@@ -27,3 +27,18 @@
 - 干净机器验证 `version`、`init`、`validate`、`serve` 与嵌入 GUI。
 - 更新失败不会破坏现有二进制；checksum 或签名失败时拒绝替换。
 - 发布清单、CHANGELOG、双语 README 和维护文档同步更新。
+
+### v0.1.0 实现状态
+
+已完成：
+
+- GoReleaser 已构建 macOS、Linux、Windows 的 amd64/arm64 archive，并发布 checksums、SBOM 和 GitHub Release 资产。
+- 发布前会构建 React 前端并同步嵌入资源；`conflow version --json` 输出版本、commit 和构建时间。
+- Homebrew Cask 和 Scoop bucket 已发布；直接下载的 macOS 二进制仍需手动移除 Gatekeeper 隔离属性，Homebrew 安装会自动处理。
+- `conflow update` 已支持直接安装方式的显式更新，并在替换二进制前验证 GitHub Release archive 的 checksum。
+
+待处理（由 [Issue #39](https://github.com/ConteMan/conflow/issues/39) 跟踪）：
+
+- macOS、Windows 和 Linux 的代码签名，以及 macOS 公证。
+- 更新失败后的自动回滚。
+- 供应链 provenance。
