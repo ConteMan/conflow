@@ -16,6 +16,10 @@ make check      # 本地完整门禁，包含 Playwright E2E
 make check-ci   # 不启动浏览器，与 GitHub Actions 一致
 ```
 
+## 问题反馈
+
+在 [GitHub Issues](https://github.com/ConteMan/conflow/issues) 报告 Bug 或提出改进建议。Label 说明：`bug`（行为错误）、`design-gap`（与 UI 设计稿不符）、`enhancement`（可在现有范围内改进）、`spec-needed`（需要新 Spec 才能动工）。具体工作流见 [AGENTS.md](AGENTS.md)。
+
 ## 规则
 
 - 从 `main` 创建 `feat/<name>`、`fix/<name>` 或 `docs/<name>` 分支。
