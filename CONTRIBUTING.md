@@ -18,7 +18,7 @@ make check-ci   # 不启动浏览器，与 GitHub Actions 一致
 
 ## 问题反馈
 
-在 [GitHub Issues](https://github.com/ConteMan/conflow/issues) 报告 Bug 或提出改进建议。Label 说明：`bug`（行为错误）、`design-gap`（与 UI 设计稿不符）、`enhancement`（可在现有范围内改进）、`spec-needed`（需要新 Spec 才能动工）。具体工作流见 [AGENTS.md](AGENTS.md)。
+在 [GitHub Issues](https://github.com/ConteMan/conflow/issues) 报告 Bug 或提出改进建议，Issue 标题和正文统一使用中文。Label 说明：`bug`（行为错误）、`design-gap`（与 UI 设计稿不符）、`enhancement`（可在现有范围内改进）、`spec-needed`（需要新 Spec 才能动工）。具体工作流见 [AGENTS.md](AGENTS.md)。
 
 ## 规则
 
