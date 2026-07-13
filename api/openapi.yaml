@@ -4003,3 +4003,86 @@ components:
           minLength: 1
         confirmation:
           $ref: "#/components/schemas/ReleaseConfirmation"
+    Duration:
+      type: object
+      properties:
+        unit:
+          type: string
+          enum: [seconds, minutes, hours, days]
+        value:
+          type: integer
+          minimum: 1
+      required: [unit, value]
+    Interval:
+      type: object
+      properties:
+        unit:
+          type: string
+          enum: [seconds, minutes, hours, days, items]
+        value:
+          type: integer
+          minimum: 1
+      required: [unit, value]
+    CountLimit:
+      type: object
+      properties:
+        unit:
+          type: string
+          enum: [session, day]
+        value:
+          type: integer
+          minimum: 0
+      required: [unit, value]
+    ShiftLimit:
+      type: object
+      properties:
+        am:
+          type: integer
+          minimum: 0
+        pm:
+          type: integer
+          minimum: 0
+      required: [am, pm]
+    MigrationPreview:
+      type: object
+      properties:
+        source_pack_ref:
+          type: string
+        target_pack_ref:
+          type: string
+        manifest_revision:
+          type: string
+        source_revision:
+          type: string
+        field_mapping:
+          type: array
+          items:
+            type: object
+        generated_entities:
+          type: object
+        deleted_fields:
+          type: array
+          items:
+            type: string
+        decisions_required:
+          type: array
+          items:
+            type: object
+        risk_level:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      required: [source_pack_ref, target_pack_ref, manifest_revision, source_revision, decisions_required, risk_level]
+    MigrationApplyRequest:
+      type: object
+      properties:
+        confirmed:
+          type: boolean
+        decisions:
+          type: object
+        if_match:
+          type: string
+        expected_source_revision:
+          type: string
+      required: [confirmed, decisions, if_match, expected_source_revision]

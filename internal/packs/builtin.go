@@ -4,7 +4,7 @@ import "encoding/json"
 
 // BuiltinRegistry contains Pack declarations compiled into the Conflow binary.
 func BuiltinRegistry() *Registry {
-	return MustNewRegistry(mobileAdDefinition())
+	return MustNewRegistry(mobileAdDefinition(), mobileAdV2Definition())
 }
 
 func mobileAdDefinition() Definition {

@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "pack_ref": "mobile-ad-monetization/v2",
+  "description": "v2 Pack schema golden. Consumers must read the Pack definition via the registry, not this file.",
+  "entity_types": ["remote_config_layout", "feature_switch", "network_settings", "frequency_policy", "placement", "unit_binding"],
+  "schema_version": 2
+}

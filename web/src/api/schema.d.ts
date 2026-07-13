@@ -1776,6 +1776,44 @@ export interface components {
             expected_remote_etag: string;
             confirmation: components["schemas"]["ReleaseConfirmation"];
         };
+        Duration: {
+            /** @enum {string} */
+            unit: "seconds" | "minutes" | "hours" | "days";
+            value: number;
+        };
+        Interval: {
+            /** @enum {string} */
+            unit: "seconds" | "minutes" | "hours" | "days" | "items";
+            value: number;
+        };
+        CountLimit: {
+            /** @enum {string} */
+            unit: "session" | "day";
+            value: number;
+        };
+        ShiftLimit: {
+            am: number;
+            pm: number;
+        };
+        MigrationPreview: {
+            source_pack_ref: string;
+            target_pack_ref: string;
+            manifest_revision: string;
+            source_revision: string;
+            field_mapping?: Record<string, never>[];
+            generated_entities?: Record<string, never>;
+            deleted_fields?: string[];
+            decisions_required: Record<string, never>[];
+            risk_level: string;
+            /** Format: date-time */
+            expires_at?: string;
+        };
+        MigrationApplyRequest: {
+            confirmed: boolean;
+            decisions: Record<string, never>;
+            if_match: string;
+            expected_source_revision: string;
+        };
     };
     responses: {
         /** @description Malformed JSON, unknown fields, or invalid request headers. */
