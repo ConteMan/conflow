@@ -160,3 +160,11 @@ mappings:
 项目清单中的 `pack.id` 是不透明引用，当前格式为 `<name>/<version>`，例如 `mobile-ad-monetization/v1`。项目层只保存和展示该值；只有 Pack 注册表在能力发现、表单构建或后续草稿处理时解析它，因此新增 Pack 不要求修改项目、源适配器或发布适配器。
 
 每个 Pack 版本声明独立的 schema version、实体 ID 规则、字段类型与默认值、敏感级别、删除策略、允许环境覆盖的字段和表单 UI metadata。schema migration 是显式声明的入口；不执行项目文件、网络下载内容或用户提供的脚本。编译、校验和语义差异计算由 Pack 边界定义，具体领域行为由对应 Pack Spec 实现。
+
+### Pack 编译与受管参数
+
+Pack 实体与远端参数不要求一一对应。Pack compiler 可以把一个实体编译为多个受管参数，也可以把多个实体确定性聚合为一个版本化 JSON 参数。聚合是交付形态，不创建新的配置事实源，也不改变实体 ID、引用关系、分层或业务语义。
+
+项目需要声明远端参数 key、聚合 payload version 或其他交付布局时，这些值必须作为对应 Pack schema 下的业务配置保存并接受校验；不得写入 Source mapping、Provider 私有配置或通用代码中的项目特例。Pack compiler 输出 provider-neutral managed parameter 集合及其来源实体引用，Plan 基于该集合生成远端参数节点，Provider 只负责目标模板的读取、验证、合并和发布。
+
+同一规范化输入必须产生相同的参数 key、值、来源引用和 content digest。对象键顺序、源文件排版或无业务语义的记录顺序不得改变编译结果。远端受管聚合参数含未知版本、无法映射字段或未建模条件值时默认阻止发布，不能重建后静默覆盖。
