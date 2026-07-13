@@ -42,6 +42,11 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     if (path === "/api/v1/environments/development/provider" && request.method() === "GET") {
       await json(route, { data: { environment_id: "development", provider_type: "firebase-remote-config", status: providerConnected ? "connected" : "not_configured", credentials_path_display: providerConnected ? "…/firebase.json" : undefined, capabilities: { pull: true, validate: true, publish: true, rollback: true } }, meta: { request_id: "req_provider", revision: 1 } }); return;
     }
+    if (path === "/api/v1/drafts/development/entities" && request.method() === "GET") {
+      const entityType = new URL(request.url()).searchParams.get("entity_type");
+      const counts: Record<string, number> = { placement: 3, frequency_policy: 2, feature_switch: 4 };
+      await json(route, { data: Array.from({ length: counts[entityType ?? ""] ?? 0 }, (_, index) => ({ entity_ref: `entity:mobile-ad-monetization/v1:${entityType}:${index}`, entity_type: entityType, entity_id: String(index), source: { present: true, value: {} }, draft: { present: false }, resolved: { present: true, value: {} }, effective: { present: true, value: {} }, origin: "baseline", source_revision: "source_1" })), meta: { request_id: "req_entities", revision: 1 } }); return;
+    }
     if (path === "/api/v1/environments/development/provider:connect" && request.method() === "POST") {
       expect(request.headers()["content-type"]).toContain("application/json");
       const credentialsPath = (request.postDataJSON() as { credentials_path: string }).credentials_path;
@@ -106,7 +111,10 @@ test("bootstrap renders project overview from API data", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Photo Editor" })).toBeVisible();
   await expect(page.getByText("mobile-ad-monetization/v1")).toBeVisible();
-  await expect(page.getByText("Provider 状态").locator("../..").getByText("查看连接卡")).toBeVisible();
+  await expect(page.getByText("配置实体").locator("../..")).toContainText("9");
+  await expect(page.getByText("未发布修改").locator("../..")).toContainText("已同步");
+  await expect(page.getByText("校验状态").locator("../..")).toContainText("未校验");
+  await expect(page.getByText("远端连接").locator("../..")).toContainText("未配置");
 });
 
 test("production identity comes from environment kind and remains explicit", async ({ page }) => {

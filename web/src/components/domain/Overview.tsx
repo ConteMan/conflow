@@ -1,19 +1,57 @@
-import { Boxes, Cloud, ExternalLink, GitBranch, Plus, Settings, ShieldCheck, SwitchCamera } from "lucide-react";
-import type { Environment, PackMetadata, Project } from "../../api/client";
+import { Boxes, Cloud, GitBranch, Plus, Settings, ShieldCheck, SwitchCamera } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getProviderStatus, listDraftEntities, type Environment, type PackMetadata, type Project, type ProviderStatus, type ValidationResult } from "../../api/client";
 import { Button } from "../ui/Button";
 import { ProviderConnectionCard } from "./ProviderConnectionCard";
 
-export function Overview({ project, selectedEnvironment, environments, pack, onManageEnvironments, onManageProject, onSwitchEnvironment, onCreateEnvironment }: {
+type EntityCounts = { placement: number; frequencyPolicy: number; featureSwitch: number };
+
+export function Overview({ project, selectedEnvironment, environments, pack, validation, draftDirty, revision, onManageEnvironments, onManageProject, onSwitchEnvironment, onCreateEnvironment }: {
   project: Project;
   selectedEnvironment: Environment;
   environments: Environment[];
   pack: PackMetadata | null;
+  validation: ValidationResult | null;
+  draftDirty: boolean;
+  revision: number;
   onManageEnvironments: (environmentId?: string) => void;
   onManageProject: () => void;
   onSwitchEnvironment: () => void;
   onCreateEnvironment: () => void;
 }) {
+  const [entityCounts, setEntityCounts] = useState<EntityCounts | null>(null);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const production = selectedEnvironment.kind === "production";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setEntityCounts(null);
+    setProviderStatus(null);
+
+    void Promise.all([
+      listDraftEntities(selectedEnvironment.id, "placement", controller.signal),
+      listDraftEntities(selectedEnvironment.id, "frequency_policy", controller.signal),
+      listDraftEntities(selectedEnvironment.id, "feature_switch", controller.signal),
+    ]).then(([placements, frequencyPolicies, featureSwitches]) => {
+      if (!controller.signal.aborted) setEntityCounts({ placement: placements.data.length, frequencyPolicy: frequencyPolicies.data.length, featureSwitch: featureSwitches.data.length });
+    }).catch(() => {
+      // Each metric falls back to an unavailable state when local data cannot be loaded.
+    });
+
+    void getProviderStatus(selectedEnvironment.id, controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) setProviderStatus(response.data);
+      })
+      .catch(() => {
+        // The overview remains usable when the provider cannot be reached.
+      });
+
+    return () => controller.abort();
+  }, [selectedEnvironment.id]);
+
+  const diagnosticCounts = countDiagnostics(validation);
+  const validationReady = validation?.readiness === "ready" && validation.status === "fresh";
+  const provider = providerMetric(providerStatus);
   return (
     <main className="page-container">
       {production ? <section className="production-banner"><ShieldCheck /><div><strong>你正在查看 Production</strong><p>修改会影响真实用户；发布能力将在后续 Spec 接入。</p></div><Button className="production-switch" icon={<SwitchCamera size={16} />} onClick={onSwitchEnvironment}>切换环境</Button></section> : null}
@@ -22,10 +60,10 @@ export function Overview({ project, selectedEnvironment, environments, pack, onM
         <div className="overview-heading-actions"><Button onClick={() => onManageEnvironments()}>管理环境</Button><Button variant="primary" icon={<Plus size={16} />} onClick={onCreateEnvironment}>新建环境</Button></div>
       </header>
       <section className="metric-grid" aria-label="项目状态">
-        <Metric icon={<Boxes />} label="环境" value={String(environments.length)} detail="项目清单中的可用环境" />
-        <Metric icon={<GitBranch />} label="配置来源" value={sourceLabel(project.source_type)} detail={project.source_type} />
-        <Metric icon={<Cloud />} label="Provider 状态" value="查看连接卡" detail="在下方验证本地服务账号并拉取线上配置" muted />
-        <Metric icon={<ExternalLink />} label="最近发布" value="见发布记录" detail="发布与回滚历史在「发布记录」页查看" muted />
+        <Metric icon={<Boxes />} label="配置实体" value={entityCounts ? String(entityCounts.placement + entityCounts.frequencyPolicy + entityCounts.featureSwitch) : "—"} detail={entityCounts ? `${entityCounts.placement} 广告位 · ${entityCounts.frequencyPolicy} 频控 · ${entityCounts.featureSwitch} 开关` : "实体数据暂不可用"} muted={!entityCounts} />
+        <Metric icon={<GitBranch />} label="未发布修改" value={draftDirty ? "有修改" : "已同步"} detail={draftDirty ? "等待校验与发布" : `revision ${revision}`} />
+        <Metric icon={<ShieldCheck />} label="校验状态" value={validationReady ? "可发布" : validation ? "有阻断" : "未校验"} detail={validation ? `阻断 ${diagnosticCounts.blocking} · 提醒 ${diagnosticCounts.warning}` : "运行校验以检查发布条件"} muted={!validation} />
+        <Metric icon={<Cloud />} label="远端连接" value={provider.value} detail={provider.detail} muted={providerStatus === null} />
       </section>
       <div className="overview-grid">
         <section className="panel">
@@ -57,8 +95,21 @@ export function kindLabel(kind: Environment["kind"]) {
   return ({ development: "Development", staging: "Staging", production: "Production", custom: "Custom" })[kind];
 }
 
-function sourceLabel(source: Project["source_type"]) { return source === "managed-file" ? "托管文件" : "Git JSON"; }
-
 function uniqueSubtitle(projectName: string, environmentName: string) {
   return [...new Set([projectName, environmentName])].join(" · ");
+}
+
+function countDiagnostics(validation: ValidationResult | null) {
+  return (validation?.diagnostics ?? []).reduce((counts, diagnostic) => {
+    if (diagnostic.severity === "blocking" || diagnostic.severity === "error") counts.blocking += 1;
+    else if (diagnostic.severity === "warning") counts.warning += 1;
+    return counts;
+  }, { blocking: 0, warning: 0 });
+}
+
+function providerMetric(status: ProviderStatus | null) {
+  if (!status) return { value: "—", detail: "连接状态暂不可用" };
+  if (status.status === "connected") return { value: "已连接", detail: "Firebase Remote Config" };
+  if (status.status === "not_configured") return { value: "未配置", detail: "请配置 Firebase 服务账号" };
+  return { value: "不可用", detail: status.status === "unauthorized" ? "服务账号未获授权" : "请检查 Provider 连接" };
 }
