@@ -28,6 +28,8 @@ jobs:
       - run: npm --prefix web ci
       - run: npm --prefix web run build
       - run: go run ./cmd/embedui
+      - name: Install syft (for SBOM generation)
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       # 从 CHANGELOG.md 抽取当前版本对应节作为 release notes；
       # rc/预发布 tag 无对应节时回退为指向 CHANGELOG 的占位。
