@@ -197,9 +197,8 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .dirty-filter { min-height: 40px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); font-size: 13px; white-space: nowrap; }
 .dirty-filter input { width: 15px; height: 15px; accent-color: var(--accent); }
 .entity-table-panel { overflow-x: auto; }
-.entity-table { min-width: 940px; table-layout: fixed; width: 100%; }
-.entity-table th:first-child, .entity-table td:first-child { width: 240px; }
-.entity-table td:first-child code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entity-table { min-width: 940px; }
+.entity-table td:first-child code { display: block; width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entity-table th, .entity-table td { height: 52px; }
 .entity-table td:nth-last-child(2) { width: 132px; }
 .entity-table tr { cursor: pointer; }
