@@ -54,7 +54,6 @@ export function Overview({ project, selectedEnvironment, environments, pack, val
   const provider = providerMetric(providerStatus);
   return (
     <main className="page-container">
-      {production ? <section className="production-banner"><ShieldCheck /><div><strong>你正在查看 Production</strong><p>修改会影响真实用户；发布能力将在后续 Spec 接入。</p></div><Button className="production-switch" icon={<SwitchCamera size={16} />} onClick={onSwitchEnvironment}>切换环境</Button></section> : null}
       <header className="page-heading">
         <div><span className="eyebrow">项目概览</span><div className="project-title"><h1>{project.name}</h1><Button className="project-settings-link" icon={<Settings size={15} />} onClick={onManageProject}>项目设置</Button></div><p>{uniqueSubtitle(project.name, selectedEnvironment.name)}</p></div>
         <div className="overview-heading-actions"><Button onClick={() => onManageEnvironments()}>管理环境</Button><Button variant="primary" icon={<Plus size={16} />} onClick={onCreateEnvironment}>新建环境</Button></div>

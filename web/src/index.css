@@ -423,10 +423,19 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .plan-review--stale { opacity: .64; }
 .plan-metrics { margin-bottom: 16px; }
 .plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; align-items: start; gap: 20px; }
+.plan-main { display: grid; gap: 16px; min-width: 0; }
 .semantic-tree { padding: 0; overflow: hidden; }
+.panel-section-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 18px; border: 0; border-bottom: 1px solid var(--border); background: transparent; cursor: pointer; text-align: left; color: var(--text); }
+.panel-section-toggle:hover { background: var(--surface-muted); }
+.panel-section-toggle h2 { margin: 0; font-size: 16px; }
+.section-chevron { flex-shrink: 0; transition: transform .18s ease; color: var(--text-muted); }
+.section-chevron--closed { transform: rotate(-90deg); }
 .tree-heading { padding: 18px; border-bottom: 1px solid var(--border); }
 .tree-heading h2 { margin: 0 0 5px; font-size: 16px; }
 .tree-heading p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.panel-section-toggle.tree-heading { display: flex; padding: 18px; }
+.panel-section-toggle.tree-heading > div { flex: 1; }
+.panel-section-toggle.tree-heading h2 { margin: 0 0 5px; }
 .tree-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; width: 100%; gap: 10px; align-items: center; min-height: 64px; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; background: var(--surface); }
 .tree-row:hover { background: var(--surface-muted); }
 .tree-row > span { display: grid; gap: 3px; min-width: 0; }
@@ -440,7 +449,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .remote-parameter code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .remote-parameter span { color: var(--text-muted); }
 .remote-parameter strong { font-weight: 500; overflow-wrap: anywhere; }
-.plan-sidebar { display: grid; gap: 14px; }
+.plan-sidebar { display: grid; gap: 14px; position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; }
 .remote-baseline, .risk-panel, .artifact-panel, .release-placeholder { padding: 17px; }
 .remote-baseline h2, .risk-panel h2, .artifact-panel h2, .release-placeholder h2 { margin-bottom: 13px; }
 .remote-baseline dl { display: grid; margin: 0; }
@@ -456,8 +465,9 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .blocking-reasons p { color: var(--text); }
 .risk-tag--blocking { color: var(--danger); background: var(--danger-soft); }
 .risk-entity-ref { display: block; margin-top: 2px; font-size: 11px; color: var(--text-muted); }
-.remote-param-panel { margin-top: 16px; padding: 17px; overflow-x: auto; }
-.remote-param-panel h2 { margin: 0 0 13px; font-size: 16px; }
+.remote-param-panel { padding: 0; overflow: hidden; }
+.remote-param-panel .panel-section-toggle { padding: 17px 18px; }
+.remote-param-panel table { padding: 0 17px 17px; width: 100%; box-sizing: border-box; }
 .remote-param-panel h2 small { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
 .remote-param-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .remote-param-table th { padding: 6px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
@@ -552,7 +562,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .release-steps li.active i { color: #fff; background: var(--accent); }
 .release-steps li.done i { color: #fff; background: var(--success); }
 .release-flow-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: 20px; }
-.release-flow-sidebar { display: grid; gap: 14px; }
+.release-flow-sidebar { display: grid; gap: 14px; position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; }
 .release-flow-sidebar > .button { width: 100%; justify-content: center; }
 .target-card, .confirmation-panel, .confirmation-summary { padding: 18px; }
 .target-card h2, .confirmation-panel h2, .confirmation-summary h2 { margin: 0 0 8px; font-size: 16px; }

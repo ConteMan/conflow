@@ -86,14 +86,31 @@ function OperationProgress({ operation }: { operation: Operation | null }) {
 function PlanReview({ plan, environment, onRebuild, onOpenConfiguration, onOpenRelease }: { plan: Plan; environment: Environment; onRebuild: () => void; onOpenConfiguration: () => void; onOpenRelease: (planID: string) => void }) {
   const invalid = plan.status === "invalidated" || plan.status === "expired";
   const [invalidDialogOpen, setInvalidDialogOpen] = useState(invalid);
+  const [treeClosed, setTreeClosed] = useState(false);
   useEffect(() => setInvalidDialogOpen(invalid), [invalid, plan.plan_id]);
   const directChanges = plan.semantic_changes.length;
   return <>
     <section className={`plan-status ${invalid ? "plan-status--invalid" : plan.status === "preview_only" ? "plan-status--preview" : "plan-status--ready"}`}>{invalid ? <><FileClock size={18} /><strong>这份发布计划已失效</strong><span>{invalidationText(plan.invalidation_reason)}</span></> : plan.status === "preview_only" ? <><CircleAlert size={18} /><strong>不可发布</strong><span>{plan.blocking_reasons.map((item) => item.summary).join("；") || "服务端仅允许预览此计划。"}</span></> : <><CheckCircle2 size={18} /><strong>计划可审阅</strong><span>风险与发布条件均以服务端结果为准。</span></>}</section>
     <section className={invalid ? "plan-review plan-review--stale" : "plan-review"}>
       <div className="metric-grid plan-metrics"><Metric label="直接修改" value={`${directChanges} 项`} copy="用户明确修改" /><Metric label="受影响实体" value={`${plan.affected_entities.length} 个`} copy="由业务影响展开" /><Metric label="远端参数" value={`${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 项`} copy="最终写入目标" /><Metric label="最高风险" value={riskLabel(plan.severity)} copy={`${plan.risk_items.filter((item) => item.acknowledgement_required).length} 项需要确认`} risk={plan.severity} /></div>
-      <div className="plan-layout"><section className="semantic-tree panel"><header className="tree-heading"><div><h2>业务变更与影响</h2><p>{`${directChanges} 项直接修改 · ${plan.affected_entities.length} 个受影响实体 · ${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 个远端参数`}</p></div></header><SemanticTree plan={plan} /></section><aside className="plan-sidebar"><RemoteBaseline plan={plan} /><RiskPanel plan={plan} /><ArtifactPanel plan={plan} /><section className="panel release-placeholder"><h2>下一步</h2><p>{invalid ? "旧计划仅供参考，重新构建后才能继续。" : plan.status === "preview_only" ? "此计划不可发布，请先处理服务端给出的原因。" : "继续进入独立发布步骤页，服务端会在提交时再次确认计划、版本和线上 ETag。"}</p><Button variant="primary" disabled={invalid || plan.status !== "ready"} onClick={() => onOpenRelease(plan.plan_id)} icon={<ChevronRight size={16} />}>发布到 {environment.name}</Button></section></aside></div>
-      <RemoteParamPanel plan={plan} />
+      <div className="plan-layout">
+        <div className="plan-main">
+          <section className="semantic-tree panel">
+            <button className="panel-section-toggle tree-heading" onClick={() => setTreeClosed((c) => !c)} aria-expanded={!treeClosed}>
+              <div><h2>业务变更与影响</h2><p>{`${directChanges} 项直接修改 · ${plan.affected_entities.length} 个受影响实体 · ${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 个远端参数`}</p></div>
+              <ChevronDown size={16} className={treeClosed ? "section-chevron section-chevron--closed" : "section-chevron"} />
+            </button>
+            {!treeClosed ? <SemanticTree plan={plan} /> : null}
+          </section>
+          <RemoteParamPanel plan={plan} />
+        </div>
+        <aside className="plan-sidebar">
+          <section className="panel release-placeholder"><h2>下一步</h2><p>{invalid ? "旧计划仅供参考，重新构建后才能继续。" : plan.status === "preview_only" ? "此计划不可发布，请先处理服务端给出的原因。" : "继续进入独立发布步骤页，服务端会在提交时再次确认计划、版本和线上 ETag。"}</p><Button variant="primary" disabled={invalid || plan.status !== "ready"} onClick={() => onOpenRelease(plan.plan_id)} icon={<ChevronRight size={16} />}>发布到 {environment.name}</Button></section>
+          <RemoteBaseline plan={plan} />
+          <RiskPanel plan={plan} />
+          <ArtifactPanel plan={plan} />
+        </aside>
+      </div>
       {invalid ? <section className="plan-invalid-actions"><AlertTriangle size={18} /><div><strong>旧计划保留为参考</strong><p>{invalidationText(plan.invalidation_reason)}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></section> : null}
       {!invalid && plan.status === "ready" && !plan.semantic_changes.length ? <section className="validation-empty"><CheckCircle2 size={28} /><div><h2>当前环境没有待发布的修改</h2><p>修改配置后可重新构建发布计划。</p><Button onClick={onOpenConfiguration}>返回配置</Button></div></section> : null}
     </section>
@@ -124,11 +141,18 @@ function formatParamValue(value: string | undefined): string {
   } catch { return value; }
 }
 export function RemoteParamPanel({ plan }: { plan: Plan }) {
+  const [collapsed, setCollapsed] = useState(false);
   const changes = plan.remote_parameter_changes;
   const seen = new Set<string>();
   const unique = changes.filter((c) => { if (seen.has(c.parameter_key)) return false; seen.add(c.parameter_key); return true; });
   if (!unique.length) return null;
-  return <section className="panel remote-param-panel"><h2>远端参数预览<small>{unique.length} 个参数</small></h2><table className="remote-param-table"><thead><tr><th>参数键</th><th>变更</th><th>变更前</th><th>变更后</th></tr></thead><tbody>{unique.map((c) => <tr key={c.parameter_key}><td><code>{c.parameter_key}</code></td><td><span className={`change-tag change-tag--${c.change_kind}`}>{changeKind(c.change_kind)}</span></td><td><pre className="param-value">{formatParamValue(c.before_summary)}</pre></td><td><pre className="param-value param-value--after">{formatParamValue(c.after_summary)}</pre></td></tr>)}</tbody></table></section>;
+  return <section className="panel remote-param-panel">
+    <button className="panel-section-toggle" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed}>
+      <h2>远端参数预览<small>{unique.length} 个参数</small></h2>
+      <ChevronDown size={16} className={collapsed ? "section-chevron section-chevron--closed" : "section-chevron"} />
+    </button>
+    {!collapsed ? <table className="remote-param-table"><thead><tr><th>参数键</th><th>变更</th><th>变更前</th><th>变更后</th></tr></thead><tbody>{unique.map((c) => <tr key={c.parameter_key}><td><code>{c.parameter_key}</code></td><td><span className={`change-tag change-tag--${c.change_kind}`}>{changeKind(c.change_kind)}</span></td><td><pre className="param-value">{formatParamValue(c.before_summary)}</pre></td><td><pre className="param-value param-value--after">{formatParamValue(c.after_summary)}</pre></td></tr>)}</tbody></table> : null}
+  </section>;
 }
 function RemoteBaseline({ plan }: { plan: Plan }) { const snapshot = plan.remote_snapshot; return <section className="panel remote-baseline"><h2>线上配置基线</h2>{snapshot.status === "available" ? <dl><div><dt>版本</dt><dd>{snapshot.version ?? "已读取"}</dd></div><div><dt>参数数量</dt><dd>{snapshot.summary?.parameter_count ?? "-"}</dd></div><div><dt>受管参数</dt><dd>{snapshot.summary?.managed_parameter_count ?? "-"}</dd></div><div><dt>条件值</dt><dd>{snapshot.summary?.condition_count ?? "-"}</dd></div></dl> : <p>当前无法读取线上配置，发布将保持不可用。</p>}</section>; }
 export function RiskPanel({ plan }: { plan: Plan }) { const groups = ["blocking", "high", "medium", "low"] as const; return <section className="panel risk-panel"><h2>风险清单</h2>{plan.blocking_reasons.length ? <div className="blocking-reasons"><strong>阻断原因</strong>{plan.blocking_reasons.map((item) => <p key={item.reason_code}>{item.summary}</p>)}</div> : null}{groups.map((severity) => { const items = plan.risk_items.filter((item) => item.severity === severity); return items.length ? <div className="risk-group" key={severity}><h3 className={`risk-tag risk-tag--${severity === "blocking" ? "high" : severity}`}>{riskLabel(severity)}</h3>{items.map((item) => <p key={item.risk_item_id}>{item.summary}{item.entity_ref ? <> · <code>{item.entity_ref}</code></> : null}</p>)}</div> : null; })}{!plan.risk_items.length && !plan.blocking_reasons.length ? <p className="muted-copy">服务端未报告额外风险。</p> : null}</section>; }
@@ -138,6 +162,6 @@ function stageLabel(value: string) { return ({ queued: "等待开始", reading_r
 function invalidationText(reason?: string) { return ({ draft_revision_changed: "配置已变化，旧计划不能继续发布。", source_digest_changed: "配置来源已变化，旧计划不能继续发布。", remote_etag_changed: "线上配置已变化，旧计划不能继续发布。", remote_snapshot_unavailable: "无法读取线上配置，旧计划不能继续发布。", ttl_expired: "计划已过期，请重新构建。", provider_capability_changed: "发布目标能力已变化，请重新构建。" } as Record<string, string>)[reason ?? ""] ?? "计划已失效，请重新构建。"; }
 export function riskLabel(value: string) { return ({ low: "低", medium: "中", high: "高", blocking: "阻断" } as Record<string, string>)[value] ?? value; }
 function changeKind(value: string) { return ({ created: "新增", updated: "修改", deleted: "删除", overridden: "环境专属修改" } as Record<string, string>)[value] ?? value; }
-function entityType(value: string) { return ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "环境绑定" } as Record<string, string>)[value] ?? value; }
+function entityType(value: string) { return ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定" } as Record<string, string>)[value] ?? value; }
 function impactKind(value: string) { return ({ direct: "直接修改", inherited: "继承影响", referenced: "引用影响", compiled: "编译结果" } as Record<string, string>)[value] ?? value; }
 function toRequestError(cause: unknown) { if (cause instanceof ConflowAPIError) return { code: cause.code, requestId: cause.requestId }; if (cause instanceof ConflowNetworkError) return { code: "network_unavailable" }; return { code: "internal_error" }; }
