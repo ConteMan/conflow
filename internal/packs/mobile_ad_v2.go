@@ -58,6 +58,7 @@ func mobileAdV2Definition() Definition {
 					field("ad_type", FieldTypeString, true, false, `"interstitial"`, "广告类型", "支持开屏、插屏和原生广告。", "select", "基础", 2, enum("app_open", "interstitial", "native")),
 					field("enabled_switch_id", FieldTypeReference, true, false, `""`, "启用开关", "引用 feature_switch 实体 ID。", "feature_switch_ref", "投放", 3, FieldValidation{}),
 					field("frequency_policy_type", FieldTypeString, true, false, `"preset"`, "频控类型", "使用预设或自定义频控策略。", "select", "投放", 4, enum("preset", "custom")),
+					field("network_mode", FieldTypeString, false, false, `"admob"`, "广告链路", "覆盖全局 ad_network_mode。", "select", "投放", 5, enum("admob", "max")),
 					field("frequency_policy_id", FieldTypeReference, true, true, "null", "频控策略", "引用 frequency_policy 实体 ID。", "select", "投放", 5, FieldValidation{}),
 					field("custom_frequency_policy", FieldTypeObject, true, true, "null", "自定义频控", "使用与频控策略相同的结构。", "object", "投放", 6, FieldValidation{}),
 					field("load_timeout_ms", FieldTypeInteger, true, false, "4000", "加载超时（毫秒）", "加载广告的最长等待时间。", "number", "投放", 7, FieldValidation{Minimum: &minimumOne}),

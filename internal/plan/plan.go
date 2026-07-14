@@ -252,7 +252,7 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 						remoteBefore = value
 					}
 					if in.PackRef == "mobile-ad-monetization/v2" {
-						if value, exists := compileV2Parameters(in.Desired)[key]; exists {
+						if value, exists := compileV2Parameters(in.Desired, in.EnvironmentID)[key]; exists {
 							if changeKind == "deleted" {
 								changeKind = "updated"
 							}
