@@ -49,6 +49,17 @@ vet:
 	go vet ./...
 
 build:
+	@if [ -d web/dist/assets ]; then \
+	  dist_js=$$(ls web/dist/assets/*.js 2>/dev/null | xargs -n1 basename | sort | tr '\n' ':'); \
+	  embed_js=$$(ls internal/webui/assets/assets/*.js 2>/dev/null | xargs -n1 basename | sort | tr '\n' ':'); \
+	  if [ "$$dist_js" != "$$embed_js" ]; then \
+	    echo ""; \
+	    echo "ERROR: internal/webui/assets 与 web/dist 不同步（JS hash 不一致）。"; \
+	    echo "       请先执行 make web-build 再重试。"; \
+	    echo ""; \
+	    exit 1; \
+	  fi; \
+	fi
 	mkdir -p bin
 	go build -o bin/conflow ./cmd/conflow
 
