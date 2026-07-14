@@ -9,7 +9,7 @@ import (
 
 // compileV2Parameters reads the v2 effective config and returns the managed
 // parameter map: paramKey -> Go value (bool, string, or JSON string).
-func compileV2Parameters(desired map[string]any) map[string]any {
+func compileV2Parameters(desired map[string]any, environmentID string) map[string]any {
 	values := map[string]any{}
 	layout, found := records(desired["remote_config_layouts"])["default"]
 	if !found {
@@ -41,7 +41,7 @@ func compileV2Parameters(desired map[string]any) map[string]any {
 		values[key] = marshalV2JSON(map[string]any{"version": 2, "policies": v2Policies(desired)})
 	}
 	if key, ok := layout.Fields["placements_parameter_key"].(string); ok && key != "" {
-		values[key] = marshalV2JSON(map[string]any{"version": 2, "placements": v2Placements(desired)})
+		values[key] = marshalV2JSON(map[string]any{"version": 2, "placements": v2Placements(desired, environmentID)})
 	}
 	return values
 }
@@ -60,9 +60,14 @@ func v2Policies(desired map[string]any) map[string]any {
 	return policies
 }
 
-func v2Placements(desired map[string]any) []any {
+func v2Placements(desired map[string]any, environmentID string) []any {
+	featureSwitches := records(desired["feature_switches"])
 	bindingsByPlacement := map[string][]entities.Record{}
 	for _, binding := range sortedRecords(desired, "unit_bindings") {
+		bindingEnvironmentID, _ := binding.Fields["environment_id"].(string)
+		if bindingEnvironmentID != environmentID {
+			continue
+		}
 		placementID, _ := binding.Fields["placement_id"].(string)
 		bindingsByPlacement[placementID] = append(bindingsByPlacement[placementID], binding)
 	}
@@ -81,30 +86,62 @@ func v2Placements(desired map[string]any) []any {
 		sort.SliceStable(bindings, func(i, j int) bool {
 			return v2BindingSortKey(bindings[i]) < v2BindingSortKey(bindings[j])
 		})
-		compiledBindings := make([]any, 0, len(bindings))
+		units := map[string]any{}
 		for _, binding := range bindings {
-			compiledBindings = append(compiledBindings, map[string]any{
-				"environment_id": binding.Fields["environment_id"],
-				"platform":       binding.Fields["platform"],
-				"network":        binding.Fields["network"],
-				"unit_id_ref":    binding.Fields["unit_id_ref"],
-			})
+			network, _ := binding.Fields["network"].(string)
+			if network == "" {
+				continue
+			}
+			if _, exists := units[network]; exists {
+				continue
+			}
+			units[network] = map[string]any{"unit_id": binding.Fields["unit_id_ref"]}
+		}
+		enabledConfigKey := ""
+		enabledSwitchID, _ := placement.Fields["enabled_switch_id"].(string)
+		if featureSwitch, found := featureSwitches[enabledSwitchID]; found {
+			enabledConfigKey, _ = featureSwitch.Fields["key"].(string)
 		}
 		result = append(result, map[string]any{
-			"client_id":               placement.Fields["client_id"],
-			"key":                     placement.Fields["key"],
-			"ad_type":                 placement.Fields["ad_type"],
+			"id":                      placement.Fields["client_id"],
+			"placement":               placement.Fields["key"],
+			"type":                    placement.Fields["ad_type"],
+			"enabled_config_key":      enabledConfigKey,
+			"network_mode":            placement.Fields["network_mode"],
+			"units":                   units,
 			"frequency_policy_type":   placement.Fields["frequency_policy_type"],
 			"frequency_policy_id":     placement.Fields["frequency_policy_id"],
 			"custom_frequency_policy": normalizedV2FrequencyValue(placement.Fields["custom_frequency_policy"]),
 			"load_timeout_ms":         placement.Fields["load_timeout_ms"],
-			"cache_policy":            placement.Fields["cache_policy"],
-			"cache_ttl":               placement.Fields["cache_ttl"],
-			"fallback_behavior":       placement.Fields["fallback_behavior"],
-			"unit_bindings":           compiledBindings,
+			"cache_ttl_seconds":       v2DurationSeconds(placement.Fields["cache_ttl"]),
+			"fallback":                placement.Fields["fallback_behavior"],
 		})
 	}
 	return result
+}
+
+func v2DurationSeconds(value any) any {
+	duration, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	unit, unitOK := duration["unit"].(string)
+	amount, amountOK := duration["value"].(float64)
+	if !unitOK || !amountOK {
+		return nil
+	}
+	switch unit {
+	case "seconds":
+		return amount
+	case "minutes":
+		return amount * 60
+	case "hours":
+		return amount * 3600
+	case "days":
+		return amount * 86400
+	default:
+		return nil
+	}
 }
 
 func sortedRecords(desired map[string]any, collection string) []entities.Record {

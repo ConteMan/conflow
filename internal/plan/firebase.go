@@ -10,7 +10,7 @@ import (
 // MergeFirebaseTemplate changes only managed default values selected by the
 // immutable Plan. It keeps every unselected parameter, condition, and
 // conditional value exactly as Firebase returned it.
-func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteParameterChange, packRef string) ([]byte, error) {
+func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteParameterChange, packRef, environmentID string) ([]byte, error) {
 	var document map[string]any
 	if err := json.Unmarshal(remoteTemplate, &document); err != nil {
 		return nil, fmt.Errorf("parse remote template: %w", err)
@@ -24,7 +24,7 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	if err := json.Unmarshal(desiredJSON, &desired); err != nil {
 		return nil, fmt.Errorf("parse provider input: %w", err)
 	}
-	values := desiredParameterValues(desired, packRef)
+	values := desiredParameterValues(desired, packRef, environmentID)
 	keys := make([]string, 0, len(changes))
 	allV2Parameters := false
 	for _, change := range changes {
@@ -59,9 +59,9 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	return merged, nil
 }
 
-func desiredParameterValues(desired map[string]any, packRef string) map[string]any {
+func desiredParameterValues(desired map[string]any, packRef, environmentID string) map[string]any {
 	if packRef == "mobile-ad-monetization/v2" {
-		return compileV2Parameters(desired)
+		return compileV2Parameters(desired, environmentID)
 	}
 	values := map[string]any{}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {

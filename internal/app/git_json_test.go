@@ -45,7 +45,7 @@ func TestGitJSONServiceImportsPreviewsAndSavesPDFLauncherFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template, err := plan.MergeFirebaseTemplate([]byte(`{"parameters":{}}`), desired, []plan.RemoteParameterChange{{ParameterKey: "ad_frequency_inter_global_cap", Managed: true}}, "mobile-ad-monetization/v1")
+	template, err := plan.MergeFirebaseTemplate([]byte(`{"parameters":{}}`), desired, []plan.RemoteParameterChange{{ParameterKey: "ad_frequency_inter_global_cap", Managed: true}}, "mobile-ad-monetization/v1", "")
 	if err != nil || !strings.Contains(string(template), `"value":"120000"`) {
 		t.Fatalf("Firebase desired config = %s, err = %v", template, err)
 	}
