@@ -84,6 +84,12 @@ type disk struct {
 	// ID. The enclosing file is mode 0600, and this field is never returned by
 	// a public read model.
 	PrivateTemplates map[string]json.RawMessage `json:"private_templates,omitempty"`
+	// PrivateConflowState holds the Conflow effective desired state at the time
+	// of each successful publish, keyed by Release ID. It is used as the
+	// baseline for subsequent plan builds so that the plan diff reflects only
+	// changes made since the last publish rather than the full config vs. empty
+	// schema default. Never exposed by any public read model.
+	PrivateConflowState map[string]json.RawMessage `json:"private_conflow_state,omitempty"`
 }
 type Store struct {
 	mu      sync.Mutex
@@ -93,7 +99,7 @@ type Store struct {
 }
 
 func Open(path string) (*Store, error) {
-	s := &Store{path: path, disk: disk{Idempotency: map[string]idempotencyRecord{}, Releases: map[string]Release{}, Previews: map[string]RollbackPreview{}, PrivateTemplates: map[string]json.RawMessage{}}}
+	s := &Store{path: path, disk: disk{Idempotency: map[string]idempotencyRecord{}, Releases: map[string]Release{}, Previews: map[string]RollbackPreview{}, PrivateTemplates: map[string]json.RawMessage{}, PrivateConflowState: map[string]json.RawMessage{}}}
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return s, nil
@@ -116,6 +122,9 @@ func Open(path string) (*Store, error) {
 	}
 	if s.disk.PrivateTemplates == nil {
 		s.disk.PrivateTemplates = map[string]json.RawMessage{}
+	}
+	if s.disk.PrivateConflowState == nil {
+		s.disk.PrivateConflowState = map[string]json.RawMessage{}
 	}
 	if err := validateDisk(s.disk); err != nil {
 		s.corrupt = err
@@ -262,6 +271,59 @@ func (s *Store) Template(id string) ([]byte, error) {
 	}
 	return append([]byte(nil), value...), nil
 }
+// SaveConflowState persists the Conflow effective desired state that was
+// published in the given release. Errors are non-critical; callers may ignore
+// them without affecting release outcome correctness.
+func (s *Store) SaveConflowState(releaseID string, state json.RawMessage) error {
+	if releaseID == "" || len(state) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.healthyLocked(); err != nil {
+		return err
+	}
+	s.disk.PrivateConflowState[releaseID] = append(json.RawMessage(nil), state...)
+	return s.persistLocked()
+}
+
+// ConflowState returns the stored Conflow effective desired state for a release.
+func (s *Store) ConflowState(releaseID string) (json.RawMessage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.healthyLocked(); err != nil {
+		return nil, err
+	}
+	value, ok := s.disk.PrivateConflowState[releaseID]
+	if !ok || len(value) == 0 {
+		return nil, ErrNotFound
+	}
+	return append(json.RawMessage(nil), value...), nil
+}
+
+// LatestSucceeded returns the most recent succeeded release for the given
+// environment, or (Release{}, false, nil) if none exists.
+func (s *Store) LatestSucceeded(environmentID string) (Release, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.healthyLocked(); err != nil {
+		return Release{}, false, err
+	}
+	var result Release
+	for _, r := range s.disk.Releases {
+		if r.EnvironmentID != environmentID || r.Outcome != "succeeded" {
+			continue
+		}
+		if result.ReleaseID == "" || r.CreatedAt.After(result.CreatedAt) {
+			result = r
+		}
+	}
+	if result.ReleaseID == "" {
+		return Release{}, false, nil
+	}
+	return result, true, nil
+}
+
 func (s *Store) SavePreview(value RollbackPreview) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

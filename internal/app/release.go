@@ -44,6 +44,7 @@ type releasePreflight struct {
 	environment project.Environment
 	remote      remote.Snapshot
 	template    []byte
+	desiredJSON []byte // Conflow effective state at publish time; used as next plan baseline
 	kind        string
 	rollbackOf  string
 }
@@ -191,7 +192,7 @@ func (s *Service) preflightRelease(ctx context.Context, environmentID string, re
 		return releasePreflight{}, err
 	}
 	_ = publisher
-	return releasePreflight{plan: p, environment: environment, remote: current, template: merged, kind: "publish"}, nil
+	return releasePreflight{plan: p, environment: environment, remote: current, template: merged, desiredJSON: input, kind: "publish"}, nil
 }
 
 func validateReleaseConfirmation(p plan.Plan, environment project.Environment, policy project.ReleaseConfirmationPolicy, confirmation ReleaseConfirmation) error {
@@ -301,6 +302,9 @@ func (s *Service) publishRelease(operationID string, preflight releasePreflight)
 	if err := s.releases.SaveWithTemplate(result, verified.Raw); err != nil {
 		s.failRelease(operationID, preflight, "recording_audit", err, "changed")
 		return
+	}
+	if len(preflight.desiredJSON) > 0 {
+		_ = s.releases.SaveConflowState(result.ReleaseID, preflight.desiredJSON)
 	}
 	_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "release", ResourceID: result.ReleaseID, Href: "/api/v1/environments/" + preflight.environment.ID + "/releases/" + result.ReleaseID}, "changed")
 	_ = published
@@ -571,7 +575,8 @@ func (s *Service) StartRollback(ctx context.Context, environmentID, releaseID, i
 	if _, err := s.releases.ReserveAction(environmentID, "rollback", idempotencyKey, digest, op.OperationID); err != nil {
 		return operation.Operation{}, err
 	}
-	preflight := releasePreflight{plan: rollbackPlan, environment: environment, remote: current, template: template, kind: "rollback", rollbackOf: releaseID}
+	targetState, _ := s.releases.ConflowState(releaseID)
+	preflight := releasePreflight{plan: rollbackPlan, environment: environment, remote: current, template: template, desiredJSON: targetState, kind: "rollback", rollbackOf: releaseID}
 	go s.publishRelease(op.OperationID, preflight)
 	return op, nil
 }

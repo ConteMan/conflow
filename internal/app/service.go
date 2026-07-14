@@ -684,9 +684,9 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		fail("compiling", err)
 		return
 	}
-	clean, err := draft.BuildView(schema, environments, draftSourceSnapshot(sourceSnapshot), draft.State{Revision: 1, EnvironmentOverrides: map[string]map[string]any{}}, environmentID)
-	if err != nil {
-		fail("compiling", err)
+	baseline, baseLayer := s.resolveBaseline(environmentID, schema, environments, sourceSnapshot, view)
+	if baseline == nil {
+		fail("compiling", errors.New("failed to resolve plan baseline"))
 		return
 	}
 	mode := manifest.Manifest.Project.ReleaseConfirmationPolicy.ProductionLowRiskMode
@@ -694,7 +694,7 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		mode = "environment_id"
 	}
 	_, _ = s.operations.Update(operationID, "running", "analyzing", nil, nil, "unchanged")
-	built, err := plan.Build(plan.Input{EnvironmentID: environmentID, EnvironmentKind: environment.Kind, PackRef: view.PackRef, SourceDigest: view.SourceRevision, DraftRevision: revision, Desired: view.Effective, Baseline: clean.Effective, BaseLayer: view.Baseline.Resolved.Value, RemoteSnapshot: remoteSnapshot, ValidationReady: validationResult.Readiness == validation.ReadinessReady && validationResult.Status == validation.StatusFresh, ProductionLowRiskMode: mode})
+	built, err := plan.Build(plan.Input{EnvironmentID: environmentID, EnvironmentKind: environment.Kind, PackRef: view.PackRef, SourceDigest: view.SourceRevision, DraftRevision: revision, Desired: view.Effective, Baseline: baseline, BaseLayer: baseLayer, RemoteSnapshot: remoteSnapshot, ValidationReady: validationResult.Readiness == validation.ReadinessReady && validationResult.Status == validation.StatusFresh, ProductionLowRiskMode: mode})
 	if err != nil {
 		fail("analyzing", err)
 		return
@@ -704,6 +704,38 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		return
 	}
 	_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "plan", ResourceID: built.Plan.PlanID, Href: "/api/v1/plans/" + built.Plan.PlanID}, "unchanged")
+}
+
+// resolveBaseline returns the baseline and baseLayer for plan.Build.
+//
+// When a prior successful release exists for the environment and its Conflow
+// effective state has been stored, that state becomes the baseline so the plan
+// diff reflects only changes since the last publish. In all other cases
+// (first publish, migration gap from older releases) the function falls back to
+// the clean empty-override view so that the full configuration is shown as
+// additions, matching the pre-baseline behavior.
+func (s *Service) resolveBaseline(
+	environmentID string,
+	schema draft.Schema,
+	environments []draft.Environment,
+	sourceSnapshot source.Snapshot,
+	view draft.View,
+) (baseline map[string]any, baseLayer map[string]any) {
+	latest, found, err := s.releases.LatestSucceeded(environmentID)
+	if err == nil && found {
+		raw, err := s.releases.ConflowState(latest.ReleaseID)
+		if err == nil && len(raw) > 0 {
+			var published map[string]any
+			if json.Unmarshal(raw, &published) == nil {
+				return published, nil
+			}
+		}
+	}
+	clean, err := draft.BuildView(schema, environments, draftSourceSnapshot(sourceSnapshot), draft.State{Revision: 1, EnvironmentOverrides: map[string]map[string]any{}}, environmentID)
+	if err != nil {
+		return nil, nil
+	}
+	return clean.Effective, view.Baseline.Resolved.Value
 }
 
 // planRemoteSnapshot owns the Plan read boundary. A configured provider is
