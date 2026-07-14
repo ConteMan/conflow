@@ -914,3 +914,4 @@ func rawValues(values []json.RawMessage) []any {
 func pointerToken(value string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(value, "~", "~0"), "/", "~1")
 }
+

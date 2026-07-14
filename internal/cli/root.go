@@ -39,6 +39,7 @@ Automation exit codes: 0 success; 1 validation failure; 2 blocking validation;
 	root.AddCommand(newDefaultsCommand())
 	root.AddCommand(newProjectCommand())
 	root.AddCommand(newEnvironmentCommand())
+	root.AddCommand(newImportCommand())
 	root.AddCommand(newUpdateCommand(info))
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "write a stable JSON automation envelope to stdout")
 	configureAutomation(root, &jsonOutput)
