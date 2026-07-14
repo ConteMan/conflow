@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, CircleAlert, Link2, LoaderCircle, Plus, Save, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, CircleAlert, Download, Link2, LoaderCircle, Plus, Save, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ConflowAPIError,
@@ -27,6 +27,7 @@ import {
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Dialog";
 import { RequestError } from "../ui/StateViews";
+import { ImportDialog } from "./ImportDialog";
 
 type EditorRoute = { mode: "list" } | { mode: "detail"; id?: string; section?: "bindings" };
 type EditorTab = "placement" | "frequency_policy" | "feature_switch" | "unit_binding";
@@ -63,6 +64,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   const [validationError, setValidationError] = useState<{ code: string; requestId?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ code: string; requestId?: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadList = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null);
@@ -118,15 +120,16 @@ export function ConfigurationEditor({ environment, environments, revision, packR
     if (reference.entity_type === "placement") setRoute({ mode: "detail", id: reference.entity_id });
   };
   return <>
-    <ConfigurationList packRef={packRef} tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} draft={draft} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: false })} onOpenPolicy={(policy) => setFrequencyDrawer({ mode: "edit", policy })} onCreateSwitch={() => setCreatingSwitch(true)} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} />
+    <ConfigurationList packRef={packRef} tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} draft={draft} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: false })} onOpenPolicy={(policy) => setFrequencyDrawer({ mode: "edit", policy })} onCreateSwitch={() => setCreatingSwitch(true)} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} onImport={() => setImportOpen(true)} />
     <FrequencyDrawer packRef={packRef} state={frequencyDrawer} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setFrequencyDrawer(null)} onSaved={() => { setFrequencyDrawer(null); void loadList(); }} onDelete={(entity) => { setFrequencyDrawer(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={openReference} />
     <FeatureSwitchDrawer open={creatingSwitch} environment={environment} revision={revision} draft={draft} onClose={() => setCreatingSwitch(false)} onSaved={() => { setCreatingSwitch(false); void loadList(); }} />
     <DeleteEntityDialog target={deleting} environment={environment} revision={revision} draft={draft} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); void loadList(); }} onBlocked={(target, references) => { setDeleting(null); setBlockedReferences({ target, references }); }} />
     <ReferencedDeleteDialog blocked={blockedReferences} onClose={() => setBlockedReferences(null)} onOpenReference={openReference} />
+    <ImportDialog environmentId={environment.id} open={importOpen} onClose={() => setImportOpen(false)} onSuccess={() => { setImportOpen(false); void loadList(); }} />
   </>;
 }
 
-function ConfigurationList({ packRef, tab, onTabChange, placements, policies, switches, draft, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onCreatePolicy, onOpenPolicy, onCreateSwitch, onDelete, onSwitchSaved }: {
+function ConfigurationList({ packRef, tab, onTabChange, placements, policies, switches, draft, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onCreatePolicy, onOpenPolicy, onCreateSwitch, onDelete, onSwitchSaved, onImport }: {
   packRef: string;
   tab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
@@ -153,12 +156,13 @@ function ConfigurationList({ packRef, tab, onTabChange, placements, policies, sw
   onCreateSwitch: () => void;
   onDelete: (entity: EntityView, entityType: "placement" | "frequency_policy") => void;
   onSwitchSaved: () => void;
+  onImport: () => void;
 }) {
   const title = ({ placement: "配置", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "环境绑定" } as Record<EditorTab, string>)[tab];
   const description = ({ placement: "按业务对象维护广告位配置。", frequency_policy: "通用频控值会影响引用它的广告位。", feature_switch: "开关默认值的风险与回滚方式由配置包定义。", unit_binding: "跨广告位查看各环境的广告单元绑定。" } as Record<EditorTab, string>)[tab];
   const allEntitiesEmpty = !loading && placements.length === 0 && policies.length === 0 && switches.length === 0 && Object.values(bindings).every((items) => items.length === 0);
   return <main className="page-container configuration-page">
-    <header className="page-heading configuration-heading"><div><h1>{title}</h1><p>{description}</p></div><div className="configuration-actions"><Button icon={validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} disabled={validating || loading} onClick={onValidate}>{validating ? "正在校验" : validation?.status === "stale" ? "重新运行校验" : "运行校验"}</Button>{tab === "placement" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreate}>新建广告位</Button> : null}{tab === "frequency_policy" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreatePolicy}>新建频控策略</Button> : null}{tab === "feature_switch" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreateSwitch}>新建开关</Button> : null}</div></header>
+    <header className="page-heading configuration-heading"><div><h1>{title}</h1><p>{description}</p></div><div className="configuration-actions"><Button icon={<Download size={16} />} onClick={onImport}>导入配置</Button><Button icon={validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} disabled={validating || loading} onClick={onValidate}>{validating ? "正在校验" : validation?.status === "stale" ? "重新运行校验" : "运行校验"}</Button>{tab === "placement" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreate}>新建广告位</Button> : null}{tab === "frequency_policy" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreatePolicy}>新建频控策略</Button> : null}{tab === "feature_switch" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreateSwitch}>新建开关</Button> : null}</div></header>
     <div className="entity-tabs" role="tablist" aria-label="配置对象">
       <TabButton active={tab === "placement"} onClick={() => onTabChange("placement")}>广告位</TabButton>
       <TabButton active={tab === "frequency_policy"} onClick={() => onTabChange("frequency_policy")}>频控策略</TabButton>

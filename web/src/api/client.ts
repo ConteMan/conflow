@@ -261,3 +261,76 @@ export function rollbackRelease(environmentID: string, releaseID: string, input:
 export function defaultsURL(environmentID: string, format: "xml" | "json" | "plist") {
   return `/api/v1/environments/${encodeURIComponent(environmentID)}/defaults?format=${format}`;
 }
+
+// ── Import types (Spec 021) ───────────────────────────────────────────────────
+
+export interface ImportBundle {
+  format_version: number;
+  pack_ref: string;
+  schema_version: number;
+  entities: Record<string, Array<{ id: string; fields: Record<string, unknown> }>>;
+  decisions_required?: DecisionRequired[];
+}
+
+export interface DecisionRequired {
+  key: string;
+  reason: string;
+  hint?: string;
+}
+
+export interface ImportDecision {
+  key: string;
+  value: unknown;
+}
+
+export interface EntityAction {
+  entity_type: string;
+  id: string;
+}
+
+export interface PreviewResult {
+  preview_token: string;
+  expires_at: string;
+  pack_ref: string;
+  conflict_mode: string;
+  entity_plan: {
+    to_add: EntityAction[];
+    to_replace: EntityAction[];
+    to_skip: EntityAction[];
+    to_keep: EntityAction[];
+  };
+  decisions_required: DecisionRequired[];
+  risks?: string[];
+}
+
+export interface ApplyResult {
+  applied_count: number;
+  skipped_count: number;
+  revision: number;
+}
+
+export function previewImport(
+  environmentId: string,
+  bundle: ImportBundle,
+  conflictMode: string,
+): Promise<{ data: PreviewResult; meta: { revision: number } }> {
+  return request(`/drafts/${encodeURIComponent(environmentId)}:import-preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bundle, conflict_mode: conflictMode }),
+  });
+}
+
+export function applyImport(
+  environmentId: string,
+  bundle: ImportBundle,
+  previewToken: string,
+  decisions: ImportDecision[],
+  conflictMode: string,
+): Promise<ApplyResult> {
+  return request(`/drafts/${encodeURIComponent(environmentId)}:import-apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "If-Match": previewToken },
+    body: JSON.stringify({ bundle, decisions, conflict_mode: conflictMode }),
+  });
+}
