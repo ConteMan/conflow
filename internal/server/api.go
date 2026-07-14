@@ -10,6 +10,7 @@ import (
 	"github.com/ConteMan/conflow/internal/app"
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/gitreview"
+	"github.com/ConteMan/conflow/internal/importer"
 	"github.com/ConteMan/conflow/internal/operation"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
@@ -643,6 +644,26 @@ func (a *api) draftAction(writer http.ResponseWriter, request *http.Request) {
 		a.createPlan(writer, request)
 		return
 	}
+	if strings.HasSuffix(path, ":import-preview") {
+		environmentID := strings.TrimSuffix(path, ":import-preview")
+		if environmentID == "" || strings.Contains(environmentID, "/") {
+			routeNotFound(writer, request)
+			return
+		}
+		request.SetPathValue("environment_id", environmentID)
+		a.importPreview(writer, request)
+		return
+	}
+	if strings.HasSuffix(path, ":import-apply") {
+		environmentID := strings.TrimSuffix(path, ":import-apply")
+		if environmentID == "" || strings.Contains(environmentID, "/") {
+			routeNotFound(writer, request)
+			return
+		}
+		request.SetPathValue("environment_id", environmentID)
+		a.importApply(writer, request)
+		return
+	}
 	for suffix, action := range map[string]string{":reset": "reset", ":discard": "discard", ":validate": "validate", ":save": "save"} {
 		if strings.HasSuffix(path, suffix) {
 			environmentID := strings.TrimSuffix(path, suffix)
@@ -1014,5 +1035,97 @@ func (a *api) writeProviderError(writer http.ResponseWriter, request *http.Reque
 		writeAPIError(writer, request, http.StatusConflict, "plan_invalidated", "计划尚未就绪", 0)
 	default:
 		a.writePlanError(writer, request, err)
+	}
+}
+
+// importPreviewInput is the parsed body for POST .../drafts/{env}:import-preview.
+// The body is the ImportBundle JSON optionally wrapped so conflict_mode can be
+// sent alongside (otherwise it is read from the query string).
+type importPreviewInput struct {
+	Bundle       importer.ImportBundle `json:"bundle"`
+	ConflictMode importer.ConflictMode `json:"conflict_mode"`
+}
+
+func (a *api) importPreview(writer http.ResponseWriter, request *http.Request) {
+	var input importPreviewInput
+	if err := decodeJSON(writer, request, &input); err != nil {
+		writeRequestError(writer, request, err)
+		return
+	}
+
+	// conflict_mode query param overrides body field; default is replace.
+	conflictMode := importer.ConflictMode(request.URL.Query().Get("conflict_mode"))
+	if conflictMode == "" {
+		conflictMode = input.ConflictMode
+	}
+	if conflictMode == "" {
+		conflictMode = importer.ConflictReplace
+	}
+	switch conflictMode {
+	case importer.ConflictReplace, importer.ConflictMerge, importer.ConflictSkip:
+	default:
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "conflict_mode 必须是 replace、merge 或 skip", 0)
+		return
+	}
+
+	result, err := a.service.PreviewImport(request.Context(), request.PathValue("environment_id"), input.Bundle, conflictMode)
+	if err != nil {
+		a.writeImportError(writer, request, err)
+		return
+	}
+	writeSuccess(writer, request, http.StatusOK, result, 1)
+}
+
+// importApplyInput is the parsed body for POST .../drafts/{env}:import-apply.
+type importApplyInput struct {
+	Bundle       importer.ImportBundle     `json:"bundle"`
+	Decisions    []importer.ImportDecision `json:"decisions"`
+	ConflictMode importer.ConflictMode     `json:"conflict_mode"`
+}
+
+func (a *api) importApply(writer http.ResponseWriter, request *http.Request) {
+	previewToken := request.Header.Get("If-Match")
+	if previewToken == "" {
+		writeAPIError(writer, request, http.StatusPreconditionRequired, "precondition_required", "import apply 必须提供 If-Match preview token", 0)
+		return
+	}
+
+	var input importApplyInput
+	if err := decodeJSON(writer, request, &input); err != nil {
+		writeRequestError(writer, request, err)
+		return
+	}
+
+	conflictMode := input.ConflictMode
+	if conflictMode == "" {
+		conflictMode = importer.ConflictReplace
+	}
+	switch conflictMode {
+	case importer.ConflictReplace, importer.ConflictMerge, importer.ConflictSkip:
+	default:
+		writeAPIError(writer, request, http.StatusBadRequest, "invalid_request", "conflict_mode 必须是 replace、merge 或 skip", 0)
+		return
+	}
+
+	_, revision, applyResult, err := a.service.ApplyImport(request.Context(), request.PathValue("environment_id"), input.Bundle, previewToken, input.Decisions, conflictMode)
+	if err != nil {
+		a.writeImportError(writer, request, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"applied_count": applyResult.AppliedCount,
+		"skipped_count": applyResult.SkippedCount,
+		"revision":      revision,
+	})
+}
+
+func (a *api) writeImportError(writer http.ResponseWriter, request *http.Request, err error) {
+	switch {
+	case errors.Is(err, importer.ErrTokenExpired):
+		writeAPIError(writer, request, http.StatusPreconditionFailed, "preview_token_expired", "预览 token 已过期，请重新预览后再执行 apply", 0)
+	case errors.Is(err, importer.ErrRevisionChanged):
+		writeAPIError(writer, request, http.StatusPreconditionFailed, "draft_revision_changed", "草稿已变更，请重新预览后再执行 apply", 0)
+	default:
+		a.writeError(writer, request, err)
 	}
 }
