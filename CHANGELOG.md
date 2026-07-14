@@ -2,6 +2,12 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.2.0] - 2026-07-14
+
+### Added
+
+- **Mobile Ad Pack v2** (Spec 020): Versioned `mobile-ad-monetization/v2` Pack with structured frequency controls (`duration`, `interval`, `count_limit`, `shift_limit`), feature-switch references, and six entity types. Includes dedicated v2 validator, compiler, and UI form controls (DurationField, IntervalField, CountLimitField, ShiftLimitField) with packRef-threaded rendering across FrequencyDrawer, FrequencyTable, PlacementDetail, and PlacementRow.
+
 ## [0.1.0] - 2026-07-13
 
 ### Added
