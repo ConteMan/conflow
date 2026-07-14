@@ -3,6 +3,7 @@ package plan
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ConteMan/conflow/internal/entities"
 )
@@ -51,6 +52,7 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 			parameters[key] = parameter
 		}
 		parameter["defaultValue"] = map[string]any{"value": firebaseValue(value)}
+		parameter["valueType"] = inferValueType(value)
 	}
 	merged, err := json.Marshal(document)
 	if err != nil {
@@ -72,6 +74,23 @@ func desiredParameterValues(desired map[string]any, packRef, environmentID strin
 		}
 	}
 	return values
+}
+
+func inferValueType(value any) string {
+	switch v := value.(type) {
+	case bool:
+		return "BOOLEAN"
+	case float64, float32:
+		return "NUMBER"
+	case string:
+		t := strings.TrimSpace(v)
+		if len(t) > 1 && ((t[0] == '{' && t[len(t)-1] == '}') || (t[0] == '[' && t[len(t)-1] == ']')) && json.Valid([]byte(t)) {
+			return "JSON"
+		}
+		return "STRING"
+	default:
+		return "STRING"
+	}
 }
 
 func firebaseValue(value any) string {
