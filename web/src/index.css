@@ -451,9 +451,25 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .risk-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .risk-group h3 { margin: 0 0 7px; }
 .risk-group p, .blocking-reasons p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
+.risk-group p code { margin-left: 4px; font-size: 11px; color: var(--text-muted); }
 .blocking-reasons { padding: 11px; border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 12px; }
 .blocking-reasons p { color: var(--text); }
 .risk-tag--blocking { color: var(--danger); background: var(--danger-soft); }
+.risk-entity-ref { display: block; margin-top: 2px; font-size: 11px; color: var(--text-muted); }
+.remote-param-panel { margin-top: 16px; padding: 17px; overflow-x: auto; }
+.remote-param-panel h2 { margin: 0 0 13px; font-size: 16px; }
+.remote-param-panel h2 small { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.remote-param-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.remote-param-table th { padding: 6px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.remote-param-table td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+.remote-param-table td:first-child code { font-size: 12px; }
+.change-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.change-tag--created { background: var(--success-soft, #d1fae5); color: #065f46; }
+.change-tag--updated { background: var(--warning-soft); color: var(--warning); }
+.change-tag--deleted { background: var(--danger-soft); color: var(--danger); }
+.change-tag--overridden { background: var(--accent-soft, #ede9fe); color: var(--accent); }
+.param-value { margin: 0; font-size: 11px; font-family: var(--font-mono, monospace); white-space: pre-wrap; word-break: break-all; color: var(--text-muted); max-height: 120px; overflow-y: auto; }
+.param-value--after { color: var(--text); }
 .artifact-panel a { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); color: var(--accent); font-size: 13px; font-weight: 650; text-decoration: none; }
 .release-placeholder p { margin: 0 0 13px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 .release-placeholder .button { width: 100%; }
