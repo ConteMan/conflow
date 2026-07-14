@@ -146,6 +146,7 @@ func (f *Firebase) Validate(ctx context.Context, input []byte) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("If-Match", "*")
 	resp, err := f.config.HTTPClient.Do(req)
 	if err != nil {
 		return SafeError(err)
