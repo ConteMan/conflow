@@ -1,0 +1,7 @@
+./builtin.go
+./contract.go
+./mobile_ad_v2.go
+./registry.go
+./mobile_ad_test.go
+./mobile_ad_v2_test.go
+./registry_test.go

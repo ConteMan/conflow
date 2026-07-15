@@ -19,6 +19,7 @@ import (
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/ConteMan/conflow/internal/release"
+	"github.com/ConteMan/conflow/internal/releasedbaseline"
 	"github.com/ConteMan/conflow/internal/remote"
 	"github.com/ConteMan/conflow/internal/source"
 	"github.com/ConteMan/conflow/internal/validation"
@@ -55,6 +56,7 @@ type Service struct {
 	plans        *plan.Store
 	remote       remote.Store
 	releases     *release.Store
+	baselines    *releasedbaseline.Store
 	gitReview    *gitreview.Manager
 	releaseMu    sync.Mutex
 	workspace    string
@@ -145,7 +147,7 @@ func OpenWithPacksAndProviderFactory(workspace string, registry *packs.Registry,
 			return provider.NewFirebase(provider.FirebaseConfig{ProjectID: environment.Provider.ProjectID, CredentialsPath: credentialPath}), nil
 		}
 	}
-	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: adapter, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, gitReview: review, workspace: workspace, providerFor: factory}, nil
+	return &Service{projects: store, packRegistry: registry, drafts: draftStore, source: adapter, validations: validationStore, operations: operationStore, plans: planStore, remote: remote.OpenFileStore(workspace), releases: releaseStore, baselines: releasedbaseline.Open(filepath.Join(workspace, ".conflow", "released-baseline")), gitReview: review, workspace: workspace, providerFor: factory}, nil
 }
 
 func (s *Service) Snapshot(_ context.Context) (project.Snapshot, error) {
@@ -239,7 +241,14 @@ func (s *Service) GetDraft(_ context.Context, environmentID string) (draft.View,
 	if err != nil {
 		return draft.View{}, 0, err
 	}
-	return s.drafts.View(schema, environments, environmentID)
+	view, revision, err := s.drafts.View(schema, environments, environmentID)
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	if err := s.populateChangedEntityCount(&view); err != nil {
+		return draft.View{}, 0, err
+	}
+	return view, revision, nil
 }
 
 func (s *Service) MutateDraft(_ context.Context, environmentID string, mutation draft.Mutation) (draft.View, uint64, error) {
@@ -251,7 +260,14 @@ func (s *Service) MutateDraft(_ context.Context, environmentID string, mutation 
 	if err != nil {
 		return draft.View{}, 0, err
 	}
-	return s.drafts.Mutate(schema, environments, environmentID, mutation)
+	view, revision, err := s.drafts.Mutate(schema, environments, environmentID, mutation)
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	if err := s.populateChangedEntityCount(&view); err != nil {
+		return draft.View{}, 0, err
+	}
+	return view, revision, nil
 }
 
 type SourceInfo struct {
@@ -340,7 +356,7 @@ func (s *Service) SaveDraft(_ context.Context, environmentID string, expectedRev
 	if err != nil {
 		return draft.View{}, 0, err
 	}
-	return s.drafts.SaveToSource(schema, environments, environmentID, draft.Save{
+	view, revision, err := s.drafts.SaveToSource(schema, environments, environmentID, draft.Save{
 		ExpectedRevision: expectedRevision, ExpectedSourceRevision: expectedSourceRevision,
 		Commit: func(current draft.SourceSnapshot, state draft.State) (draft.SourceSnapshot, error) {
 			baseline := current.Baseline
@@ -364,6 +380,13 @@ func (s *Service) SaveDraft(_ context.Context, environmentID string, expectedRev
 			return draftSourceSnapshot(next), nil
 		},
 	})
+	if err != nil {
+		return draft.View{}, 0, err
+	}
+	if err := s.populateChangedEntityCount(&view); err != nil {
+		return draft.View{}, 0, err
+	}
+	return view, revision, nil
 }
 
 func draftSourceSnapshot(snapshot source.Snapshot) draft.SourceSnapshot {

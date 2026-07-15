@@ -1,0 +1,13 @@
+./api.go
+./dto.go
+./http.go
+./server.go
+./defaults_error_test.go
+./draft_test.go
+./entities_test.go
+./git_json_test.go
+./plan_test.go
+./release_error_test.go
+./release_test.go
+./server_test.go
+./validation_test.go

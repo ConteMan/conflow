@@ -2535,7 +2535,7 @@ components:
     EntityView:
       type: object
       additionalProperties: false
-      required: [entity_ref, entity_type, entity_id, source, draft, resolved, effective, origin, source_revision]
+      required: [entity_ref, entity_type, entity_id, source, draft, resolved, effective, origin, source_revision, change_status]
       properties:
         entity_ref:
           $ref: "#/components/schemas/EntityRef"
@@ -2556,6 +2556,10 @@ components:
         source_revision:
           type: string
           minLength: 1
+        change_status:
+          type: string
+          enum: [unchanged, modified, created, deleted]
+          description: Difference from the last successfully released entity baseline. deleted is only emitted by deletion-list read models.
     EntityReference:
       type: object
       additionalProperties: false
@@ -2748,6 +2752,7 @@ components:
         - pack_ref
         - source_revision
         - dirty
+        - changed_entity_count
         - dirty_scopes
         - baseline
         - environment_override
@@ -2767,6 +2772,10 @@ components:
         dirty:
           type: boolean
           description: Whether the shared baseline or this environment view has an installed replacement. Other environments are excluded.
+        changed_entity_count:
+          type: integer
+          minimum: 0
+          description: Number of created, modified, or deleted entities compared with the last successful release.
         dirty_scopes:
           type: array
           description: Non-null scopes installed in this view (shared baseline and this environment only), sorted baseline before environment_override. Other environment overrides are excluded.

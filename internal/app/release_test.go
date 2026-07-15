@@ -15,6 +15,7 @@ import (
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/ConteMan/conflow/internal/release"
+	"github.com/ConteMan/conflow/internal/releasedbaseline"
 	"github.com/ConteMan/conflow/internal/remote"
 )
 
@@ -35,6 +36,10 @@ func TestReleaseSuccessReplayConflictAndAudit(t *testing.T) {
 	}
 	if records := s.Releases(context.Background(), "development"); len(records) != 1 || records[0].OperationID != started.OperationID || records[0].Outcome != "succeeded" {
 		t.Fatalf("audit=%#v", records)
+	}
+	baseline, found, err := s.baselines.Load("development")
+	if err != nil || !found || baseline.ReleaseID != completed.Result.ResourceID || baseline.SourceRevision == "" || baseline.Entities == nil {
+		t.Fatalf("baseline=%#v found=%v err=%v", baseline, found, err)
 	}
 	replayed, err := s.StartRelease(context.Background(), "development", "publish-key-0000001", request)
 	if err != nil || replayed.OperationID != started.OperationID || replayed.Status != "succeeded" {
@@ -73,6 +78,51 @@ func TestReleaseTimeoutMakesRemoteStateUnknown(t *testing.T) {
 	records := s.Releases(context.Background(), "development")
 	if len(records) != 1 || records[0].Outcome != "failed" || records[0].RemoteState != "unknown" || records[0].RemoteAfter != nil || records[0].Failure == nil || records[0].Failure.Code != "provider_response_unknown" {
 		t.Fatalf("failed audit=%#v", records)
+	}
+	if _, found, err := s.baselines.Load("development"); err != nil || found {
+		t.Fatalf("failed release baseline found=%v err=%v", found, err)
+	}
+}
+
+func TestEntityChangeStatusUsesReleasedBaseline(t *testing.T) {
+	s, _ := releaseService(t)
+	view, revision, err := s.GetDraft(context.Background(), "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := EntityRecord{ID: "inter_global_cap", Fields: map[string]any{"cooldown_ms": float64(30000), "interval_ms": float64(300000), "max_count": float64(3), "shift_count": float64(1), "positions": []any{"open_document"}}}
+	created, revision, err := s.MutateEntity(context.Background(), "development", EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: "baseline", EntityType: "frequency_policy", EntityID: record.ID, Entity: &record, Action: "create"})
+	if err != nil || created.ChangeStatus != "created" {
+		t.Fatalf("created=%#v revision=%d err=%v", created, revision, err)
+	}
+	draftView, _, err := s.GetDraft(context.Background(), "development")
+	if err != nil || draftView.ChangedEntityCount != 1 {
+		t.Fatalf("draft=%#v err=%v", draftView, err)
+	}
+	hash, err := releasedbaseline.HashFields(record.Fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.baselines.Save(releasedbaseline.Document{EnvironmentID: "development", ReleaseID: "rel_test", ReleasedAt: time.Now().UTC(), SourceRevision: draftView.SourceRevision, Entities: map[string]string{created.EntityRef: hash}}); err != nil {
+		t.Fatal(err)
+	}
+	unchanged, revision, err := s.GetEntity(context.Background(), "development", "frequency_policy", record.ID)
+	if err != nil || unchanged.ChangeStatus != "unchanged" {
+		t.Fatalf("unchanged=%#v revision=%d err=%v", unchanged, revision, err)
+	}
+	draftView, _, err = s.GetDraft(context.Background(), "development")
+	if err != nil || draftView.ChangedEntityCount != 0 {
+		t.Fatalf("draft=%#v err=%v", draftView, err)
+	}
+	changed := cloneRecord(record)
+	changed.Fields["cooldown_ms"] = float64(60000)
+	modified, _, err := s.MutateEntity(context.Background(), "development", EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: draftView.SourceRevision, Scope: "baseline", EntityType: "frequency_policy", EntityID: record.ID, Entity: &changed, Action: "replace"})
+	if err != nil || modified.ChangeStatus != "modified" {
+		t.Fatalf("modified=%#v err=%v", modified, err)
+	}
+	draftView, _, err = s.GetDraft(context.Background(), "development")
+	if err != nil || draftView.ChangedEntityCount != 1 {
+		t.Fatalf("draft=%#v err=%v", draftView, err)
 	}
 }
 

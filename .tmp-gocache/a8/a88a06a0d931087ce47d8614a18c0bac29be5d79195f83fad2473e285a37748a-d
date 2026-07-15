@@ -1,0 +1,3 @@
+# test log
+open ../../testdata/contracts/mobile-ad-monetization/v1/entities.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/schema-golden.json

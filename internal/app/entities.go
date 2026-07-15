@@ -11,6 +11,7 @@ import (
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/entities"
 	"github.com/ConteMan/conflow/internal/packs"
+	"github.com/ConteMan/conflow/internal/releasedbaseline"
 )
 
 var (
@@ -50,6 +51,7 @@ type EntityView struct {
 	Effective      EntityPresence `json:"effective"`
 	Origin         string         `json:"origin"`
 	SourceRevision string         `json:"source_revision"`
+	ChangeStatus   string         `json:"change_status"`
 }
 
 type EntityReference struct {
@@ -91,13 +93,17 @@ func (s *Service) ListEntities(_ context.Context, environmentID, entityType stri
 			return nil, 0, ErrEntityTypeInvalid
 		}
 	}
+	baseline, baselineFound, err := s.baselines.Load(environmentID)
+	if err != nil {
+		return nil, 0, err
+	}
 	entities := make([]EntityView, 0)
 	for _, metadata := range definition.Metadata.EntityTypes {
 		if metadata.Collection == "" || (entityType != "" && metadata.Name != entityType) {
 			continue
 		}
 		for _, record := range records(view.Effective, metadata.Collection) {
-			entity, err := entityView(definition, view, metadata, record.ID)
+			entity, err := entityView(definition, view, metadata, record.ID, baseline, baselineFound)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -122,7 +128,11 @@ func (s *Service) GetEntity(_ context.Context, environmentID, entityType, entity
 	if !ok || metadata.Collection == "" {
 		return EntityView{}, 0, ErrEntityTypeInvalid
 	}
-	entity, err := entityView(definition, view, metadata, entityID)
+	baseline, baselineFound, err := s.baselines.Load(environmentID)
+	if err != nil {
+		return EntityView{}, 0, err
+	}
+	entity, err := entityView(definition, view, metadata, entityID, baseline, baselineFound)
 	return entity, revision, err
 }
 
@@ -208,7 +218,7 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 				if _, found := findRecord(collection, mutation.EntityID); !found {
 					return nil, ErrEntityNotFound
 				}
-				deleted, _ = entityView(definition, current, metadata, currentRecord.ID)
+				deleted, _ = s.entityView(definition, current, metadata, currentRecord.ID)
 				collection = removeRecord(collection, mutation.EntityID)
 			default:
 				return nil, fmt.Errorf("invalid entity mutation action %q", mutation.Action)
@@ -241,7 +251,7 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 	if mutation.Action == "delete" {
 		return deleted, revision, nil
 	}
-	entity, err := entityView(definition, view, metadata, mutation.EntityID)
+	entity, err := s.entityView(definition, view, metadata, mutation.EntityID)
 	return entity, revision, err
 }
 
@@ -271,7 +281,15 @@ func findEntityMetadata(definition packs.Definition, entityType string) (packs.E
 	return packs.EntityMetadata{}, false
 }
 
-func entityView(definition packs.Definition, view draft.View, metadata packs.EntityMetadata, entityID string) (EntityView, error) {
+func (s *Service) entityView(definition packs.Definition, view draft.View, metadata packs.EntityMetadata, entityID string) (EntityView, error) {
+	baseline, baselineFound, err := s.baselines.Load(view.EnvironmentID)
+	if err != nil {
+		return EntityView{}, err
+	}
+	return entityView(definition, view, metadata, entityID, baseline, baselineFound)
+}
+
+func entityView(definition packs.Definition, view draft.View, metadata packs.EntityMetadata, entityID string, baseline releasedbaseline.Document, baselineFound bool) (EntityView, error) {
 	effective, ok := findRecord(records(view.Effective, metadata.Collection), entityID)
 	if !ok {
 		return EntityView{}, ErrEntityNotFound
@@ -288,7 +306,76 @@ func entityView(definition packs.Definition, view draft.View, metadata packs.Ent
 	} else if _, ok := findRecord(records(view.Baseline.Draft.Value, metadata.Collection), entityID); ok {
 		origin = "draft_baseline"
 	}
-	return EntityView{EntityRef: entityRef(view.PackRef, metadata.Name, entityID), EntityType: metadata.Name, EntityID: entityID, Source: recordPresence(source, sourcePresent), Draft: recordPresence(draftRecord, draftPresent), Resolved: recordPresence(resolved, resolvedPresent), Effective: recordPresence(effective, true), Origin: origin, SourceRevision: view.SourceRevision}, nil
+	fieldsHash, err := releasedbaseline.HashFields(effective.Fields)
+	if err != nil {
+		return EntityView{}, err
+	}
+	changeStatus := "created"
+	if baselineFound {
+		if baseline.Entities[entityRef(view.PackRef, metadata.Name, entityID)] == fieldsHash {
+			changeStatus = "unchanged"
+		} else if _, exists := baseline.Entities[entityRef(view.PackRef, metadata.Name, entityID)]; exists {
+			changeStatus = "modified"
+		}
+	}
+	return EntityView{EntityRef: entityRef(view.PackRef, metadata.Name, entityID), EntityType: metadata.Name, EntityID: entityID, Source: recordPresence(source, sourcePresent), Draft: recordPresence(draftRecord, draftPresent), Resolved: recordPresence(resolved, resolvedPresent), Effective: recordPresence(effective, true), Origin: origin, SourceRevision: view.SourceRevision, ChangeStatus: changeStatus}, nil
+}
+
+func (s *Service) entityHashes(view draft.View) (map[string]string, error) {
+	return s.entityHashesForConfiguration(view.PackRef, view.Effective)
+}
+
+func (s *Service) entityHashesForConfiguration(packRef string, configuration map[string]any) (map[string]string, error) {
+	snapshot, err := s.projects.Snapshot()
+	if err != nil {
+		return nil, err
+	}
+	definition, _, err := s.packRegistry.Resolve(snapshot.Manifest.Pack.ID)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]string{}
+	for _, metadata := range definition.Metadata.EntityTypes {
+		if metadata.Collection == "" {
+			continue
+		}
+		for _, record := range records(configuration, metadata.Collection) {
+			hash, err := releasedbaseline.HashFields(record.Fields)
+			if err != nil {
+				return nil, err
+			}
+			result[entityRef(packRef, metadata.Name, record.ID)] = hash
+		}
+	}
+	return result, nil
+}
+
+func (s *Service) populateChangedEntityCount(view *draft.View) error {
+	current, err := s.entityHashes(*view)
+	if err != nil {
+		return err
+	}
+	baseline, found, err := s.baselines.Load(view.EnvironmentID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		view.ChangedEntityCount = len(current)
+		return nil
+	}
+	changed := 0
+	for reference, hash := range current {
+		if baseline.Entities[reference] != hash {
+			changed++
+		}
+	}
+	for reference := range baseline.Entities {
+		if _, exists := current[reference]; !exists {
+			changed++
+		}
+	}
+	view.ChangedEntityCount = changed
+	return nil
 }
 
 func layeredRecord(high, low map[string]any, collection, id string) (EntityRecord, bool) {
