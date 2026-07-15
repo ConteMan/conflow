@@ -24,14 +24,14 @@ const (
 // ImportBundle is the versioned interchange format produced by export and consumed by preview/apply.
 // It must not contain Firebase credentials, access tokens, private keys, or unit_binding entities.
 type ImportBundle struct {
-	FormatVersion  int                        `json:"format_version"`
-	PackRef        string                     `json:"pack_ref"`
-	SchemaVersion  uint64                     `json:"schema_version"`
-	CreatedAt      time.Time                  `json:"created_at"`
-	SourceID       string                     `json:"source_id,omitempty"`
-	SourceRevision string                     `json:"source_revision,omitempty"`
-	SourceDigest   string                     `json:"source_digest,omitempty"`
-	Entities       map[string][]BundleEntity  `json:"entities"`
+	FormatVersion  int                       `json:"format_version"`
+	PackRef        string                    `json:"pack_ref"`
+	SchemaVersion  uint64                    `json:"schema_version"`
+	CreatedAt      time.Time                 `json:"created_at"`
+	SourceID       string                    `json:"source_id,omitempty"`
+	SourceRevision string                    `json:"source_revision,omitempty"`
+	SourceDigest   string                    `json:"source_digest,omitempty"`
+	Entities       map[string][]BundleEntity `json:"entities"`
 	// DecisionsRequired lists fields that cannot be inferred from the source and must
 	// be supplied by the operator in the apply call.
 	DecisionsRequired []DecisionRequired `json:"decisions_required,omitempty"`

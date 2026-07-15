@@ -271,6 +271,7 @@ func (s *Store) Template(id string) ([]byte, error) {
 	}
 	return append([]byte(nil), value...), nil
 }
+
 // SaveConflowState persists the Conflow effective desired state that was
 // published in the given release. Errors are non-critical; callers may ignore
 // them without affecting release outcome correctness.
