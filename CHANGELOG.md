@@ -2,6 +2,14 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.4.1] - 2026-07-15
+
+### Fixed
+
+- **Baseline lazy initialization**: workspaces that published before 0.4.0 no longer show every entity as "新增" forever. When the released-baseline file is missing, the server rebuilds it from the most recent successful release's stored Conflow state (verified on a real pre-0.4.0 workspace: all entities settle to `unchanged` immediately after upgrade).
+- Feature switch list: the row toggle is no longer clipped by the pinned action column; TanStack column sizes are now applied to table cells.
+- Overview first paint: the unpublished-changes card and header badge show a neutral loading state until the draft summary arrives, instead of a misleading "已同步".
+
 ## [0.4.0] - 2026-07-15
 
 ### Added
