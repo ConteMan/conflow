@@ -618,8 +618,12 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .defaults-bar > div:first-child { display: grid; gap: 3px; }
 .defaults-bar span { color: var(--text-muted); font-size: 12px; }
 .defaults-bar > div:last-child { display: flex; gap: 8px; }
-.defaults-bar a { display: inline-flex; min-height: 32px; gap: 6px; align-items: center; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--accent); font-size: 12px; font-weight: 700; text-decoration: none; }
+.defaults-bar a, .defaults-bar button { display: inline-flex; min-height: 32px; gap: 6px; align-items: center; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--accent); background: var(--surface); font-size: 12px; font-weight: 700; text-decoration: none; }
 .defaults-bar a:hover { background: var(--accent-soft); }
+.defaults-snapshot { color: var(--text) !important; }
+.defaults-warning, .defaults-unavailable { display: inline-flex; align-items: center; gap: 5px; }
+.defaults-warning { color: var(--warning) !important; }
+.defaults-unavailable { color: var(--warning) !important; }
 .release-table td { vertical-align: middle; }
 .row-select-button { border: 0; padding: 4px 0; color: var(--text); background: transparent; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; text-align: left; }
 .row-select-button:hover { color: var(--accent); }

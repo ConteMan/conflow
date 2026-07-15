@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-type Scenario = "success" | "conflict" | "unknown_failure" | "restore" | "rollback";
+type Scenario = "success" | "conflict" | "unknown_failure" | "restore" | "rollback" | "no_snapshot";
 
 test("正常发布经过审阅、风险确认和 Operation 成功页", async ({ page }) => {
   const api = await mockReleaseFlow(page, "success");
@@ -78,6 +78,8 @@ test("发布记录倒序、默认值下载、回滚目标链接和回滚全链",
   await page.goto("/#releases");
   await expect(page.getByRole("heading", { name: "发布记录" })).toBeVisible();
   await expect(page.locator("tbody tr").first()).toContainText("最新发布");
+  await expect(page.getByText("线上版本 128")).toBeVisible();
+  await expect(page.getByText("快照：刚刚")).toBeVisible();
   await expect(page.getByRole("link", { name: "XML" })).toHaveAttribute("href", /defaults\?format=xml/);
   await expect(page.getByRole("link", { name: "JSON" })).toHaveAttribute("href", /defaults\?format=json/);
   await expect(page.getByRole("link", { name: "PLIST" })).toHaveAttribute("href", /defaults\?format=plist/);
@@ -91,6 +93,15 @@ test("发布记录倒序、默认值下载、回滚目标链接和回滚全链",
   await page.getByRole("button", { name: "回滚到版本 127" }).click();
   await expect(page.getByRole("heading", { name: "Production 回滚成功" })).toBeVisible({ timeout: 5000 });
   expect(api.rollbackRequests()).toBe(1);
+});
+
+test("没有线上快照时禁用默认值下载", async ({ page }) => {
+  await mockReleaseFlow(page, "no_snapshot");
+  await page.goto("/#releases");
+  await expect(page.getByText("尚无线上快照，请先在概览页拉取远端快照")).toBeVisible();
+  await expect(page.getByRole("button", { name: "XML" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "JSON" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "PLIST" })).toBeDisabled();
 });
 
 async function confirmRelease(page: Page) {
@@ -108,6 +119,7 @@ async function mockReleaseFlow(page: Page, scenario: Scenario) {
     const path = new URL(request.url()).pathname;
     const method = request.method();
     if (path === "/api/v1/bootstrap") return json(route, bootstrap());
+    if (path === "/api/v1/environments/production/remote/projection") return scenario === "no_snapshot" ? json(route, { error: { code: "remote_snapshot_not_found", message: "远端快照不可用", request_id: "req_snapshot_missing" } }, 404) : json(route, { data: projection(), meta: meta() });
     if (path === "/api/v1/packs/mobile-ad-monetization/versions/v1") return json(route, { data: { ref: "mobile-ad-monetization/v1", name: "mobile-ad-monetization", version: "v1", description: "广告配置", capabilities: [], schema_version: 1, entity_types: [] }, meta: meta() });
     if (path.endsWith("/diagnostics")) return json(route, { data: { environment_id: "production", validated_draft_revision: 21, validated_at: "2026-07-12T08:00:00Z", status: "fresh", readiness: "ready", diagnostics: [] }, meta: meta() });
     if (path === "/api/v1/plans/plan_release") return json(route, { data: releasePlan(), meta: meta() });
@@ -147,6 +159,7 @@ async function mockReleaseFlow(page: Page, scenario: Scenario) {
 function bootstrap() { return { data: { project: { id: "photo-editor", name: "Photo Editor", pack_ref: "mobile-ad-monetization/v1", source_type: "managed-file" }, environments: [{ id: "production", name: "Production", kind: "production", provider: { type: "firebase-remote-config", project_id: "photo-editor-prod" }, publish: { requires_confirmation: true } }], capabilities: { project_edit: true, environment_manage: true } }, meta: meta() }; }
 function meta() { return { request_id: "req_release_ui", revision: 21 }; }
 function remote() { return { remote_etag: "etag-current", version: "128", observed_at: "2026-07-12T10:00:00Z", summary: { parameter_count: 12, managed_parameter_count: 9, condition_count: 0, content_digest: "sha256:remote" } }; }
+function projection() { return { environment_id: "production", snapshot_etag: "etag-current", version: "128", observed_at: new Date().toISOString(), projections: [] }; }
 function releasePlan() { return { plan_id: "plan_release", environment_id: "production", status: "ready", snapshot_token: "snapshot", draft_revision: 21, source_digest: "sha256:source", remote_etag: "etag-plan", created_at: "2026-07-12T10:00:00Z", expires_at: "2026-07-12T10:15:00Z", content_digest: "sha256:plan", remote_snapshot: { status: "available", remote_etag: "etag-plan", version: "127", observed_at: "2026-07-12T10:00:00Z", summary: remote().summary }, semantic_changes: [], affected_entities: [], remote_parameter_changes: [], artifact_metadata: [], severity: "high", risk_items: [{ risk_item_id: "risk_release", severity: "high", reason_code: "global_feature_switch_changed", summary: "确认风险项目", acknowledgement_required: true, semantic_change_ids: [], remote_parameter_node_ids: [] }], blocking_reasons: [], confirmation_requirements: { requires_acknowledgement: true, environment_id_requirement: "required", required_risk_item_ids: ["risk_release"], policy_source: "project.release_confirmation_policy" } }; }
 function rollbackPreview() { return { rollback_preview_id: "rbp_ready", environment_id: "production", target_release_id: "rel_rollback", target_remote_version: "127", status: "ready", expected_remote_etag: "etag-current", created_at: "2026-07-12T10:00:00Z", expires_at: "2026-07-12T10:15:00Z", current_remote: remote(), semantic_changes: [], affected_entities: [], remote_parameter_changes: [], artifact_metadata: [], severity: "low", risk_items: [], blocking_reasons: [], confirmation_requirements: { requires_acknowledgement: true, environment_id_requirement: "required", required_risk_item_ids: [], policy_source: "project.release_confirmation_policy" } }; }
 function operation(id: string, status: string, stage: string, remoteState: string, resourceType?: string, resourceID?: string) { return { data: { operation_id: id, operation_type: id === "op_preview" ? "rollback_preview" : id === "op_rollback" ? "rollback" : "publish", status, stage, remote_state: remoteState, created_at: "2026-07-12T10:00:00Z", updated_at: "2026-07-12T10:00:01Z", ...(status === "failed" ? { failure: { code: "provider_response_unknown", message: "发布结果未确认", retryable: false, stage } } : {}), ...(resourceType && resourceID ? { result: { resource_type: resourceType, resource_id: resourceID, href: `/api/v1/resource/${resourceID}` } } : {}) }, meta: meta() }; }

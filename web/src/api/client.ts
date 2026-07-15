@@ -38,6 +38,7 @@ export type RollbackPreview = components["schemas"]["RollbackPreview"];
 export type ReleaseConfirmation = components["schemas"]["ReleaseConfirmation"];
 export type RemoteAuditState = components["schemas"]["RemoteAuditState"];
 export type ProviderStatus = components["schemas"]["ProviderStatus"];
+export type RemoteProjection = components["schemas"]["RemoteProjection"];
 
 type APIErrorResponse = components["schemas"]["ErrorResponse"] | components["schemas"]["DraftValidationErrorResponse"] | components["schemas"]["EntityReferencedErrorResponse"] | components["schemas"]["RemoteETagMismatchResponse"];
 type ConflictResponse = components["schemas"]["ManifestRevisionMismatchResponse"] | components["schemas"]["DraftRevisionMismatchResponse"];
@@ -136,6 +137,10 @@ export function deleteEnvironment(id: string, revision: number): Promise<DeleteE
 
 export function getProviderStatus(environmentID: string, signal?: AbortSignal): Promise<ProviderStatusResponse> {
   return request(`/environments/${encodeURIComponent(environmentID)}/provider`, { signal });
+}
+
+export function getRemoteProjection(environmentID: string, signal?: AbortSignal): Promise<{ data: RemoteProjection; meta: { revision: number } }> {
+  return request(`/environments/${encodeURIComponent(environmentID)}/remote/projection`, { signal });
 }
 
 export function connectProvider(environmentID: string, credentialsPath: string): Promise<OperationResponse> {

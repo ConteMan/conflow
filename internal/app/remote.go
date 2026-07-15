@@ -30,6 +30,7 @@ type RemoteValueProjection struct {
 type RemoteProjection struct {
 	EnvironmentID string                  `json:"environment_id"`
 	SnapshotETag  string                  `json:"snapshot_etag"`
+	Version       string                  `json:"version"`
 	ObservedAt    string                  `json:"observed_at"`
 	Projections   []RemoteValueProjection `json:"projections"`
 }
@@ -46,7 +47,7 @@ func (s *Service) RemoteProjection(ctx context.Context, environmentID string) (R
 	if snapshot.Status != "available" {
 		return RemoteProjection{}, ErrRemoteSnapshotUnavailable
 	}
-	result := RemoteProjection{EnvironmentID: environmentID, SnapshotETag: snapshot.RemoteETag, ObservedAt: snapshot.ObservedAt.UTC().Format("2006-01-02T15:04:05Z"), Projections: []RemoteValueProjection{}}
+	result := RemoteProjection{EnvironmentID: environmentID, SnapshotETag: snapshot.RemoteETag, Version: snapshot.Version, ObservedAt: snapshot.ObservedAt.UTC().Format("2006-01-02T15:04:05Z"), Projections: []RemoteValueProjection{}}
 	for collection, entityType := range map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"} {
 		for _, record := range entities.Records(view.Effective, collection) {
 			fields := make([]string, 0, len(record.Fields))

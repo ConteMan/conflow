@@ -1160,6 +1160,7 @@ paths:
                 data:
                   environment_id: production
                   snapshot_etag: etag-remote-57
+                  version: "57"
                   observed_at: "2026-07-11T10:00:02Z"
                   projections:
                     - projection_id: rvp_01JEXAMPLE
@@ -3744,12 +3745,15 @@ components:
     RemoteProjection:
       type: object
       additionalProperties: false
-      required: [environment_id, snapshot_etag, observed_at, projections]
+      required: [environment_id, snapshot_etag, version, observed_at, projections]
       properties:
         environment_id:
           type: string
         snapshot_etag:
           type: string
+        version:
+          type: string
+          description: 最近一次拉取的线上快照版本号。
         observed_at:
           type: string
           format: date-time
