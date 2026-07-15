@@ -29,6 +29,8 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
   if (options.readOnly) state.data.capabilities = { project_edit: false, environment_manage: false };
   let bootstrapFailures = 0;
   let providerConnected = false;
+  let providerStatusRequests = 0;
+  let remotePullRequests = 0;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -40,6 +42,7 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
       await json(route, { data: { ref: "mobile-ad-monetization/v1", name: "mobile-ad-monetization", version: "v1", description: "Mobile ad placement and frequency controls.", capabilities: ["environment_overrides", "semantic_diff"], schema_version: 1, entity_types: [] }, meta: { request_id: "req_pack", revision: 1 } }); return;
     }
     if (path === "/api/v1/environments/development/provider" && request.method() === "GET") {
+      providerStatusRequests += 1;
       await json(route, { data: { environment_id: "development", provider_type: "firebase-remote-config", status: providerConnected ? "connected" : "not_configured", credentials_path_display: providerConnected ? "…/firebase.json" : undefined, capabilities: { pull: true, validate: true, publish: true, rollback: true } }, meta: { request_id: "req_provider", revision: 1 } }); return;
     }
     if (path === "/api/v1/drafts/development/entities" && request.method() === "GET") {
@@ -65,6 +68,13 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     }
     if (path === "/api/v1/operations/op_connect") {
       await json(route, { data: { operation_id: "op_connect", operation_type: "provider_connect", status: "succeeded", stage: "completed", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:01Z" }, meta: { request_id: "req_operation", revision: 1 } }); return;
+    }
+    if (path === "/api/v1/environments/development/remote:pull" && request.method() === "POST") {
+      remotePullRequests += 1;
+      await json(route, { data: { operation_id: "op_pull", operation_type: "remote_pull", status: "pending", stage: "queued", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:00Z" }, meta: { request_id: "req_pull", revision: state.meta.revision } }, 202); return;
+    }
+    if (path === "/api/v1/operations/op_pull") {
+      await json(route, { data: { operation_id: "op_pull", operation_type: "remote_pull", status: "succeeded", stage: "completed", remote_state: "unchanged", created_at: "2026-07-11T10:00:00Z", updated_at: "2026-07-11T10:00:01Z" }, meta: { request_id: "req_operation", revision: state.meta.revision } }); return;
     }
     if (path === "/api/v1/project" && request.method() === "PUT") {
       await expectRevision(request, state.meta.revision);
@@ -104,6 +114,7 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     }
     await json(route, { error: { code: "route_not_found", message: "missing test route", request_id: "req_missing" } }, 404);
   });
+  return { providerStatusRequests: () => providerStatusRequests, remotePullRequests: () => remotePullRequests };
 }
 
 test("bootstrap renders project overview from API data", async ({ page }) => {
@@ -143,21 +154,44 @@ test("creates and edits an environment through the manifest API", async ({ page 
   await expect(page.getByLabel("环境类型")).toBeDisabled();
 });
 
-test("overview creates an environment through the primary entry point", async ({ page }) => {
+test("项目设置提供环境管理与新建入口", async ({ page }) => {
   await mockAPI(page);
   await page.goto("/");
+  await expect(page.getByRole("button", { name: "管理环境" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "新建环境" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "环境", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "项目设置" }).click();
+  await expect(page.getByRole("button", { name: "管理环境" })).toBeVisible();
   await page.getByRole("button", { name: "新建环境" }).click();
-  await expect(page.getByRole("heading", { name: "新建环境" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "环境管理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "新建环境", exact: true })).toBeVisible();
 });
 
-test("Firebase card submits a path without retaining its directory", async ({ page }) => {
+test("Firebase 卡片保存项目 ID 并提交路径，不保留凭据目录", async ({ page }) => {
   await mockAPI(page);
   await page.goto("/");
+  await expect(page.getByLabel("Firebase 项目 ID")).toHaveValue("photo-editor-dev");
+  await page.getByLabel("Firebase 项目 ID").fill("photo-editor-dev-next");
   await page.getByLabel("服务账号 JSON 路径").fill("/private/keys/firebase.json");
   await page.getByRole("button", { name: "连接 Firebase" }).click();
   await expect(page.getByText("已配置：")).toContainText("…/firebase.json");
+  await expect(page.getByLabel("Firebase 项目 ID")).toHaveValue("photo-editor-dev-next");
   await expect(page.getByLabel("服务账号 JSON 路径")).toHaveValue("");
   await expect(page.locator("body")).not.toContainText("/private/keys/firebase.json");
+});
+
+test("Firebase 卡片自动检查状态并说明连接和快照操作", async ({ page }) => {
+  const api = await mockAPI(page);
+  await page.goto("/");
+  await expect.poll(api.providerStatusRequests).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "刷新状态" })).toHaveCount(0);
+  await expect(page.getByText("保存凭据路径引用并验证连通性")).toBeVisible();
+  await page.getByLabel("服务账号 JSON 路径").fill("/private/keys/firebase.json");
+  await page.getByRole("button", { name: "连接 Firebase" }).click();
+  await expect(page.getByRole("button", { name: "拉取远端快照" })).toBeVisible();
+  await expect(page.getByText("获取远端模板作为发布对比基线")).toBeVisible();
+  await page.getByRole("button", { name: "拉取远端快照" }).click();
+  await expect.poll(api.remotePullRequests).toBe(1);
 });
 
 test("Firebase card shows actionable local credential errors", async ({ page }) => {
@@ -200,7 +234,7 @@ test("renders project and environment forms as read-only from server capabilitie
   await page.goto("/#project");
   await expect(page.getByText("当前为只读模式")).toBeVisible();
   await expect(page.getByRole("button", { name: "保存项目资料" })).toBeDisabled();
-  await page.getByRole("button", { name: "环境" }).click();
+  await page.getByRole("button", { name: "管理环境" }).click();
   await expect(page.getByText("当前为只读模式")).toBeVisible();
   await expect(page.getByRole("button", { name: "新建环境" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "保存环境" })).toBeDisabled();

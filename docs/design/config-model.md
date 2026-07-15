@@ -68,7 +68,7 @@ environments:
 
 环境 `id` 是稳定、不透明的技术标识；`name` 是 PM 可见名称；`kind` 固定为 `development`、`staging`、`production` 或 `custom`。客户端只根据服务端返回的 `kind` 判断 Production 风险状态，不从 `id`、`name`、Provider project ID 或确认开关推断。`id` 与 `kind` 创建后不可变，`name` 可编辑；同一项目允许存在多个同类环境。
 
-Firebase `project_id` 可在初始化阶段留空，以便先建立项目和环境；在 Provider connect 或 pull 前必须填写。缺失时服务端返回可行动错误“先在环境管理中填写 Firebase 项目 ID”，不会尝试读取凭据或发起远端请求。
+Firebase `project_id` 可在初始化阶段留空，以便先建立项目和环境；在 Provider connect 或 pull 前必须填写。可在概览页的 Firebase 连接卡片中作为连接配置的一部分填写，也可在环境管理页编辑；缺失时服务端返回可行动错误，不会尝试读取凭据或发起远端请求。
 
 Conflow 尚未冻结稳定 manifest 格式，本约束直接纳入 manifest version 1。此前的实验性 manifest 必须显式补齐 `name` 与 `kind`；服务端不得静默猜测环境类别。
 
