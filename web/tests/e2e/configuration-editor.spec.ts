@@ -30,9 +30,10 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
   const placements = mode === "empty" ? [] : [...fixture.entities.placements.slice(0, 3), fixture.entities.placements.find((item) => item.id === "ad_interstitial_001")!].map((item) => ({ ...item }));
   const policies = mode === "empty" ? [] : fixture.entities.frequency_policies.map((item) => ({ ...item }));
   const switches = mode === "empty" ? [] : fixture.entities.feature_switches.map((item) => ({ ...item }));
+  // ConfigurationEditor.tsx:500-517 stores Android bindings by advertising network.
   const bindings: Record<string, Array<{ id: string; fields: Record<string, unknown> }>> = {
-    development: mode === "empty" ? [] : placements.flatMap((placement, index) => ["ios", "android"].map((platform) => ({ id: `ub_development_${platform}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "development", platform, unit_id_ref: `${platform}_dev_${index + 1}`, status: "configured" } }))),
-    production: mode === "empty" ? [] : placements.flatMap((placement, index) => ["ios", "android"].map((platform) => ({ id: `ub_production_${platform}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "production", platform, unit_id_ref: placement.id === placements[2].id ? null : `${platform}_prod_${index + 1}`, status: placement.id === placements[2].id ? "missing" : "configured" } }))),
+    development: mode === "empty" ? [] : placements.flatMap((placement, index) => (["max", "admob"] as const).map((network) => ({ id: `ub_development_android_${network}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "development", platform: "android", network, unit_id_ref: `${network}_dev_${index + 1}`, status: "configured" } }))),
+    production: mode === "empty" ? [] : placements.flatMap((placement, index) => (["max", "admob"] as const).map((network) => ({ id: `ub_production_android_${network}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "production", platform: "android", network, unit_id_ref: placement.id === placements[2].id ? null : `${network}_prod_${index + 1}`, status: placement.id === placements[2].id ? "missing" : "configured" } }))),
   };
   const state = { data: { project: { id: "photo-editor", name: "Photo Editor", pack_ref: "mobile-ad-monetization/v1", source_type: "managed-file" }, environments, capabilities: { project_edit: true, environment_manage: true } }, meta: { request_id: "req_bootstrap", revision } };
   await page.route("**/api/v1/**", async (route) => {
@@ -93,7 +94,7 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
         const index = placements.findIndex((item) => item.id === (pathID ?? input.entity.id));
         if (index >= 0) placements[index] = next; else placements.push(next);
         dirty = true; revision += 1;
-        return json(target, { data: view("placement", next.id, fieldsOf(next), true), meta: meta(revision) }, pathID ? 200 : 201);
+        return json(target, { data: view("placement", next.id, fieldsOf(next), true, pathID ? "modified" : "created"), meta: meta(revision) }, pathID ? 200 : 201);
       }
       if (type === "frequency_policy") {
         const next = { id: input.entity.id, ...input.entity.fields } as FrequencyPolicy;
@@ -109,6 +110,8 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
         dirty = true; revision += 1;
         return json(target, { data: view("feature_switch", next.id, fieldsOf(next), true), meta: meta(revision) });
       }
+      expect(input.entity.id).toMatch(/^ub_[^_]+_android_(max|admob)_.+$/);
+      expect(input.entity.fields).toMatchObject({ platform: "android", network: expect.stringMatching(/^(max|admob)$/) });
       const existing = bindings[environmentID] ?? (bindings[environmentID] = []);
       const index = existing.findIndex((item) => item.id === input.entity.id);
       if (index >= 0) existing[index] = input.entity; else existing.push(input.entity);
@@ -121,7 +124,7 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
       return { data: { environment_id: environmentID, validated_draft_revision: 1, validated_at: "2026-07-11T09:30:00Z", status, readiness: "blocked", diagnostics: [
         { code: "placement_frequency_policy_invalid", path: "/placements/ad_app_open_001/frequency_policy_id", severity: "error", message: "广告位绑定的频控策略不适用于当前广告类型。", entity_ref: "entity:mobile-ad-monetization/v1:placement:ad_app_open_001", fix_suggestion: "选择兼容的频控策略后重新运行校验。" },
         { code: "frequency_policy_needs_review", path: "/frequency_policies/inter_global_cap", severity: "warning", message: "频控策略的周期上限接近风险阈值。", entity_ref: "entity:mobile-ad-monetization/v1:frequency_policy:inter_global_cap", fix_suggestion: "确认业务指标后保留或降低上限。" },
-        { code: "binding_review", path: "/unit_bindings/ub_production_ios_ad_app_open_001", severity: "info", message: "Production iOS 单元 ID 建议在发布前复核。", entity_ref: "entity:mobile-ad-monetization/v1:unit_binding:ub_production_ios_ad_app_open_001", fix_suggestion: "确认单元 ID 对应 Production 项目。" },
+        { code: "binding_review", path: "/unit_bindings/ub_production_android_admob_ad_app_open_001", severity: "info", message: "Production AdMob 单元 ID 建议在发布前复核。", entity_ref: "entity:mobile-ad-monetization/v1:unit_binding:ub_production_android_admob_ad_app_open_001", fix_suggestion: "确认单元 ID 对应 Production 项目。" },
       ] }, meta: meta(revision) };
     }
   });
@@ -158,16 +161,18 @@ test("历史校验结果为 stale 时提示重新运行", async ({ page }) => {
 
 test("新建广告位后回到列表并显示未发布修改", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
-  await page.getByLabel("稳定 ID").fill("ad_interstitial_011"); await page.getByLabel("广告位键").fill("interstitial_test_entry");
+  // ConfigurationEditor.tsx:429 and :464 derive a new placement ID directly from its key.
+  await page.getByLabel("广告位键").fill("interstitial_test_entry");
   await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
   const createdRow = page.getByRole("row", { name: /interstitial_test_entry/ });
-  await expect(createdRow).toBeVisible(); await expect(createdRow.getByText("未发布修改", { exact: true })).toBeVisible();
+  // ConfigurationEditor.tsx:250-251 renders the description fallback and dirty state in the list row.
+  await expect(createdRow).toBeVisible(); await expect(createdRow.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(createdRow.getByText("已修改", { exact: true })).toBeVisible();
 });
 
 test("编辑保存后在列表标记未发布修改", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "编辑 app_open_cold_start" }).click();
   await page.getByLabel("加载超时（毫秒）").fill("4800"); await page.getByRole("button", { name: "保存修改" }).click(); await page.getByLabel("返回配置列表").click();
-  await expect(page.getByRole("row", { name: /app_open_cold_start/ }).getByText("未发布修改")).toBeVisible();
+  await expect(page.getByRole("row", { name: /app_open_cold_start/ }).getByText("已修改")).toBeVisible();
 });
 
 test("412 显示实体级对照且不覆盖当前输入", async ({ page }) => {
@@ -185,8 +190,9 @@ test("422 将字段错误定位到对应表单行", async ({ page }) => {
 
 test("环境绑定矩阵以环境覆盖范围写入", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "编辑 app_open_cold_start" }).click();
-  await page.getByLabel("编辑 Development ios 绑定").click(); await page.getByLabel("Development ios 单元 ID").fill("ios_dev_changed"); await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByText("ios_dev_changed")).toBeVisible();
+  // ConfigurationEditor.tsx:500-517 exposes MAX and AdMob, with MAX's current environment as the editable row.
+  await page.getByLabel("编辑 Development MAX 绑定").click(); await page.getByLabel("Development max 单元 ID").fill("max_dev_changed"); await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByText("max_dev_changed")).toBeVisible();
 });
 
 test("频控抽屉可编辑并展示受影响广告位", async ({ page }) => {
@@ -217,23 +223,28 @@ test("未被引用频控可删除", async ({ page }) => {
   await expect(page.getByText("legacy_campaign_cap", { exact: true })).toHaveCount(0);
 });
 
-test("创建后的广告位键与稳定 ID 为只读通用值", async ({ page }) => {
+test("创建后的广告位键为只读通用值", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
-  await page.getByLabel("稳定 ID").fill("ad_interstitial_011"); await page.getByLabel("广告位键").fill("interstitial_test_entry"); await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
-  await page.getByRole("button", { name: "编辑 interstitial_test_entry" }).click(); await expect(page.getByLabel("广告位键")).toHaveAttribute("readonly", ""); await expect(page.getByText("所有环境一致，不可修改").first()).toBeVisible();
+  await page.getByLabel("广告位键").fill("interstitial_test_entry"); await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
+  await page.getByRole("button", { name: "编辑 interstitial_test_entry" }).click();
+  // ConfigurationEditor.tsx:468 and :490 set the existing placement key to the input's readOnly state.
+  await expect(page.getByLabel("广告位键")).toHaveJSProperty("readOnly", true); await expect(page.getByText("所有环境一致，不可修改").first()).toBeVisible();
 });
 
 test("全空引导可创建频控和广告位并通过校验", async ({ page }) => {
   await mockConfigurationAPI(page, "empty"); await page.goto("/#configuration");
   const guide = page.getByLabel("配置创建引导");
   await expect(guide.getByRole("button", { name: "创建频控策略" })).toBeVisible();
-  await expect(guide.getByRole("button", { name: "配置环境绑定" })).toBeDisabled();
+  // ConfigurationEditor.tsx:186 keeps the binding setup as a disabled third guide step.
+  await expect(guide.getByRole("button", { name: "配置广告单元绑定" })).toBeDisabled();
   await guide.getByRole("button", { name: "创建频控策略" }).click();
   const policyDrawer = page.getByRole("dialog", { name: "新建频控策略" });
-  await policyDrawer.getByLabel("频控策略稳定 ID").fill("first_frequency"); await policyDrawer.getByLabel("适用位置").fill("document_entry"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
+  // ConfigurationEditor.tsx:320 defines the create-only frequency key input.
+  await policyDrawer.getByLabel("频控键").fill("first_frequency"); await policyDrawer.getByLabel("适用位置").fill("document_entry"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
   await expect(policyDrawer).toHaveCount(0);
   await page.getByRole("button", { name: "新建广告位" }).click();
-  await page.getByLabel("稳定 ID").fill("ad_interstitial_first"); await page.getByLabel("广告位键").fill("interstitial_first_entry"); await page.getByLabel("频控策略").selectOption("first_frequency"); await page.getByRole("button", { name: "保存修改" }).click();
+  // ConfigurationEditor.tsx:429 derives the placement entity ID from the new key.
+  await page.getByLabel("广告位键").fill("interstitial_first_entry"); await page.getByLabel("频控策略").selectOption("first_frequency"); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_first_entry/ })).toBeVisible();
   await page.getByRole("button", { name: /运行校验/ }).first().click(); await expect(page.getByText("可发布", { exact: true })).toBeVisible();
 });
@@ -244,10 +255,12 @@ test("广告位空频控提示可直达创建并自动回填", async ({ page }) 
   await expect(page.getByText("还没有频控策略——先创建一个", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "新建频控策略" }).click();
   const policyDrawer = page.getByRole("dialog", { name: "新建频控策略" });
-  await policyDrawer.getByLabel("频控策略稳定 ID").fill("placement_frequency"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
+  // ConfigurationEditor.tsx:320 exposes the frequency entity ID as “频控键”.
+  await policyDrawer.getByLabel("频控键").fill("placement_frequency"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
   await expect(page.getByRole("dialog", { name: "新建频控策略" })).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: "频控策略" })).toHaveValue("placement_frequency");
-  await page.getByLabel("稳定 ID").fill("ad_interstitial_direct"); await page.getByLabel("广告位键").fill("interstitial_direct_entry"); await page.getByRole("button", { name: "保存修改" }).click();
+  // ConfigurationEditor.tsx:429 derives the placement entity ID from the new key.
+  await page.getByLabel("广告位键").fill("interstitial_direct_entry"); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_direct_entry/ })).toBeVisible();
 });
 
@@ -255,13 +268,15 @@ test("功能开关可从创建抽屉保存", async ({ page }) => {
   await mockConfigurationAPI(page, "empty"); await page.goto("/#configuration"); await page.getByRole("tab", { name: "功能开关" }).click();
   await page.getByRole("button", { name: "新建开关" }).click();
   const drawer = page.getByRole("dialog", { name: "新建开关" });
-  await drawer.getByLabel("开关稳定 ID").fill("enable_first_entry"); await drawer.getByLabel("开关键").fill("enable_first_entry"); await drawer.getByLabel("默认启用").click(); await drawer.getByRole("button", { name: "创建开关" }).click();
-  await expect(page.getByRole("switch", { name: "切换 enable_first_entry" })).toHaveAttribute("aria-checked", "true");
+  // ConfigurationEditor.tsx:338 and :354 use the create-time key as both the Remote Config key and entity ID.
+  await drawer.getByLabel("开关键").fill("enable_first_entry"); await drawer.getByLabel("默认启用").click(); await drawer.getByRole("button", { name: "创建开关" }).click();
+  // ConfigurationEditor.tsx:270 renders the description fallback and row-level edit/delete actions.
+  await expect(page.getByRole("switch", { name: "切换 enable_first_entry" })).toHaveAttribute("aria-checked", "true"); await expect(page.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "编辑功能开关 enable_first_entry" })).toBeVisible(); await expect(page.getByRole("button", { name: "删除功能开关 enable_first_entry" })).toBeVisible();
 });
 
 function fieldsOf(value: { id: string; [key: string]: unknown }) { const { id: _id, ...fields } = value; return fields; }
 function meta(revision: number) { return { request_id: "req_configuration", revision }; }
-function view(type: string, id: string, fields: Record<string, unknown>, dirty: boolean) { const record = { id, fields }; return { entity_ref: `entity:mobile-ad-monetization/v1:${type}:${id}`, entity_type: type, entity_id: id, source: { present: true, value: record }, draft: dirty ? { present: true, value: record } : { present: false }, resolved: { present: true, value: record }, effective: { present: true, value: record }, origin: dirty ? "draft_baseline" : "baseline", source_revision: "source_1" }; }
+function view(type: string, id: string, fields: Record<string, unknown>, dirty: boolean, changeStatus?: string) { const record = { id, fields }; return { change_status: changeStatus ?? (dirty ? "modified" : "unchanged"), entity_ref: `entity:mobile-ad-monetization/v1:${type}:${id}`, entity_type: type, entity_id: id, source: { present: true, value: record }, draft: dirty ? { present: true, value: record } : { present: false }, resolved: { present: true, value: record }, effective: { present: true, value: record }, origin: dirty ? "draft_baseline" : "baseline", source_revision: "source_1" }; }
 function draft(environmentID: string, placements: Placement[], dirty: boolean) { return { environment_id: environmentID, pack_ref: "mobile-ad-monetization/v1", source_revision: "source_1", dirty, dirty_scopes: dirty ? ["baseline"] : [], baseline: { source: { present: true, value: {} }, draft: { present: dirty, value: dirty ? {} : undefined }, resolved: { present: true, value: {} }, dirty }, environment_override: { source: { present: false }, draft: { present: false }, resolved: { present: false }, dirty: false }, effective: { placements: placements.map((item) => ({ id: item.id, fields: fieldsOf(item) })) }, field_states: placements.flatMap((placement) => Object.entries(fieldsOf(placement)).map(([name, value]) => ({ path: `/placements/${placement.id}/${name}`, pack_default: { present: false }, baseline: { present: true, value }, draft_baseline: { present: dirty, value }, environment_override: { present: false }, draft_environment_override: { present: false }, effective: { present: true, value }, origin: dirty ? "draft_baseline" : "baseline", environment_override_allowed: false, is_environment_overridden: false, source_revision: "source_1", nullable: false }))), affected_environments: [] }; }
 async function json(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
@@ -269,7 +284,8 @@ test("已有频控时新建广告位默认选中策略且状态一致", async ({
   await mockConfigurationAPI(page); await page.goto("/#configuration");
   await page.getByRole("button", { name: "新建广告位" }).click();
   await expect(page.getByLabel("频控策略")).toHaveValue("inter_global_cap");
-  await page.getByLabel("稳定 ID").fill("ad_default_ref_001"); await page.getByLabel("广告位键").fill("default_ref_entry");
+  // ConfigurationEditor.tsx:429 uses the placement key as the entity ID for a new placement.
+  await page.getByLabel("广告位键").fill("default_ref_entry");
   await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /default_ref_entry/ })).toBeVisible();
 });
