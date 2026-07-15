@@ -2,6 +2,28 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.4.0] - 2026-07-15
+
+### Added
+
+- **Entity change tracking against last release** (Spec 024, #52): publish/rollback now persists a per-entity content-hash baseline (`.conflow/released-baseline/`); draft entities expose `change_status` (unchanged / modified / created) and drafts expose `changed_entity_count`, so lists and the header badge only flag real unpublished changes instead of everything imported into the draft layer.
+- **Tiered plan invalidation with auto-rebuild** (Spec 025, #55): plan responses carry a structured `invalidation` object (`code`, `tier`, `message`). Routine invalidations (TTL expiry, draft advance) rebuild automatically with a loop guard; external ones (remote template changed outside Conflow, pack change) surface a single in-page banner. The blocking invalidation modal was removed.
+- **Entity descriptions in lists** (#53): placement / frequency-policy / feature-switch rows show the `description` field with a muted fallback; the unit-binding overview identifies rows by placement key + description instead of internal binding IDs.
+- **Feature switch editing** (#54): switches gained a create/edit drawer (risk level, rollback method, description) with conflict handling, plus row-level edit and delete actions with reference checks.
+- **Snapshot freshness for default downloads** (#57): the release history download card shows when the protected snapshot was observed and its remote version, warns when it is older than 24 h, and disables downloads until a snapshot exists. `RemoteProjection` now exposes `version`.
+
+### Changed
+
+- **Config lists migrated to TanStack Table** (Spec 026, #51): a shared headless DataTable provides first/last column pinning with scroll shadows, client-side sorting, and a unified toolbar (stats + filters + search); hand-rolled table markup and CSS width hacks were removed.
+- **Overview information architecture** (#48, #49): environment management moved from the overview page into project settings; the Firebase connection card became the single entry point (project ID + service-account path + verification), action buttons gained captions, "拉取线上配置" was renamed "拉取远端快照", and connection status is checked automatically on mount.
+- **Chinese-first copy** (#50): the v2 pack description, schema-version label, and capability tags now render in Chinese.
+
+### Fixed
+
+- Rolling back to a release that predates Conflow-state capture no longer fails; the entity baseline is cleared and rebuilt on the next successful release.
+- An invalidated empty plan shows the rebuild flow instead of a misleading "no pending changes" state.
+- Nine stale Playwright assertions were realigned with the current UI (stable-ID removal, MAX/AdMob binding matrix, switch drawer); the e2e suite grew from 42 to 45 passing tests.
+
 ## [0.3.0] - 2026-07-15
 
 ### Added
