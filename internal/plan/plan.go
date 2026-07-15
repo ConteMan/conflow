@@ -82,6 +82,11 @@ type ConfirmationRequirements struct {
 	RequiredRiskItemIDs      []string `json:"required_risk_item_ids"`
 	PolicySource             string   `json:"policy_source"`
 }
+type Invalidation struct {
+	Code    string `json:"code"`
+	Tier    string `json:"tier"`
+	Message string `json:"message"`
+}
 type Plan struct {
 	PlanID                   string                   `json:"plan_id"`
 	EnvironmentID            string                   `json:"environment_id"`
@@ -94,6 +99,7 @@ type Plan struct {
 	CreatedAt                time.Time                `json:"created_at"`
 	ExpiresAt                time.Time                `json:"expires_at"`
 	InvalidationReason       string                   `json:"invalidation_reason,omitempty"`
+	Invalidation             *Invalidation            `json:"invalidation,omitempty"`
 	ContentDigest            string                   `json:"content_digest"`
 	RemoteSnapshot           remote.Snapshot          `json:"remote_snapshot"`
 	SemanticChanges          []SemanticChange         `json:"semantic_changes"`
@@ -104,10 +110,12 @@ type Plan struct {
 	RiskItems                []RiskItem               `json:"risk_items"`
 	BlockingReasons          []BlockingReason         `json:"blocking_reasons"`
 	ConfirmationRequirements ConfirmationRequirements `json:"confirmation_requirements"`
+	packSchemaVersion        uint64
 }
 type Input struct {
 	EnvironmentID, EnvironmentKind, PackRef, SourceDigest string
 	DraftRevision                                         uint64
+	PackSchemaVersion                                     uint64
 	Desired, Baseline                                     map[string]any
 	// BaseLayer is the resolved baseline before an environment override. It
 	// preserves a direct override even when final effective value equals source.
@@ -133,7 +141,7 @@ func Build(in Input) (BuildResult, error) {
 	if in.TTL == 0 {
 		in.TTL = DefaultTTL
 	}
-	p := Plan{PlanID: "plan_" + id(in.EnvironmentID, fmt.Sprintf("%d", in.Now.UnixNano())), EnvironmentID: in.EnvironmentID, PackRef: in.PackRef, Status: "ready", DraftRevision: in.DraftRevision, SourceDigest: in.SourceDigest, CreatedAt: in.Now.UTC(), ExpiresAt: in.Now.UTC().Add(in.TTL), RemoteSnapshot: in.RemoteSnapshot, SemanticChanges: []SemanticChange{}, AffectedEntities: []AffectedEntity{}, RemoteParameterChanges: []RemoteParameterChange{}, ArtifactMetadata: []ArtifactMetadata{}, RiskItems: []RiskItem{}, BlockingReasons: []BlockingReason{}}
+	p := Plan{PlanID: "plan_" + id(in.EnvironmentID, fmt.Sprintf("%d", in.Now.UnixNano())), EnvironmentID: in.EnvironmentID, PackRef: in.PackRef, Status: "ready", DraftRevision: in.DraftRevision, SourceDigest: in.SourceDigest, CreatedAt: in.Now.UTC(), ExpiresAt: in.Now.UTC().Add(in.TTL), RemoteSnapshot: in.RemoteSnapshot, SemanticChanges: []SemanticChange{}, AffectedEntities: []AffectedEntity{}, RemoteParameterChanges: []RemoteParameterChange{}, ArtifactMetadata: []ArtifactMetadata{}, RiskItems: []RiskItem{}, BlockingReasons: []BlockingReason{}, packSchemaVersion: in.PackSchemaVersion}
 	if in.RemoteSnapshot.Status != "available" {
 		p.Status = "preview_only"
 	} else {
@@ -511,6 +519,26 @@ type Store struct {
 	plans map[string]Plan
 }
 
+type storedPlan struct {
+	Plan
+	PackSchemaVersion uint64 `json:"pack_schema_version"`
+}
+
+func marshalPlan(p Plan) ([]byte, error) {
+	return json.MarshalIndent(storedPlan{Plan: p, PackSchemaVersion: p.packSchemaVersion}, "", "  ")
+}
+
+func unmarshalPlan(data []byte) (Plan, error) {
+	var stored storedPlan
+	if err := json.Unmarshal(data, &stored); err != nil {
+		return Plan{}, err
+	}
+	stored.Plan.packSchemaVersion = stored.PackSchemaVersion
+	return stored.Plan, nil
+}
+
+func (p Plan) PackSchemaVersion() uint64 { return p.packSchemaVersion }
+
 func Open(root string) (*Store, error) {
 	s := &Store{root: root, plans: map[string]Plan{}}
 	entries, err := os.ReadDir(root)
@@ -528,8 +556,8 @@ func Open(root string) (*Store, error) {
 		if err != nil {
 			return nil, err
 		}
-		var p Plan
-		if err := json.Unmarshal(b, &p); err != nil {
+		p, err := unmarshalPlan(b)
+		if err != nil {
 			return nil, err
 		}
 		s.plans[p.PlanID] = p
@@ -548,7 +576,7 @@ func (s *Store) Save(result BuildResult) error {
 			return err
 		}
 	}
-	b, err := json.MarshalIndent(result.Plan, "", "  ")
+	b, err := marshalPlan(result.Plan)
 	if err != nil {
 		return err
 	}
@@ -573,7 +601,10 @@ func (s *Store) Update(p Plan) error {
 	if _, ok := s.plans[p.PlanID]; !ok {
 		return ErrNotFound
 	}
-	b, _ := json.MarshalIndent(p, "", "  ")
+	b, err := marshalPlan(p)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(filepath.Join(s.root, p.PlanID, "plan.json"), append(b, '\n'), 0o600); err != nil {
 		return err
 	}

@@ -1,8 +1,7 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Download, FileClock, LoaderCircle, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Download, LoaderCircle, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { ConflowAPIError, ConflowNetworkError, createPlan, getOperation, getPlan, planArtifactURL, type AffectedEntity, type Environment, type Operation, type Plan, type RemoteParameterChange } from "../../api/client";
 import { Button } from "../ui/Button";
-import { Modal } from "../ui/Dialog";
 import { RequestError } from "../ui/StateViews";
 
 const operationStorageKey = (environmentID: string) => `conflow.plan.operation.${environmentID}`;
@@ -13,8 +12,11 @@ export function ReleasePlan({ environment, onOpenConfiguration, onOpenRelease }:
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ code: string; requestId?: string } | null>(null);
+  const [autoRebuilding, setAutoRebuilding] = useState(false);
+  const [automaticRetryExhausted, setAutomaticRetryExhausted] = useState(false);
   const operationRef = useRef<string | null>(null);
   const startingEnvironmentRef = useRef<string | null>(null);
+  const autoRebuildAttemptedRef = useRef(false);
 
   const poll = useCallback(async (operationID: string, signal?: AbortSignal) => {
     try {
@@ -22,23 +24,23 @@ export function ReleasePlan({ environment, onOpenConfiguration, onOpenRelease }:
       setOperation(response.data);
       if (response.data.status === "succeeded" && response.data.result?.resource_type === "plan") {
         const nextPlan = await getPlan(response.data.result.resource_id, signal);
-        setPlan(nextPlan.data); setLoading(false);
-      } else if (["failed", "cancelled"].includes(response.data.status)) { setLoading(false); setError({ code: response.data.failure?.code ?? "operation_failed" }); }
-    } catch (cause) { if (!(cause instanceof DOMException && cause.name === "AbortError")) { setLoading(false); setError(toRequestError(cause)); } }
+        setPlan(nextPlan.data); setLoading(false); setAutoRebuilding(false);
+      } else if (["failed", "cancelled"].includes(response.data.status)) { setLoading(false); setAutoRebuilding(false); setError({ code: response.data.failure?.code ?? "operation_failed" }); }
+    } catch (cause) { if (!(cause instanceof DOMException && cause.name === "AbortError")) { setLoading(false); setAutoRebuilding(false); setError(toRequestError(cause)); } }
   }, []);
 
-  const start = useCallback(async (replace = false) => {
+  const start = useCallback(async (replace = false, automatic = false) => {
     const environmentID = environment.id;
     if (!replace && startingEnvironmentRef.current === environmentID) return;
     startingEnvironmentRef.current = environmentID;
-    setLoading(true); setError(null); setPlan(null); setOperation(null);
+    setLoading(true); setError(null); setPlan(null); setOperation(null); setAutoRebuilding(automatic);
     if (replace) sessionStorage.removeItem(operationStorageKey(environmentID));
     try {
       const response = await createPlan(environmentID);
       operationRef.current = response.data.operation_id;
       sessionStorage.setItem(operationStorageKey(environmentID), response.data.operation_id);
       setOperation(response.data);
-    } catch (cause) { setLoading(false); setError(toRequestError(cause)); }
+    } catch (cause) { setLoading(false); setAutoRebuilding(false); setError(toRequestError(cause)); }
     finally {
       if (startingEnvironmentRef.current === environmentID) startingEnvironmentRef.current = null;
     }
@@ -46,13 +48,24 @@ export function ReleasePlan({ environment, onOpenConfiguration, onOpenRelease }:
 
   useEffect(() => {
     const savedOperationID = sessionStorage.getItem(operationStorageKey(environment.id));
-    setPlan(null); setOperation(null); setError(null);
+    autoRebuildAttemptedRef.current = false;
+    setPlan(null); setOperation(null); setError(null); setAutoRebuilding(false); setAutomaticRetryExhausted(false);
     operationRef.current = savedOperationID;
     if (new URLSearchParams(window.location.hash.split("?")[1]).get("rebuild") === "1") void start(true);
     else if (savedOperationID) { setLoading(true); void poll(savedOperationID); }
     else if (startingEnvironmentRef.current !== environment.id) void start();
     return () => { operationRef.current = null; };
   }, [environment.id, poll, start]);
+
+  useEffect(() => {
+    if (!plan || !isPlanInvalid(plan) || invalidationTier(plan) !== "routine") return;
+    if (autoRebuildAttemptedRef.current) {
+      setAutomaticRetryExhausted(true);
+      return;
+    }
+    autoRebuildAttemptedRef.current = true;
+    void start(true, true);
+  }, [plan, start]);
 
   useEffect(() => {
     const operationID = operationRef.current;
@@ -70,29 +83,34 @@ export function ReleasePlan({ environment, onOpenConfiguration, onOpenRelease }:
     return () => stream.close();
   }, [error, plan, poll, operation]);
 
+  const invalid = isPlanInvalid(plan);
   return <main className="page-container plan-page">
-    <header className="page-heading plan-heading"><div><h1>发布计划</h1><p>{plan ? `计划 ${plan.plan_id} · 当前保存版本 ${plan.draft_revision}` : "正在为当前环境构建发布前审阅"}</p></div><Button onClick={() => void start(true)} disabled={loading} icon={<RefreshCw size={16} />}>重新构建计划</Button></header>
+    <header className="page-heading plan-heading"><div><h1>发布计划</h1><p>{plan ? `计划 ${plan.plan_id} · 当前保存版本 ${plan.draft_revision}` : "正在为当前环境构建发布前审阅"}</p></div>{!invalid ? <Button onClick={() => void start(true)} disabled={loading} icon={<RefreshCw size={16} />}>重新构建计划</Button> : null}</header>
     {error ? <RequestError {...error} onDismiss={() => setError(null)} /> : null}
-    {loading && !plan ? <OperationProgress operation={operation} /> : null}
-    {plan ? <PlanReview plan={plan} environment={environment} onRebuild={() => void start(true)} onOpenConfiguration={onOpenConfiguration} onOpenRelease={onOpenRelease} /> : null}
+    {loading && !plan ? <OperationProgress operation={operation} rebuilding={autoRebuilding} /> : null}
+    {plan && invalid ? <PlanInvalidationBanner plan={plan} automaticRetryExhausted={automaticRetryExhausted} onRebuild={() => void start(true)} /> : null}
+    {plan ? <PlanReview plan={plan} environment={environment} onOpenConfiguration={onOpenConfiguration} onOpenRelease={onOpenRelease} /> : null}
   </main>;
 }
 
-function OperationProgress({ operation }: { operation: Operation | null }) {
+function OperationProgress({ operation, rebuilding }: { operation: Operation | null; rebuilding: boolean }) {
   const activeIndex = operation ? Math.max(0, stageOrder.indexOf(operation.stage)) : 0;
-  return <section className="operation-progress panel" aria-live="polite"><header><div><LoaderCircle className="spin" size={20} /><div><h2>正在构建发布计划</h2><p>读取线上配置、计算业务影响并分析风险。</p></div></div><code>{operation?.operation_id ?? "正在创建操作"}</code></header><ol>{stageOrder.map((stage, index) => <li className={index <= activeIndex ? "done" : ""} key={stage}><i>{index + 1}</i><span>{stageLabel(stage)}</span></li>)}</ol><div className="operation-progress-bar"><span style={{ width: `${((activeIndex + 1) / stageOrder.length) * 100}%` }} /></div><p className="muted-copy">页面刷新后会恢复此操作的状态；进度流中断时将自动继续读取当前状态。</p></section>;
+  return <section className="operation-progress panel" aria-live="polite"><header><div><LoaderCircle className="spin" size={20} /><div><h2>{rebuilding ? "正在重新构建计划…" : "正在构建发布计划"}</h2><p>读取线上配置、计算业务影响并分析风险。</p></div></div><code>{operation?.operation_id ?? "正在创建操作"}</code></header><ol>{stageOrder.map((stage, index) => <li className={index <= activeIndex ? "done" : ""} key={stage}><i>{index + 1}</i><span>{stageLabel(stage)}</span></li>)}</ol><div className="operation-progress-bar"><span style={{ width: `${((activeIndex + 1) / stageOrder.length) * 100}%` }} /></div><p className="muted-copy">页面刷新后会恢复此操作的状态；进度流中断时将自动继续读取当前状态。</p></section>;
 }
 
-function PlanReview({ plan, environment, onRebuild, onOpenConfiguration, onOpenRelease }: { plan: Plan; environment: Environment; onRebuild: () => void; onOpenConfiguration: () => void; onOpenRelease: (planID: string) => void }) {
-  const invalid = plan.status === "invalidated" || plan.status === "expired";
-  const [invalidDialogOpen, setInvalidDialogOpen] = useState(invalid);
+function PlanInvalidationBanner({ plan, automaticRetryExhausted, onRebuild }: { plan: Plan; automaticRetryExhausted: boolean; onRebuild: () => void }) {
+  const message = automaticRetryExhausted ? `${invalidationText(plan)} 自动重新构建后的计划仍然失效，请手动重新构建计划。` : invalidationText(plan);
+  return <section className="plan-invalidation-banner" role="status"><AlertTriangle size={18} /><div><strong>这份发布计划已失效</strong><p>{message}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></section>;
+}
+
+function PlanReview({ plan, environment, onOpenConfiguration, onOpenRelease }: { plan: Plan; environment: Environment; onOpenConfiguration: () => void; onOpenRelease: (planID: string) => void }) {
+  const invalid = isPlanInvalid(plan);
   const [treeClosed, setTreeClosed] = useState(false);
-  useEffect(() => setInvalidDialogOpen(invalid), [invalid, plan.plan_id]);
   const directChanges = plan.semantic_changes.length;
   const isEmptyPlan = !invalid && directChanges === 0 && plan.affected_entities.length === 0 && plan.remote_parameter_changes.length === 0;
   if (isEmptyPlan) return <section className="plan-empty"><CheckCircle2 size={32} /><h2>当前环境没有待发布的修改</h2><p>修改配置后可重新构建发布计划。</p><Button onClick={onOpenConfiguration}>返回配置</Button></section>;
   return <>
-    <section className={`plan-status ${invalid ? "plan-status--invalid" : plan.status === "preview_only" ? "plan-status--preview" : "plan-status--ready"}`}>{invalid ? <><FileClock size={18} /><strong>这份发布计划已失效</strong><span>{invalidationText(plan.invalidation_reason)}</span></> : plan.status === "preview_only" ? <><CircleAlert size={18} /><strong>不可发布</strong><span>{plan.blocking_reasons.map((item) => item.summary).join("；") || "服务端仅允许预览此计划。"}</span></> : <><CheckCircle2 size={18} /><strong>计划可审阅</strong><span>风险与发布条件均以服务端结果为准。</span></>}</section>
+    {!invalid ? <section className={`plan-status ${plan.status === "preview_only" ? "plan-status--preview" : "plan-status--ready"}`}>{plan.status === "preview_only" ? <><CircleAlert size={18} /><strong>不可发布</strong><span>{plan.blocking_reasons.map((item) => item.summary).join("；") || "服务端仅允许预览此计划。"}</span></> : <><CheckCircle2 size={18} /><strong>计划可审阅</strong><span>风险与发布条件均以服务端结果为准。</span></>}</section> : null}
     <section className={invalid ? "plan-review plan-review--stale" : "plan-review"}>
       <div className="metric-grid plan-metrics"><Metric label="直接修改" value={`${directChanges} 项`} copy="用户明确修改" /><Metric label="受影响实体" value={`${plan.affected_entities.length} 个`} copy="由业务影响展开" /><Metric label="远端参数" value={`${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 项`} copy="最终写入目标" /><Metric label="最高风险" value={riskLabel(plan.severity)} copy={`${plan.risk_items.filter((item) => item.acknowledgement_required).length} 项需要确认`} risk={plan.severity} /></div>
       <div className="plan-layout">
@@ -107,17 +125,13 @@ function PlanReview({ plan, environment, onRebuild, onOpenConfiguration, onOpenR
           <RemoteParamPanel plan={plan} />
         </div>
         <aside className="plan-sidebar">
-          <section className="panel release-placeholder"><h2>下一步</h2><p>{invalid ? "旧计划仅供参考，重新构建后才能继续。" : plan.status === "preview_only" ? "此计划不可发布，请先处理服务端给出的原因。" : "继续进入独立发布步骤页，服务端会在提交时再次确认计划、版本和线上 ETag。"}</p><Button variant="primary" disabled={invalid || plan.status !== "ready"} onClick={() => onOpenRelease(plan.plan_id)} icon={<ChevronRight size={16} />}>发布到 {environment.name}</Button></section>
+          <section className="panel release-placeholder"><h2>下一步</h2><p>{invalid ? "当前计划不可发布。" : plan.status === "preview_only" ? "此计划不可发布，请先处理服务端给出的原因。" : "继续进入独立发布步骤页，服务端会在提交时再次确认计划、版本和线上 ETag。"}</p><Button variant="primary" disabled={invalid || plan.status !== "ready"} onClick={() => onOpenRelease(plan.plan_id)} icon={<ChevronRight size={16} />}>发布到 {environment.name}</Button></section>
           <RemoteBaseline plan={plan} />
           <RiskPanel plan={plan} />
           <ArtifactPanel plan={plan} />
         </aside>
       </div>
-      {invalid ? <section className="plan-invalid-actions"><AlertTriangle size={18} /><div><strong>旧计划保留为参考</strong><p>{invalidationText(plan.invalidation_reason)}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></section> : null}
     </section>
-    <Modal open={invalid && invalidDialogOpen} onOpenChange={setInvalidDialogOpen} title="这份发布计划已失效" description="配置或线上配置已变化。旧计划只能查看，不能继续发布。">
-      <div className="plan-invalid-dialog"><div><strong>失效原因</strong><p>{invalidationText(plan.invalidation_reason)}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></div>
-    </Modal>
   </>;
 }
 
@@ -160,7 +174,9 @@ export function RiskPanel({ plan }: { plan: Plan }) { const groups = ["blocking"
 function ArtifactPanel({ plan }: { plan: Plan }) { const artifacts = plan.artifact_metadata.filter((item) => item.available && (item.artifact_name === "review.json" || item.artifact_name === "review.md")); return <section className="panel artifact-panel"><h2>审阅文件</h2>{artifacts.length ? artifacts.map((artifact) => <a href={planArtifactURL(plan.plan_id, artifact.artifact_name)} key={artifact.artifact_name} download><Download size={15} />{artifact.artifact_name}</a>) : <p className="muted-copy">当前计划没有可下载的审阅文件。</p>}</section>; }
 function Metric({ label, value, copy, risk }: { label: string; value: string; copy: string; risk?: string }) { return <div className="metric"><span className="metric-label">{label}</span><strong className={risk ? `risk-value risk-value--${risk}` : undefined}>{value}</strong><p>{copy}</p></div>; }
 function stageLabel(value: string) { return ({ queued: "等待开始", reading_remote: "读取线上配置", compiling: "计算业务变更", analyzing: "分析影响与风险" } as Record<string, string>)[value] ?? "处理中"; }
-function invalidationText(reason?: string) { return ({ draft_revision_changed: "配置已变化，旧计划不能继续发布。", source_digest_changed: "配置来源已变化，旧计划不能继续发布。", remote_etag_changed: "线上配置已变化，旧计划不能继续发布。", remote_snapshot_unavailable: "无法读取线上配置，旧计划不能继续发布。", ttl_expired: "计划已过期，请重新构建。", provider_capability_changed: "发布目标能力已变化，请重新构建。" } as Record<string, string>)[reason ?? ""] ?? "计划已失效，请重新构建。"; }
+function isPlanInvalid(plan: Plan | null) { return plan?.status === "invalidated" || plan?.status === "expired"; }
+function invalidationTier(plan: Plan) { return plan.invalidation?.tier === "routine" ? "routine" : "external"; }
+function invalidationText(plan: Plan) { return plan.invalidation?.message ?? ({ draft_revision_changed: "配置已变化，旧计划不能继续发布。", source_digest_changed: "配置来源已变化，旧计划不能继续发布。", remote_etag_changed: "线上配置已变化，旧计划不能继续发布。", remote_snapshot_unavailable: "无法读取线上配置，旧计划不能继续发布。", ttl_expired: "计划已过期，请重新构建。", provider_capability_changed: "发布目标能力已变化，请重新构建。" } as Record<string, string>)[plan.invalidation_reason ?? ""] ?? "计划已失效，请重新构建。"; }
 export function riskLabel(value: string) { return ({ low: "低", medium: "中", high: "高", blocking: "阻断" } as Record<string, string>)[value] ?? value; }
 function changeKind(value: string) { return ({ created: "新增", updated: "修改", deleted: "删除", overridden: "环境专属修改" } as Record<string, string>)[value] ?? value; }
 function entityType(value: string) { return ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定" } as Record<string, string>)[value] ?? value; }
