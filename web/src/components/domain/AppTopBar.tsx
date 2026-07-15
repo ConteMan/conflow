@@ -9,7 +9,7 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
   environments: Environment[];
   selectedEnvironment: Environment;
   page: Page;
-  draftDirty: boolean;
+  draftDirty: boolean | null;
   validation: ValidationResult | null;
   environmentSelectRef: RefObject<HTMLSelectElement | null>;
   onEnvironmentChange: (id: string) => void;
@@ -40,7 +40,7 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
       </nav>
       <div className="topbar-statuses">
         {validation ? <button className={`validation-global-badge validation-global-badge--${validation.readiness} validation-global-badge--${validation.status}`} onClick={() => onPageChange("validation")} aria-label="查看校验结果">{validation.status === "stale" ? "校验结果可能过期" : validation.readiness === "ready" ? "校验通过" : `${validation.diagnostics.length} 项校验问题`}</button> : null}
-        <div className={draftDirty ? "draft-slot draft-slot--dirty" : "draft-slot"} aria-label="未发布修改状态">{draftDirty ? "有未发布修改" : "尚未有修改"}</div>
+        <div className={draftDirty ? "draft-slot draft-slot--dirty" : "draft-slot"} aria-label="未发布修改状态">{draftDirty === null ? "正在获取草稿状态" : draftDirty ? "有未发布修改" : "尚未有修改"}</div>
       </div>
       <button className="mobile-menu-button" aria-label={menuOpen ? "关闭导航" : "打开导航"} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
         {menuOpen ? <X /> : <Menu />}

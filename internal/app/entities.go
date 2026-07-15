@@ -93,10 +93,7 @@ func (s *Service) ListEntities(_ context.Context, environmentID, entityType stri
 			return nil, 0, ErrEntityTypeInvalid
 		}
 	}
-	baseline, baselineFound, err := s.baselines.Load(environmentID)
-	if err != nil {
-		return nil, 0, err
-	}
+	baseline, baselineFound := s.releasedBaseline(environmentID)
 	entities := make([]EntityView, 0)
 	for _, metadata := range definition.Metadata.EntityTypes {
 		if metadata.Collection == "" || (entityType != "" && metadata.Name != entityType) {
@@ -128,10 +125,7 @@ func (s *Service) GetEntity(_ context.Context, environmentID, entityType, entity
 	if !ok || metadata.Collection == "" {
 		return EntityView{}, 0, ErrEntityTypeInvalid
 	}
-	baseline, baselineFound, err := s.baselines.Load(environmentID)
-	if err != nil {
-		return EntityView{}, 0, err
-	}
+	baseline, baselineFound := s.releasedBaseline(environmentID)
 	entity, err := entityView(definition, view, metadata, entityID, baseline, baselineFound)
 	return entity, revision, err
 }
@@ -282,10 +276,7 @@ func findEntityMetadata(definition packs.Definition, entityType string) (packs.E
 }
 
 func (s *Service) entityView(definition packs.Definition, view draft.View, metadata packs.EntityMetadata, entityID string) (EntityView, error) {
-	baseline, baselineFound, err := s.baselines.Load(view.EnvironmentID)
-	if err != nil {
-		return EntityView{}, err
-	}
+	baseline, baselineFound := s.releasedBaseline(view.EnvironmentID)
 	return entityView(definition, view, metadata, entityID, baseline, baselineFound)
 }
 
@@ -355,10 +346,7 @@ func (s *Service) populateChangedEntityCount(view *draft.View) error {
 	if err != nil {
 		return err
 	}
-	baseline, found, err := s.baselines.Load(view.EnvironmentID)
-	if err != nil {
-		return err
-	}
+	baseline, found := s.releasedBaseline(view.EnvironmentID)
 	if !found {
 		view.ChangedEntityCount = len(current)
 		return nil
@@ -376,6 +364,53 @@ func (s *Service) populateChangedEntityCount(view *draft.View) error {
 	}
 	view.ChangedEntityCount = changed
 	return nil
+}
+
+// releasedBaseline restores the entity baseline for workspaces created before
+// released-baseline persistence was introduced. Read models remain available
+// when historical state is absent or cannot be recovered.
+func (s *Service) releasedBaseline(environmentID string) (releasedbaseline.Document, bool) {
+	baseline, found, err := s.baselines.Load(environmentID)
+	if err != nil || found {
+		return baseline, found
+	}
+	snapshot, err := s.projects.Snapshot()
+	if err != nil {
+		return releasedbaseline.Document{}, false
+	}
+	releases, err := s.releases.List(environmentID, 0, "")
+	if err != nil {
+		return releasedbaseline.Document{}, false
+	}
+	for _, item := range releases {
+		if item.Outcome != "succeeded" {
+			continue
+		}
+		raw, err := s.releases.ConflowState(item.ReleaseID)
+		if err != nil {
+			continue
+		}
+		var configuration map[string]any
+		if err := json.Unmarshal(raw, &configuration); err != nil {
+			continue
+		}
+		hashes, err := s.entityHashesForConfiguration(snapshot.Manifest.Pack.ID, configuration)
+		if err != nil {
+			continue
+		}
+		baseline = releasedbaseline.Document{
+			EnvironmentID:  environmentID,
+			ReleaseID:      item.ReleaseID,
+			ReleasedAt:     item.CompletedAt,
+			SourceRevision: item.SourceDigest,
+			Entities:       hashes,
+		}
+		if err := s.baselines.Save(baseline); err != nil {
+			return releasedbaseline.Document{}, false
+		}
+		return baseline, true
+	}
+	return releasedbaseline.Document{}, false
 }
 
 func layeredRecord(high, low map[string]any, collection, id string) (EntityRecord, bool) {

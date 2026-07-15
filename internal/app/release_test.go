@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
@@ -124,6 +125,97 @@ func TestEntityChangeStatusUsesReleasedBaseline(t *testing.T) {
 	if err != nil || draftView.ChangedEntityCount != 1 {
 		t.Fatalf("draft=%#v err=%v", draftView, err)
 	}
+}
+
+func TestEntityBaselineLazyInitialization(t *testing.T) {
+	t.Run("restores the latest successful release with state", func(t *testing.T) {
+		s, _ := releaseService(t)
+		view := createBaselineTestEntity(t, s)
+		state, err := json.Marshal(view.Effective)
+		if err != nil {
+			t.Fatal(err)
+		}
+		releasedAt := time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+		after := release.AuditState{RemoteETag: "etag-history", Version: "1", ObservedAt: releasedAt}
+		const releaseID = "rel_historical_state"
+		if err := s.releases.Save(release.Release{ReleaseID: releaseID, EnvironmentID: "development", Kind: "publish", Outcome: "succeeded", CreatedAt: releasedAt, CompletedAt: releasedAt, OperationID: "op_historical_state", RemoteState: "changed", RiskSummary: "low", RemoteAfter: &after, SourceDigest: view.SourceRevision}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.releases.SaveConflowState(releaseID, state); err != nil {
+			t.Fatal(err)
+		}
+		items, _, err := s.ListEntities(context.Background(), "development", "")
+		if err != nil || len(items) == 0 {
+			t.Fatalf("entities=%#v err=%v", items, err)
+		}
+		for _, item := range items {
+			if item.ChangeStatus != "unchanged" {
+				t.Fatalf("entity=%#v", item)
+			}
+		}
+		baseline, found, err := s.baselines.Load("development")
+		if err != nil || !found || baseline.ReleaseID != releaseID || !baseline.ReleasedAt.Equal(releasedAt) {
+			t.Fatalf("baseline=%#v found=%v err=%v", baseline, found, err)
+		}
+		if err := s.releases.SaveConflowState(releaseID, json.RawMessage(`[]`)); err != nil {
+			t.Fatal(err)
+		}
+		item, _, err := s.GetEntity(context.Background(), "development", items[0].EntityType, items[0].EntityID)
+		if err != nil || item.ChangeStatus != "unchanged" {
+			t.Fatalf("second read entity=%#v err=%v", item, err)
+		}
+	})
+
+	t.Run("keeps the no-release behavior", func(t *testing.T) {
+		s, _ := releaseService(t)
+		createBaselineTestEntity(t, s)
+		items, _, err := s.ListEntities(context.Background(), "development", "")
+		if err != nil || len(items) == 0 {
+			t.Fatalf("entities=%#v err=%v", items, err)
+		}
+		for _, item := range items {
+			if item.ChangeStatus != "created" {
+				t.Fatalf("entity=%#v", item)
+			}
+		}
+	})
+
+	t.Run("degrades when historical state cannot be parsed", func(t *testing.T) {
+		s, _ := releaseService(t)
+		createBaselineTestEntity(t, s)
+		releasedAt := time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+		after := release.AuditState{RemoteETag: "etag-history", Version: "1", ObservedAt: releasedAt}
+		if err := s.releases.Save(release.Release{ReleaseID: "rel_invalid_state", EnvironmentID: "development", Kind: "publish", Outcome: "succeeded", CreatedAt: releasedAt, CompletedAt: releasedAt, OperationID: "op_invalid_state", RemoteState: "changed", RiskSummary: "low", RemoteAfter: &after}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.releases.SaveConflowState("rel_invalid_state", json.RawMessage(`[]`)); err != nil {
+			t.Fatal(err)
+		}
+		items, _, err := s.ListEntities(context.Background(), "development", "")
+		if err != nil || len(items) == 0 || items[0].ChangeStatus != "created" {
+			t.Fatalf("entities=%#v err=%v", items, err)
+		}
+		if _, found, err := s.baselines.Load("development"); err != nil || found {
+			t.Fatalf("baseline found=%v err=%v", found, err)
+		}
+	})
+}
+
+func createBaselineTestEntity(t *testing.T, s *Service) draft.View {
+	t.Helper()
+	view, revision, err := s.GetDraft(context.Background(), "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := EntityRecord{ID: "inter_global_cap", Fields: map[string]any{"cooldown_ms": float64(30000), "interval_ms": float64(300000), "max_count": float64(3), "shift_count": float64(1), "positions": []any{"open_document"}}}
+	if _, _, err := s.MutateEntity(context.Background(), "development", EntityMutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: "baseline", EntityType: "frequency_policy", EntityID: record.ID, Entity: &record, Action: "create"}); err != nil {
+		t.Fatal(err)
+	}
+	view, _, err = s.GetDraft(context.Background(), "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return view
 }
 
 func TestReleaseBlockingPlanCannotBeConfirmedAway(t *testing.T) {

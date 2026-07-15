@@ -285,6 +285,20 @@ test("功能开关可从创建抽屉保存", async ({ page }) => {
   await expect(page.getByRole("switch", { name: "切换 enable_first_entry" })).toHaveAttribute("aria-checked", "true"); await expect(page.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "编辑功能开关 enable_first_entry" })).toBeVisible(); await expect(page.getByRole("button", { name: "删除功能开关 enable_first_entry" })).toBeVisible();
 });
 
+test("功能开关操作列完整显示编辑、删除和切换控件", async ({ page }) => {
+  await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("tab", { name: "功能开关" }).click();
+  const row = page.getByRole("row", { name: /enable_native_preload/ });
+  const actions = row.locator("td").last();
+  const actionBox = await actions.boundingBox();
+  for (const control of [row.getByRole("button", { name: /编辑功能开关/ }), row.getByRole("button", { name: /删除功能开关/ }), row.getByRole("switch")]) {
+    await expect(control).toBeVisible();
+    const controlBox = await control.boundingBox();
+    expect(actionBox).not.toBeNull(); expect(controlBox).not.toBeNull();
+    expect(controlBox!.x).toBeGreaterThanOrEqual(actionBox!.x);
+    expect(controlBox!.x + controlBox!.width).toBeLessThanOrEqual(actionBox!.x + actionBox!.width);
+  }
+});
+
 function fieldsOf(value: { id: string; [key: string]: unknown }) { const { id: _id, ...fields } = value; return fields; }
 function meta(revision: number) { return { request_id: "req_configuration", revision }; }
 function view(type: string, id: string, fields: Record<string, unknown>, dirty: boolean, changeStatus?: string) { const record = { id, fields }; return { change_status: changeStatus ?? (dirty ? "modified" : "unchanged"), entity_ref: `entity:mobile-ad-monetization/v1:${type}:${id}`, entity_type: type, entity_id: id, source: { present: true, value: record }, draft: dirty ? { present: true, value: record } : { present: false }, resolved: { present: true, value: record }, effective: { present: true, value: record }, origin: dirty ? "draft_baseline" : "baseline", source_revision: "source_1" }; }
