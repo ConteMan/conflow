@@ -73,8 +73,10 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 `internal/packs/mobile_ad_v2.go` placement entity 新增字段：
 
 ```go
-field("network_mode", FieldTypeString, false, false, `"admob"`, "广告链路", "覆盖全局 ad_network_mode。", "select", "投放", 5, enum("admob", "max"))
+field("network_mode", FieldTypeString, false, true, `"admob"`, "广告链路", "覆盖全局 ad_network_mode；空表示继承全局配置。", "select", "投放", 5, enum("admob", "max"))
 ```
+
+> 维护者修订（2026-07-15）：`network_mode` 调整为可空，空值表示继承全局 `ad_network_mode`。
 
 ### 测试变更
 

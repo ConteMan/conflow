@@ -81,6 +81,8 @@
 
 沿用 v1 的稳定实体 ID、`key`、`default_value`、`risk_level` 和 `rollback_method`。每个开关编译为独立 Boolean 受管参数，不嵌入广告位或频控聚合 JSON。
 
+> 维护者修订（2026-07-15）：新增可空 `description` 字段用于用途说明，仅存于基线，不参与编译输出。
+
 ### `network_settings`
 
 项目基线必须且只能包含一个 ID 为 `default` 的网络设置实体：
@@ -105,6 +107,8 @@
 
 五个字段都必须显式存在，值可以为 `null`。全为 `null` 是合法的“无额外频控”策略，不等价于实体缺失。数组去重并按规范化顺序编译；源文件中的数组顺序不产生业务语义。
 
+> 维护者修订（2026-07-15）：新增可空 `description` 字段用于用途说明，仅存于基线，不参与编译输出。
+
 ### `placement`
 
 | 字段 | 类型 | 可空 | 说明 |
@@ -122,6 +126,11 @@
 | `fallback_behavior` | string | 否 | 广告不可用时的业务动作 |
 
 `client_id` 在同一项目内唯一，允许与 Conflow 的 snake_case 实体 ID 不同。`preset` 必须且只能设置 `frequency_policy_id`；`custom` 必须且只能设置 `custom_frequency_policy`。广告位不保存可变的 unit ID，也不把网络供应商字段嵌进基础实体。
+
+> 维护者修订（2026-07-15）：
+> - 新增可空 `description` 字段用于用途说明，仅存于基线，不参与编译输出；
+> - `network_mode`（Spec 022 新增）调整为可空 enum（`admob`、`max`），空表示继承全局 `ad_network_mode`；
+> - `fallback_behavior` 收敛为 enum：`continue`、`skip_slot`、`show_empty_safe`。
 
 ### `unit_binding`
 
