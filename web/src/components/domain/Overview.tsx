@@ -78,7 +78,7 @@ export function Overview({ project, selectedEnvironment, environments, pack, val
         </section>
         <section className="panel">
           <div className="panel-heading"><div><h2>配置包能力</h2><p><code>{project.pack_ref}</code></p></div></div>
-          {pack ? <><p className="pack-description">{pack.description}</p><div className="chip-list">{pack.capabilities.map((capability) => <span className="chip" key={capability}>{capability.replaceAll("_", " ")}</span>)}</div><dl className="detail-list"><div><dt>Schema version</dt><dd>{pack.schema_version}</dd></div><div><dt>实体类型</dt><dd>{pack.entity_types.length}</dd></div></dl></> : <p className="muted-copy">Pack 元数据暂时不可用；项目仍可管理。</p>}
+          {pack ? <><p className="pack-description">{pack.description}</p><div className="chip-list">{pack.capabilities.map((capability) => <span className="chip" key={capability}>{capabilityLabel(capability)}</span>)}</div><dl className="detail-list"><div><dt>Schema 版本</dt><dd>{pack.schema_version}</dd></div><div><dt>实体类型</dt><dd>{pack.entity_types.length}</dd></div></dl></> : <p className="muted-copy">Pack 元数据暂时不可用；项目仍可管理。</p>}
         </section>
       </div>
       <ProviderConnectionCard environment={selectedEnvironment} />
@@ -96,6 +96,13 @@ export function kindLabel(kind: Environment["kind"]) {
 
 function uniqueSubtitle(projectName: string, environmentName: string) {
   return [...new Set([projectName, environmentName])].join(" · ");
+}
+
+function capabilityLabel(capability: string) {
+  return ({
+    entities: "实体管理",
+    environment_overrides: "环境覆盖",
+  } as Record<string, string>)[capability] ?? capability;
 }
 
 function countDiagnostics(validation: ValidationResult | null) {
