@@ -39,6 +39,7 @@ func mobileAdV2Definition() Definition {
 					field("default_value", FieldTypeBoolean, true, false, "false", "默认值", "未覆盖时使用的开关值。", "switch", "基础", 1, FieldValidation{}),
 					field("risk_level", FieldTypeString, true, false, `"medium"`, "风险等级", "变更该开关的业务风险。", "select", "治理", 2, enum("low", "medium", "high")),
 					field("rollback_method", FieldTypeString, true, false, `""`, "回滚方式", "发生风险时的标准回滚操作。", "input", "治理", 3, FieldValidation{}),
+					field("description", FieldTypeString, false, true, "null", "描述", "功能开关用途说明。", "input", "基础", 4, FieldValidation{}),
 				}},
 				{Name: "network_settings", Fields: []FieldSchema{
 					field("active_network", FieldTypeString, true, false, `""`, "当前网络", "当前生效网络或聚合平台的稳定 ID。", "input", "网络", 0, FieldValidation{}),
@@ -51,11 +52,13 @@ func mobileAdV2Definition() Definition {
 					field("max_count", FieldTypeObject, true, true, "null", "次数上限", "session 或 day 的次数上限。", "count_limit", "频控", 2, FieldValidation{}),
 					field("shift_count", FieldTypeObject, true, true, "null", "分时上限", "本地上午和下午的次数上限。", "shift_limit", "频控", 3, FieldValidation{}),
 					field("positions", FieldTypeArray, true, true, "null", "适用位置", "固定业务位置集合。", "tags", "频控", 4, FieldValidation{}),
+					field("description", FieldTypeString, false, true, "null", "描述", "频控策略用途说明。", "input", "频控", 5, FieldValidation{}),
 				}},
 				{Name: "placement", Fields: []FieldSchema{
 					field("client_id", FieldTypeString, true, false, `""`, "客户端 ID", "编译到客户端聚合 JSON 的稳定 ID。", "input", "基础", 0, FieldValidation{}),
 					field("key", FieldTypeString, true, false, `""`, "广告位键", "面向业务的稳定键。", "input", "基础", 1, FieldValidation{}),
 					field("ad_type", FieldTypeString, true, false, `"interstitial"`, "广告类型", "支持开屏、插屏和原生广告。", "select", "基础", 2, enum("app_open", "interstitial", "native")),
+					field("description", FieldTypeString, false, true, "null", "描述", "广告位用途说明。", "input", "基础", 3, FieldValidation{}),
 					field("enabled_switch_id", FieldTypeReference, true, false, `""`, "启用开关", "引用 feature_switch 实体 ID。", "feature_switch_ref", "投放", 3, FieldValidation{}),
 					field("frequency_policy_type", FieldTypeString, true, false, `"preset"`, "频控类型", "使用预设或自定义频控策略。", "select", "投放", 4, enum("preset", "custom")),
 					field("network_mode", FieldTypeString, false, true, `"admob"`, "广告链路", "覆盖全局 ad_network_mode；空表示继承全局配置。", "select", "投放", 5, enum("admob", "max")),
