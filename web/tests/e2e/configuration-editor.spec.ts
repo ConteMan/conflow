@@ -30,7 +30,7 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
   const placements = mode === "empty" ? [] : [...fixture.entities.placements.slice(0, 3), fixture.entities.placements.find((item) => item.id === "ad_interstitial_001")!].map((item) => ({ ...item }));
   const policies = mode === "empty" ? [] : fixture.entities.frequency_policies.map((item) => ({ ...item }));
   const switches = mode === "empty" ? [] : fixture.entities.feature_switches.map((item) => ({ ...item }));
-  // ConfigurationEditor.tsx:500-517 stores Android bindings by advertising network.
+  // Bindings are stored by Android advertising network.
   const bindings: Record<string, Array<{ id: string; fields: Record<string, unknown> }>> = {
     development: mode === "empty" ? [] : placements.flatMap((placement, index) => (["max", "admob"] as const).map((network) => ({ id: `ub_development_android_${network}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "development", platform: "android", network, unit_id_ref: `${network}_dev_${index + 1}`, status: "configured" } }))),
     production: mode === "empty" ? [] : placements.flatMap((placement, index) => (["max", "admob"] as const).map((network) => ({ id: `ub_production_android_${network}_${placement.id}`, fields: { placement_id: placement.id, environment_id: "production", platform: "android", network, unit_id_ref: placement.id === placements[2].id ? null : `${network}_prod_${index + 1}`, status: placement.id === placements[2].id ? "missing" : "configured" } }))),
@@ -132,11 +132,22 @@ async function mockConfigurationAPI(page: Page, mode: "normal" | "conflict" | "v
 
 test("列表加载后可按类型和文本筛选", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration");
-  await expect(page.getByRole("row", { name: /app_open_cold_start/ })).toBeVisible();
+  const table = page.getByRole("table", { name: "广告位列表" });
+  await expect(table.getByRole("row", { name: /app_open_cold_start/ })).toBeVisible();
+  await expect(page.getByText("总计 4 个广告位 · 筛选命中 4 个", { exact: true })).toBeVisible();
   await page.getByLabel("按类型筛选").selectOption("native");
-  await expect(page.getByRole("row", { name: /app_open_cold_start/ })).toHaveCount(0);
+  await expect(table.getByRole("row", { name: /app_open_cold_start/ })).toHaveCount(0);
   await page.getByLabel("按类型筛选").selectOption("all"); await page.getByPlaceholder("搜索名称或 key").fill("warm_resume");
-  await expect(page.getByRole("row", { name: /app_open_warm_resume/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /app_open_warm_resume/ })).toBeVisible();
+  await expect(page.getByText("总计 4 个广告位 · 筛选命中 1 个", { exact: true })).toBeVisible();
+});
+
+test("配置列表默认按 key 排序且可切换排序方向", async ({ page }) => {
+  await mockConfigurationAPI(page); await page.goto("/#configuration");
+  const table = page.getByRole("table", { name: "广告位列表" });
+  await expect(table.locator("tbody tr").first()).toContainText("app_open_after_document_share");
+  await table.getByRole("columnheader", { name: "广告位 key" }).getByRole("button").click();
+  await expect(table.locator("tbody tr").first()).toContainText("interstitial_open_document");
 });
 
 test("运行校验显示摘要、行锚点和广告位详情诊断", async ({ page }) => {
@@ -161,11 +172,11 @@ test("历史校验结果为 stale 时提示重新运行", async ({ page }) => {
 
 test("新建广告位后回到列表并显示未发布修改", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
-  // ConfigurationEditor.tsx:429 and :464 derive a new placement ID directly from its key.
+  // A new placement ID is derived directly from its key.
   await page.getByLabel("广告位键").fill("interstitial_test_entry");
   await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
   const createdRow = page.getByRole("row", { name: /interstitial_test_entry/ });
-  // ConfigurationEditor.tsx:250-251 renders the description fallback and dirty state in the list row.
+  // The list row retains the description fallback and dirty state.
   await expect(createdRow).toBeVisible(); await expect(createdRow.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(createdRow.getByText("已修改", { exact: true })).toBeVisible();
 });
 
@@ -190,7 +201,7 @@ test("422 将字段错误定位到对应表单行", async ({ page }) => {
 
 test("环境绑定矩阵以环境覆盖范围写入", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "编辑 app_open_cold_start" }).click();
-  // ConfigurationEditor.tsx:500-517 exposes MAX and AdMob, with MAX's current environment as the editable row.
+  // The matrix exposes MAX and AdMob, with the current environment editable.
   await page.getByLabel("编辑 Development MAX 绑定").click(); await page.getByLabel("Development max 单元 ID").fill("max_dev_changed"); await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByText("max_dev_changed")).toBeVisible();
 });
@@ -227,7 +238,7 @@ test("创建后的广告位键为只读通用值", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
   await page.getByLabel("广告位键").fill("interstitial_test_entry"); await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
   await page.getByRole("button", { name: "编辑 interstitial_test_entry" }).click();
-  // ConfigurationEditor.tsx:468 and :490 set the existing placement key to the input's readOnly state.
+  // Existing placement keys remain read-only.
   await expect(page.getByLabel("广告位键")).toHaveJSProperty("readOnly", true); await expect(page.getByText("所有环境一致，不可修改").first()).toBeVisible();
 });
 
@@ -235,15 +246,15 @@ test("全空引导可创建频控和广告位并通过校验", async ({ page }) 
   await mockConfigurationAPI(page, "empty"); await page.goto("/#configuration");
   const guide = page.getByLabel("配置创建引导");
   await expect(guide.getByRole("button", { name: "创建频控策略" })).toBeVisible();
-  // ConfigurationEditor.tsx:186 keeps the binding setup as a disabled third guide step.
+  // The guide keeps binding setup as a disabled third step.
   await expect(guide.getByRole("button", { name: "配置广告单元绑定" })).toBeDisabled();
   await guide.getByRole("button", { name: "创建频控策略" }).click();
   const policyDrawer = page.getByRole("dialog", { name: "新建频控策略" });
-  // ConfigurationEditor.tsx:320 defines the create-only frequency key input.
+  // The frequency key is available only while creating a policy.
   await policyDrawer.getByLabel("频控键").fill("first_frequency"); await policyDrawer.getByLabel("适用位置").fill("document_entry"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
   await expect(policyDrawer).toHaveCount(0);
   await page.getByRole("button", { name: "新建广告位" }).click();
-  // ConfigurationEditor.tsx:429 derives the placement entity ID from the new key.
+  // The placement entity ID is derived from the new key.
   await page.getByLabel("广告位键").fill("interstitial_first_entry"); await page.getByLabel("频控策略").selectOption("first_frequency"); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_first_entry/ })).toBeVisible();
   await page.getByRole("button", { name: /运行校验/ }).first().click(); await expect(page.getByText("可发布", { exact: true })).toBeVisible();
@@ -255,11 +266,11 @@ test("广告位空频控提示可直达创建并自动回填", async ({ page }) 
   await expect(page.getByText("还没有频控策略——先创建一个", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "新建频控策略" }).click();
   const policyDrawer = page.getByRole("dialog", { name: "新建频控策略" });
-  // ConfigurationEditor.tsx:320 exposes the frequency entity ID as “频控键”.
+  // The frequency entity ID is exposed as "频控键".
   await policyDrawer.getByLabel("频控键").fill("placement_frequency"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
   await expect(page.getByRole("dialog", { name: "新建频控策略" })).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: "频控策略" })).toHaveValue("placement_frequency");
-  // ConfigurationEditor.tsx:429 derives the placement entity ID from the new key.
+  // The placement entity ID is derived from the new key.
   await page.getByLabel("广告位键").fill("interstitial_direct_entry"); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_direct_entry/ })).toBeVisible();
 });
@@ -268,9 +279,9 @@ test("功能开关可从创建抽屉保存", async ({ page }) => {
   await mockConfigurationAPI(page, "empty"); await page.goto("/#configuration"); await page.getByRole("tab", { name: "功能开关" }).click();
   await page.getByRole("button", { name: "新建开关" }).click();
   const drawer = page.getByRole("dialog", { name: "新建开关" });
-  // ConfigurationEditor.tsx:338 and :354 use the create-time key as both the Remote Config key and entity ID.
+  // The create-time key is both the Remote Config key and entity ID.
   await drawer.getByLabel("开关键").fill("enable_first_entry"); await drawer.getByLabel("默认启用").click(); await drawer.getByRole("button", { name: "创建开关" }).click();
-  // ConfigurationEditor.tsx:270 renders the description fallback and row-level edit/delete actions.
+  // The list retains its description fallback and row-level edit/delete actions.
   await expect(page.getByRole("switch", { name: "切换 enable_first_entry" })).toHaveAttribute("aria-checked", "true"); await expect(page.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "编辑功能开关 enable_first_entry" })).toBeVisible(); await expect(page.getByRole("button", { name: "删除功能开关 enable_first_entry" })).toBeVisible();
 });
 
@@ -284,7 +295,7 @@ test("已有频控时新建广告位默认选中策略且状态一致", async ({
   await mockConfigurationAPI(page); await page.goto("/#configuration");
   await page.getByRole("button", { name: "新建广告位" }).click();
   await expect(page.getByLabel("频控策略")).toHaveValue("inter_global_cap");
-  // ConfigurationEditor.tsx:429 uses the placement key as the entity ID for a new placement.
+  // The placement key becomes the entity ID for a new placement.
   await page.getByLabel("广告位键").fill("default_ref_entry");
   await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /default_ref_entry/ })).toBeVisible();
