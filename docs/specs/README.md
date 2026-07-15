@@ -24,8 +24,14 @@
 | [016](016-git-json-source.md) | Git JSON 源适配器与迁移 | 004、005、008 | 已实现 |
 | [017](017-git-review-workflow.md) | Git 评审工作流与审阅产物 | 008、016 | 已实现 |
 | [018](018-cli-automation.md) | CLI 能力对齐与自动化契约 | 007–011、016、017 | 已实现 |
-| [019](019-release-update.md) | 跨平台发版、签名与更新 | 015、018 | 待实现 |
-| [020](020-mobile-ad-pack-v2.md) | 移动广告配置包 v2 与聚合参数编译 | 006、008、011 | 待实现 |
+| [019](019-release-update.md) | 跨平台发版、签名与更新 | 015、018 | 已实现 |
+| [020](020-mobile-ad-pack-v2.md) | 移动广告配置包 v2 与聚合参数编译 | 006、008、011 | 已实现 |
+| [021](021-config-import.md) | 配置导入（导出 / 预览 / 应用） | 004、005、020 | 已实现 |
+| [022](022-v2-placement-compile-fix.md) | v2 广告位编译格式与客户端合约对齐 | 020 | 已实现 |
+| [023](023-ui-binding-matrix-network.md) | UI 环境绑定矩阵改版（按广告网络维度） | 014、020、022 | 已实现 |
+| [024](024-entity-dirty-baseline.md) | 实体未发布修改以上次发布为基线 | 004、011 | 待实现 |
+| [025](025-plan-invalidation-tiers.md) | 发布计划失效分层与自动重建 | 008 | 待实现 |
+| [026](026-config-tables-tanstack.md) | 配置列表迁移 TanStack Table | 014 | 待实现 |
 
 新建规格使用 [template.md](template.md)。
 
