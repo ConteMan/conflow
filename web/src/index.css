@@ -85,16 +85,10 @@ code { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monos
 .metric-label svg { width: 19px; color: var(--accent); }
 .metric strong { display: block; margin-top: 13px; font-size: 24px; }
 .metric p { margin: 7px 0 0; color: var(--text-muted); font-size: 12px; }
-.overview-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 22px; }
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 22px; }
 .panel { padding: 20px; }
 .panel-heading { display: flex; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
 .panel-heading h2, .editor-panel h2 { margin: 0 0 5px; font-size: 17px; }
-.environment-summary-list { margin: 0 -20px -20px; }
-.environment-summary { display: flex; width: 100%; min-height: 64px; align-items: center; justify-content: space-between; padding: 10px 20px; border: 0; border-bottom: 1px solid var(--border); text-align: left; background: transparent; }
-.environment-summary:last-child { border-bottom: 0; }
-.environment-summary:hover, .environment-summary--active { background: var(--surface-muted); }
-.environment-summary span:first-child { display: grid; gap: 4px; }
-.environment-summary code { color: var(--text-muted); }
 .kind-badge, .chip { display: inline-flex; width: fit-content; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 999px; background: var(--surface-muted); font-size: 12px; font-weight: 700; }
 .kind-badge--production { color: var(--danger); background: var(--danger-soft); }
 .kind-badge--development { color: var(--success); background: var(--success-soft); }
@@ -141,16 +135,19 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .center-state { display: flex; min-height: 78vh; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
 .center-state h1 { margin: 18px 0 6px; font-size: 25px; }
 .center-state p { max-width: 560px; margin: 0 0 20px; color: var(--text-muted); }
-.overview-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.project-settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .provider-card { display: grid; gap: 14px; margin-top: 20px; padding: 22px; }
 .provider-card .panel-heading { margin-bottom: 0; }
 .provider-status { display: inline-flex; min-height: 28px; align-items: center; gap: 6px; padding: 0 9px; border-radius: 999px; color: var(--text-muted); background: var(--surface-muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .provider-status--connected { color: var(--success); background: var(--success-soft); }
 .provider-status--unauthorized, .provider-status--unavailable { color: var(--danger); background: var(--danger-soft); }
-.provider-path-field { display: grid; max-width: 660px; gap: 7px; color: var(--text); font-size: 13px; font-weight: 650; }
+.provider-fields { display: grid; max-width: 660px; gap: 14px; }
+.provider-path-field { display: grid; gap: 7px; color: var(--text); font-size: 13px; font-weight: 650; }
 .provider-path-field input { width: 100%; }
 .provider-path-display, .provider-operation { margin: -4px 0 0; color: var(--text-muted); font-size: 12px; }
 .provider-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.provider-action { display: grid; align-content: start; gap: 5px; }
+.provider-action .provider-action-caption { margin: 0; max-width: 240px; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
 .provider-error, .provider-callout { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 13px; }
 .state-icon { display: inline-flex; width: 64px; height: 64px; align-items: center; justify-content: center; border-radius: 50%; }
 .state-icon--danger { color: var(--danger); background: var(--danger-soft); }
