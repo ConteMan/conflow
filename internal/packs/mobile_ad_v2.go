@@ -13,7 +13,7 @@ func mobileAdV2Definition() Definition {
 		Metadata: Metadata{
 			Name:         "mobile-ad-monetization",
 			Version:      "v2",
-			Description:  "Versioned contract for mobile advertising configuration with structured frequency controls.",
+			Description:  "移动广告配置的版本化合同，含结构化频控。",
 			Capabilities: []string{"entities", "environment_overrides"},
 			EntityTypes: []EntityMetadata{
 				defaultEntity("remote_config_layout", "remote_config_layouts", "远端配置布局", "定义广告聚合参数布局。", nil),
