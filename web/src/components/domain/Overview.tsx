@@ -11,7 +11,7 @@ export function Overview({ project, selectedEnvironment, pack, validation, draft
   selectedEnvironment: Environment;
   pack: PackMetadata | null;
   validation: ValidationResult | null;
-  draftDirty: boolean;
+  draftDirty: boolean | null;
   revision: number;
   onManageProject: () => void;
   onSaveEnvironment: (environment: Environment) => Promise<boolean>;
@@ -56,7 +56,7 @@ export function Overview({ project, selectedEnvironment, pack, validation, draft
       </header>
       <section className="metric-grid" aria-label="项目状态">
         <Metric icon={<Boxes />} label="配置实体" value={entityCounts ? String(entityCounts.placement + entityCounts.frequencyPolicy + entityCounts.featureSwitch) : "—"} detail={entityCounts ? `${entityCounts.placement} 广告位 · ${entityCounts.frequencyPolicy} 频控 · ${entityCounts.featureSwitch} 开关` : "实体数据暂不可用"} muted={!entityCounts} />
-        <Metric icon={<GitBranch />} label="未发布修改" value={draftDirty ? "有修改" : "已同步"} detail={draftDirty ? "等待校验与发布" : `revision ${revision}`} />
+        <Metric icon={<GitBranch />} label="未发布修改" value={draftDirty === null ? "正在获取" : draftDirty ? "有修改" : "已同步"} detail={draftDirty === null ? "正在获取草稿状态" : draftDirty ? "等待校验与发布" : `revision ${revision}`} muted={draftDirty === null} />
         <Metric icon={<ShieldCheck />} label="校验状态" value={validationReady ? "可发布" : validation ? "有阻断" : "未校验"} detail={validation ? `阻断 ${diagnosticCounts.blocking} · 提醒 ${diagnosticCounts.warning}` : "运行校验以检查发布条件"} muted={!validation} />
         <Metric icon={<Cloud />} label="远端连接" value={provider.value} detail={provider.detail} muted={providerStatus === null} />
       </section>

@@ -24,7 +24,7 @@ function bootstrap(environments = initialEnvironments) {
   };
 }
 
-async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; conflictProject?: boolean; conflictEnvironment?: boolean; readOnly?: boolean } = {}) {
+async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; conflictProject?: boolean; conflictEnvironment?: boolean; readOnly?: boolean; changedEntityCount?: number } = {}) {
   const state = bootstrap(structuredClone(initialEnvironments));
   if (options.readOnly) state.data.capabilities = { project_edit: false, environment_manage: false };
   let bootstrapFailures = 0;
@@ -40,6 +40,9 @@ async function mockAPI(page: Page, options: { failBootstrapOnce?: boolean; confl
     }
     if (path === "/api/v1/packs/mobile-ad-monetization/versions/v1") {
       await json(route, { data: { ref: "mobile-ad-monetization/v1", name: "mobile-ad-monetization", version: "v1", description: "Mobile ad placement and frequency controls.", capabilities: ["environment_overrides", "semantic_diff"], schema_version: 1, entity_types: [] }, meta: { request_id: "req_pack", revision: 1 } }); return;
+    }
+    if (path === "/api/v1/drafts/development" && request.method() === "GET") {
+      await json(route, { data: { changed_entity_count: options.changedEntityCount ?? 0 }, meta: { request_id: "req_draft", revision: 1 } }); return;
     }
     if (path === "/api/v1/environments/development/provider" && request.method() === "GET") {
       providerStatusRequests += 1;
@@ -126,6 +129,13 @@ test("bootstrap renders project overview from API data", async ({ page }) => {
   await expect(page.getByText("未发布修改").locator("../..")).toContainText("已同步");
   await expect(page.getByText("校验状态").locator("../..")).toContainText("未校验");
   await expect(page.getByText("远端连接").locator("../..")).toContainText("未配置");
+});
+
+test("overview and top bar use the draft summary after bootstrap", async ({ page }) => {
+  await mockAPI(page, { changedEntityCount: 2 });
+  await page.goto("/");
+  await expect(page.locator("article.metric").filter({ hasText: "未发布修改" })).toContainText("有修改");
+  await expect(page.getByLabel("未发布修改状态")).toHaveText("有未发布修改");
 });
 
 test("production identity comes from environment kind and remains explicit", async ({ page }) => {

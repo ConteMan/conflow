@@ -76,7 +76,7 @@ export function DataTable<TData>({
     <table aria-label={ariaLabel} className="data-table-table" style={minTableWidth ? { minWidth: minTableWidth } : undefined}>
       <thead>{table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => {
         const pinned = header.column.getIsPinned();
-        return <th key={header.id} className={pinningClassName(pinned, scrollState, true)} style={pinningStyle(header.column)}>{header.isPlaceholder ? null : header.column.getCanSort()
+        return <th key={header.id} className={pinningClassName(pinned, scrollState, true)} style={columnStyle(header.column)}>{header.isPlaceholder ? null : header.column.getCanSort()
           ? <button className="data-table-sort-button" type="button" onClick={header.column.getToggleSortingHandler()}>{flexRender(header.column.columnDef.header, header.getContext())}<SortIndicator column={header.column} /></button>
           : flexRender(header.column.columnDef.header, header.getContext())}</th>;
       })}</tr>)}</thead>
@@ -84,7 +84,7 @@ export function DataTable<TData>({
         ? <tr><td className="data-table-empty" colSpan={columns.length}>{emptyState}</td></tr>
         : table.getRowModel().rows.map((row) => <tr key={row.id} className={rowClassName?.(row.original)} onClick={onRowClick ? () => onRowClick(row.original) : undefined}>{row.getVisibleCells().map((cell) => {
           const pinned = cell.column.getIsPinned();
-          return <td key={cell.id} className={pinningClassName(pinned, scrollState)} style={pinningStyle(cell.column)}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>;
+          return <td key={cell.id} className={pinningClassName(pinned, scrollState)} style={columnStyle(cell.column)}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>;
         })}</tr>)}</tbody>
     </table>
   </div>;
@@ -109,4 +109,11 @@ function pinningStyle<TData>(column: Column<TData, unknown>) {
   if (pinned === "left") return { left: column.getStart("left"), position: "sticky" as const };
   if (pinned === "right") return { right: column.getAfter("right"), position: "sticky" as const };
   return undefined;
+}
+
+function columnStyle<TData>(column: Column<TData, unknown>) {
+  const pinning = pinningStyle(column);
+  const size = column.columnDef.size;
+  if (size === undefined) return pinning;
+  return { ...pinning, width: size, minWidth: column.columnDef.minSize ?? size, maxWidth: column.columnDef.maxSize ?? size };
 }
