@@ -1092,6 +1092,11 @@ export interface components {
             effective: components["schemas"]["PresentEntity"];
             origin: components["schemas"]["EntityOrigin"];
             source_revision: string;
+            /**
+             * @description Difference from the last successfully released entity baseline. deleted is only emitted by deletion-list read models.
+             * @enum {string}
+             */
+            change_status: "unchanged" | "modified" | "created" | "deleted";
         };
         EntityReference: {
             entity_ref: components["schemas"]["EntityRef"];
@@ -1182,6 +1187,8 @@ export interface components {
             source_revision: string;
             /** @description Whether the shared baseline or this environment view has an installed replacement. Other environments are excluded. */
             dirty: boolean;
+            /** @description Number of created, modified, or deleted entities compared with the last successful release. */
+            changed_entity_count: number;
             /** @description Non-null scopes installed in this view (shared baseline and this environment only), sorted baseline before environment_override. Other environment overrides are excluded. */
             dirty_scopes: components["schemas"]["DraftWriteScope"][];
             baseline: components["schemas"]["DraftLayerState"];

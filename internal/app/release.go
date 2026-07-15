@@ -17,6 +17,7 @@ import (
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/provider"
 	"github.com/ConteMan/conflow/internal/release"
+	"github.com/ConteMan/conflow/internal/releasedbaseline"
 	"github.com/ConteMan/conflow/internal/remote"
 )
 
@@ -40,13 +41,15 @@ type ReleaseConfirmation struct {
 }
 
 type releasePreflight struct {
-	plan        plan.Plan
-	environment project.Environment
-	remote      remote.Snapshot
-	template    []byte
-	desiredJSON []byte // Conflow effective state at publish time; used as next plan baseline
-	kind        string
-	rollbackOf  string
+	plan           plan.Plan
+	environment    project.Environment
+	remote         remote.Snapshot
+	template       []byte
+	desiredJSON    []byte // Conflow effective state at publish time; used as next plan baseline
+	entityHashes   map[string]string
+	sourceRevision string
+	kind           string
+	rollbackOf     string
 }
 
 type RollbackRequest struct {
@@ -131,12 +134,16 @@ func (s *Service) preflightRelease(ctx context.Context, environmentID string, re
 	if request.ExpectedDraftRevision != p.DraftRevision {
 		return releasePreflight{}, &PlanInvalidatedError{PlanID: p.PlanID, Reason: "draft_revision_changed"}
 	}
-	_, revision, err := s.GetDraft(ctx, environmentID)
+	draftView, revision, err := s.GetDraft(ctx, environmentID)
 	if err != nil {
 		return releasePreflight{}, err
 	}
 	if revision != p.DraftRevision {
 		return releasePreflight{}, &PlanInvalidatedError{PlanID: p.PlanID, Reason: "draft_revision_changed"}
+	}
+	entityHashes, err := s.entityHashes(draftView)
+	if err != nil {
+		return releasePreflight{}, err
 	}
 	info, err := s.SourceInfo(ctx)
 	if err != nil {
@@ -192,7 +199,7 @@ func (s *Service) preflightRelease(ctx context.Context, environmentID string, re
 		return releasePreflight{}, err
 	}
 	_ = publisher
-	return releasePreflight{plan: p, environment: environment, remote: current, template: merged, desiredJSON: input, kind: "publish"}, nil
+	return releasePreflight{plan: p, environment: environment, remote: current, template: merged, desiredJSON: input, entityHashes: entityHashes, sourceRevision: draftView.SourceRevision, kind: "publish"}, nil
 }
 
 func validateReleaseConfirmation(p plan.Plan, environment project.Environment, policy project.ReleaseConfirmationPolicy, confirmation ReleaseConfirmation) error {
@@ -305,6 +312,15 @@ func (s *Service) publishRelease(operationID string, preflight releasePreflight)
 	}
 	if len(preflight.desiredJSON) > 0 {
 		_ = s.releases.SaveConflowState(result.ReleaseID, preflight.desiredJSON)
+	}
+	if preflight.entityHashes == nil {
+		if err := s.baselines.Clear(preflight.environment.ID); err != nil {
+			s.failRelease(operationID, preflight, "recording_audit", err, "changed")
+			return
+		}
+	} else if err := s.baselines.Save(releasedbaseline.Document{EnvironmentID: preflight.environment.ID, ReleaseID: result.ReleaseID, ReleasedAt: result.CompletedAt, SourceRevision: preflight.sourceRevision, Entities: preflight.entityHashes}); err != nil {
+		s.failRelease(operationID, preflight, "recording_audit", err, "changed")
+		return
 	}
 	_, _ = s.operations.Update(operationID, "succeeded", "completed", nil, &operation.Result{ResourceType: "release", ResourceID: result.ReleaseID, Href: "/api/v1/environments/" + preflight.environment.ID + "/releases/" + result.ReleaseID}, "changed")
 	_ = published
@@ -576,7 +592,23 @@ func (s *Service) StartRollback(ctx context.Context, environmentID, releaseID, i
 		return operation.Operation{}, err
 	}
 	targetState, _ := s.releases.ConflowState(releaseID)
-	preflight := releasePreflight{plan: rollbackPlan, environment: environment, remote: current, template: template, desiredJSON: targetState, kind: "rollback", rollbackOf: releaseID}
+	currentDraft, _, err := s.GetDraft(ctx, environmentID)
+	if err != nil {
+		return operation.Operation{}, err
+	}
+	// Releases that predate Conflow-state capture must stay rollbackable:
+	// without the target entity state the baseline is cleared instead of
+	// blocking, and the next successful release rebuilds it.
+	var entityHashes map[string]string
+	if len(targetState) > 0 {
+		var targetConfiguration map[string]any
+		if err := json.Unmarshal(targetState, &targetConfiguration); err == nil {
+			if hashes, err := s.entityHashesForConfiguration(currentDraft.PackRef, targetConfiguration); err == nil {
+				entityHashes = hashes
+			}
+		}
+	}
+	preflight := releasePreflight{plan: rollbackPlan, environment: environment, remote: current, template: template, desiredJSON: targetState, entityHashes: entityHashes, sourceRevision: target.SourceDigest, kind: "rollback", rollbackOf: releaseID}
 	go s.publishRelease(op.OperationID, preflight)
 	return op, nil
 }

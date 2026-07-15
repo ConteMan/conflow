@@ -125,6 +125,7 @@ type View struct {
 	PackRef              string         `json:"pack_ref"`
 	SourceRevision       string         `json:"source_revision"`
 	Dirty                bool           `json:"dirty"`
+	ChangedEntityCount   int            `json:"changed_entity_count"`
 	DirtyScopes          []string       `json:"dirty_scopes"`
 	Baseline             LayerState     `json:"baseline"`
 	EnvironmentOverride  LayerState     `json:"environment_override"`

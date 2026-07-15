@@ -1,0 +1,6 @@
+./compile_v2.go
+./firebase.go
+./plan.go
+./compile_v2_test.go
+./firebase_test.go
+./plan_test.go

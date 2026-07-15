@@ -45,12 +45,12 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [requestError, setRequestError] = useState<{ code: string; requestId?: string } | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
-  const [draftDirty, setDraftDirty] = useState(false);
+  const [changedEntityCount, setChangedEntityCount] = useState(0);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const environmentSelectRef = useRef<HTMLSelectElement>(null);
-  const updateDraftState = useCallback((nextRevision: number, dirty: boolean) => {
+  const updateDraftState = useCallback((nextRevision: number, nextChangedEntityCount: number) => {
     setRevision(nextRevision);
-    setDraftDirty(dirty);
+    setChangedEntityCount(nextChangedEntityCount);
   }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -146,13 +146,13 @@ export default function App() {
   );
   return (
     <div className="app-shell">
-      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={draftDirty} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
+      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={changedEntityCount > 0} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
       {requestError ? <div className="error-container"><RequestError {...requestError} onDismiss={() => setRequestError(null)} /></div> : null}
-      {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} environments={data.environments} pack={pack} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} draftDirty={draftDirty} revision={revision} onManageEnvironments={(environmentId) => { if (environmentId) setSelectedEnvironmentId(environmentId); selectPage("environments"); }} onManageProject={() => selectPage("project")} onSwitchEnvironment={() => environmentSelectRef.current?.focus()} onCreateEnvironment={() => { window.location.hash = "environments?new=1"; setPage("environments"); }} /> : null}
+      {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} environments={data.environments} pack={pack} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} draftDirty={changedEntityCount > 0} revision={revision} onManageEnvironments={(environmentId) => { if (environmentId) setSelectedEnvironmentId(environmentId); selectPage("environments"); }} onManageProject={() => selectPage("project")} onSwitchEnvironment={() => environmentSelectRef.current?.focus()} onCreateEnvironment={() => { window.location.hash = "environments?new=1"; setPage("environments"); }} /> : null}
       {page === "environments" ? <EnvironmentManager environments={data.environments} selectedEnvironmentId={selectedEnvironment.id} busy={busy} readOnly={!data.capabilities.environment_manage} onSelect={setSelectedEnvironmentId} onSubmit={saveEnvironment} onDelete={removeEnvironment} /> : null}
       {page === "project" ? <ProjectSettings project={data.project} busy={busy} readOnly={!data.capabilities.project_edit} onManageEnvironments={() => selectPage("environments")} onSave={saveProject} /> : null}
       {page === "configuration" ? <ConfigurationEditor environment={selectedEnvironment} environments={data.environments} revision={revision} packRef={data.project.pack_ref} focusEntityRef={entityRefFromHash()} onRevision={updateDraftState} onValidation={setValidation} /> : null}
-      {page === "validation" ? <ValidationCenter environment={selectedEnvironment} draftDirty={draftDirty} onValidation={setValidation} onOpenEntity={(entityRef) => { window.location.hash = `configuration?entity_ref=${encodeURIComponent(entityRef)}`; setPage("configuration"); }} onOpenPlan={() => selectPage("plan")} /> : null}
+      {page === "validation" ? <ValidationCenter environment={selectedEnvironment} draftDirty={changedEntityCount > 0} onValidation={setValidation} onOpenEntity={(entityRef) => { window.location.hash = `configuration?entity_ref=${encodeURIComponent(entityRef)}`; setPage("configuration"); }} onOpenPlan={() => selectPage("plan")} /> : null}
       {page === "plan" ? <ReleasePlan environment={selectedEnvironment} onOpenConfiguration={() => selectPage("configuration")} onOpenRelease={(planID) => { window.location.hash = `release/${encodeURIComponent(planID)}`; setPage("release"); }} /> : null}
       {page === "release" ? <ReleaseFlow environment={selectedEnvironment} planID={releasePlanIDFromHash() ?? ""} onOpenPlan={() => { window.location.hash = "plan?rebuild=1"; setPage("plan"); }} onOpenHistory={(releaseID) => { window.location.hash = releaseID ? `releases/${encodeURIComponent(releaseID)}` : "releases"; setPage("releases"); }} onOpenRollback={(releaseID) => { window.location.hash = `rollback/${encodeURIComponent(releaseID)}`; setPage("rollback"); }} /> : null}
       {page === "releases" ? <ReleaseHistory environment={selectedEnvironment} releaseID={releaseIDFromHash()} onOpenRollback={(releaseID) => { window.location.hash = `rollback/${encodeURIComponent(releaseID)}`; setPage("rollback"); }} /> : null}

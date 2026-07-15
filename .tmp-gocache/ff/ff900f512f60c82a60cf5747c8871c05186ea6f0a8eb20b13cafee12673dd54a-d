@@ -1,0 +1,5 @@
+./config.go
+./firebase.go
+./provider.go
+./config_test.go
+./firebase_test.go

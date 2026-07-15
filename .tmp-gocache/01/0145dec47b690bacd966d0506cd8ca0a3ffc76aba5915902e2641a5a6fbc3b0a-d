@@ -1,0 +1,6 @@
+./mobile_ad.go
+./mobile_ad_v2.go
+./store.go
+./validation.go
+./mobile_ad_test.go
+./mobile_ad_v2_test.go

@@ -44,7 +44,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   revision: number;
   packRef: string;
   focusEntityRef?: string;
-  onRevision: (revision: number, dirty: boolean) => void;
+  onRevision: (revision: number, changedEntityCount: number) => void;
   onValidation?: (result: ValidationResult | null) => void;
 }) {
   const [route, setRoute] = useState<EditorRoute>({ mode: "list" });
@@ -84,7 +84,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
         diagnostics,
       ]);
       setSchema(nextSchema.data); setPlacements(nextPlacements.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setDraft(nextDraft.data); setBindings(Object.fromEntries(nextBindings)); setValidation(nextDiagnostics?.data ?? null); onValidation?.(nextDiagnostics?.data ?? null);
-      onRevision(nextDraft.meta.revision, nextDraft.data.dirty);
+      onRevision(nextDraft.meta.revision, nextDraft.data.changed_entity_count);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       setError(toRequestError(cause));
@@ -111,7 +111,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
 
   if (route.mode === "detail") {
     return <>
-      <PlacementDetail packRef={packRef} key={`${environment.id}:${route.id ?? "new"}`} environment={environment} environments={environments} revision={revision} schema={schema} validation={validation} placementID={route.id} focusBindings={route.section === "bindings"} createdPolicy={createdPolicy} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: true })} onBack={() => { setCreatedPolicy(null); setRoute({ mode: "list" }); void loadList(); }} onSaved={(nextRevision, dirty) => { onRevision(nextRevision, dirty); void loadList(); }} />
+      <PlacementDetail packRef={packRef} key={`${environment.id}:${route.id ?? "new"}`} environment={environment} environments={environments} revision={revision} schema={schema} validation={validation} placementID={route.id} focusBindings={route.section === "bindings"} createdPolicy={createdPolicy} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: true })} onBack={() => { setCreatedPolicy(null); setRoute({ mode: "list" }); void loadList(); }} onSaved={(nextRevision, changedEntityCount) => { onRevision(nextRevision, changedEntityCount); void loadList(); }} />
       <FrequencyDrawer packRef={packRef} state={frequencyDrawer} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setFrequencyDrawer(null)} onSaved={(policy) => { if (frequencyDrawer?.mode === "create" && frequencyDrawer.returnToPlacement) setCreatedPolicy(policy); setFrequencyDrawer(null); void loadList(); }} onDelete={(entity) => { setFrequencyDrawer(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={(reference) => { setFrequencyDrawer(null); if (reference.entity_type === "placement") setRoute({ mode: "detail", id: reference.entity_id }); }} />
     </>;
   }
@@ -225,7 +225,7 @@ function PlacementTable({ packRef, placements, draft, bindings, environment, dia
     const fields = placement.effective.value.fields;
     const matchesType = type === "all" || fields.ad_type === type;
     const text = `${placement.entity_id} ${String(fields.key ?? "")}`.toLowerCase();
-    return matchesType && text.includes(query.toLowerCase()) && (!dirtyOnly || isEntityDirty(placement));
+    return matchesType && text.includes(query.toLowerCase()) && (!dirtyOnly || placement.change_status !== "unchanged");
   }), [dirtyOnly, placements, query, type]);
 
   return <>
@@ -238,7 +238,7 @@ function PlacementTable({ packRef, placements, draft, bindings, environment, dia
       <table className="entity-table"><thead><tr><th>广告位 key</th><th>类型</th><th>启用状态</th><th>频控策略</th><th>加载超时</th><th>绑定完整度</th><th>未发布修改</th><th><span className="sr-only">打开详情</span></th></tr></thead>
         <tbody>{rows.map((placement) => <PlacementRow packRef={packRef} key={placement.entity_id} placement={placement} bindings={bindings} environment={environment} diagnostics={diagnosticsForEntity(diagnostics, placement)} onOpen={onOpen} onDelete={onDelete} />)}</tbody>
       </table>
-      {rows.length === 0 ? <div className="table-no-results">{dirtyOnly ? "当前没有未发布修改的广告位。" : "没有符合当前筛选条件的广告位。"}</div> : <footer className="table-footer">显示 {rows.length} / {placements.length} 个广告位{draft?.dirty ? <span>当前环境有未发布修改</span> : null}</footer>}
+      {rows.length === 0 ? <div className="table-no-results">{dirtyOnly ? "当前没有未发布修改的广告位。" : "没有符合当前筛选条件的广告位。"}</div> : <footer className="table-footer">显示 {rows.length} / {placements.length} 个广告位{draft && draft.changed_entity_count > 0 ? <span>当前环境有未发布修改</span> : null}</footer>}
     </section>}
   </>;
 }
@@ -248,7 +248,7 @@ function PlacementRow({ packRef, placement, bindings, environment, diagnostics, 
   const key = String(fields.key ?? placement.entity_id);
   const configured = (bindings[environment.id] ?? []).filter((binding) => binding.effective.value.fields.placement_id === placement.entity_id && binding.effective.value.fields.status === "configured" && binding.effective.value.fields.unit_id_ref).length;
   return <tr onClick={() => onOpen(placement.entity_id)}>
-    <td><div className="entity-label"><code>{key}</code><span className="muted-cell">{descriptionText(fields)}</span></div><DiagnosticAnchor diagnostics={diagnostics} /></td><td>{adTypeLabel(fields.ad_type)}</td><td>{packRef === "mobile-ad-monetization/v2" ? <code>{String(fields.enabled_switch_id ?? "-")}</code> : <StatusChip enabled={Boolean(fields.enabled)} />}</td><td><code>{String(fields.frequency_policy_id ?? "-")}</code></td><td>{Number(fields.load_timeout_ms ?? 0)} ms</td><td>{configured}/2</td><td>{isEntityDirty(placement) ? <span className="dirty-chip">未发布修改</span> : <span className="muted-cell">-</span>}</td><td className="row-actions"><button className="icon-button row-open" aria-label={`编辑 ${key}`} onClick={(event) => { event.stopPropagation(); onOpen(placement.entity_id); }}><ChevronRight size={18} /></button><button className="icon-button row-delete" aria-label={`删除 ${key}`} onClick={(event) => { event.stopPropagation(); onDelete(placement, "placement"); }}><Trash2 size={16} /></button></td>
+    <td><div className="entity-label"><code>{key}</code><span className="muted-cell">{descriptionText(fields)}</span></div><DiagnosticAnchor diagnostics={diagnostics} /></td><td>{adTypeLabel(fields.ad_type)}</td><td>{packRef === "mobile-ad-monetization/v2" ? <code>{String(fields.enabled_switch_id ?? "-")}</code> : <StatusChip enabled={Boolean(fields.enabled)} />}</td><td><code>{String(fields.frequency_policy_id ?? "-")}</code></td><td>{Number(fields.load_timeout_ms ?? 0)} ms</td><td>{configured}/2</td><td><ChangeStatusChip status={placement.change_status} /></td><td className="row-actions"><button className="icon-button row-open" aria-label={`编辑 ${key}`} onClick={(event) => { event.stopPropagation(); onOpen(placement.entity_id); }}><ChevronRight size={18} /></button><button className="icon-button row-delete" aria-label={`删除 ${key}`} onClick={(event) => { event.stopPropagation(); onDelete(placement, "placement"); }}><Trash2 size={16} /></button></td>
   </tr>;
 }
 
@@ -383,7 +383,7 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
   createdPolicy: EntityView | null;
   onCreatePolicy: () => void;
   onBack: () => void;
-  onSaved: (revision: number, dirty: boolean) => void;
+  onSaved: (revision: number, changedEntityCount: number) => void;
 }) {
   const [placement, setPlacement] = useState<EntityView | null>(null);
   const [draft, setDraft] = useState<DraftView | null>(null);
@@ -440,7 +440,7 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
       const response = placementID
         ? await replaceDraftEntity(environment.id, "placement", placementID, revision, { expected_source_revision: draft.source_revision, write_scope: "baseline", entity: record })
         : await createDraftEntity(environment.id, revision, { expected_source_revision: draft.source_revision, write_scope: "baseline", entity_type: "placement", entity: record });
-      setPlacement(response.data); setFields(response.data.effective.value.fields); onSaved(response.meta.revision, true);
+      setPlacement(response.data); setFields(response.data.effective.value.fields); onSaved(response.meta.revision, 1);
       if (!placementID) onBack();
     } catch (cause) {
       if (cause instanceof ConflowAPIError) {
@@ -466,7 +466,7 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
     {loading ? <DetailSkeleton /> : <div className="detail-layout"><div className="detail-main">
       <EntityDiagnostics diagnostics={diagnostics} title="此广告位的校验问题" />
       {groups.map(([group, names]) => { const groupFields = allFields.filter((field) => names.includes(field.name)); return groupFields.length ? <section className="editor-section" key={group}><h2>{group}</h2><div className="field-grid">{groupFields.map((field) => <PlacementField key={field.name} field={field} value={fields[field.name]} readOnly={Boolean(placementID && (field.name === "key" || field.name === "ad_type" || (packRef === "mobile-ad-monetization/v2" && field.name === "client_id")))} policies={policies} switches={switches} caption={field.name === "key" && placementID ? "所有环境一致，不可修改" : fieldCaption(draft, placementID, field.name)} error={fieldErrors[field.name]} onCreatePolicy={onCreatePolicy} onChange={updateField} />)}</div></section> : null; })}
-      <BindingMatrix environments={[environment]} bindings={bindings} diagnostics={validation?.diagnostics ?? []} placementID={placementID} revision={revision} sourceRevision={draft?.source_revision ?? ""} onSaved={(nextRevision) => { onSaved(nextRevision, true); void load(); }} />
+      <BindingMatrix environments={[environment]} bindings={bindings} diagnostics={validation?.diagnostics ?? []} placementID={placementID} revision={revision} sourceRevision={draft?.source_revision ?? ""} onSaved={(nextRevision) => { onSaved(nextRevision, 1); void load(); }} />
     </div><aside className="detail-sidebar"><section className="change-summary"><h2>修改摘要</h2><dl><div><dt>当前环境</dt><dd>{environment.name}</dd></div><div><dt>字段错误</dt><dd>{fieldErrorCount(fieldErrors) ? `${fieldErrorCount(fieldErrors)} 项` : "无"}</dd></div></dl></section><details className="advanced-info"><summary>高级信息与源映射</summary><code>{placement?.entity_ref ?? "将在创建后生成"}</code></details></aside></div>}
     <EntityConflictDialog conflict={conflict} onClose={() => setConflict(null)} onReload={() => { setConflict(null); void load(); }} />
   </main>;
@@ -526,7 +526,7 @@ function EntityConflictDialog({ conflict, onClose, onReload }: { conflict: Entit
 function TableSkeleton() { return <section className="table-panel entity-table-panel"><div className="table-skeleton"><LoaderCircle className="spin" /><span>正在载入广告位</span></div></section>; }
 function DetailSkeleton() { return <div className="detail-skeleton"><LoaderCircle className="spin" /><span>正在载入广告位详情</span></div>; }
 function StatusChip({ enabled }: { enabled: boolean }) { return <span className={enabled ? "status-chip status-chip--enabled" : "status-chip status-chip--disabled"}><i />{enabled ? "已启用" : "已停用"}</span>; }
-function isEntityDirty(entity: EntityView) { return entity.origin === "draft_baseline" || entity.origin === "draft_environment_override" || entity.draft.present; }
+function ChangeStatusChip({ status }: { status: EntityView["change_status"] }) { if (status === "unchanged") return <span className="muted-cell">-</span>; return <span className={status === "created" ? "dirty-chip dirty-chip--created" : "dirty-chip"}>{status === "created" ? "新增" : "已修改"}</span>; }
 function adTypeLabel(value: unknown) { return ({ app_open: "App Open", interstitial: "插屏", native: "原生" } as Record<string, string>)[String(value)] ?? String(value ?? "-"); }
 function enumLabel(name: string, value: string) { if (name === "ad_type") return adTypeLabel(value); return value; }
 function fieldErrorCount(errors: Record<string, string>) { return Object.keys(errors).length; }
