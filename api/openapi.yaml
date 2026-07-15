@@ -3391,6 +3391,23 @@ components:
     PlanInvalidationReason:
       type: string
       enum: [draft_revision_changed, source_digest_changed, remote_etag_changed, remote_snapshot_unavailable, ttl_expired, provider_capability_changed]
+    PlanInvalidation:
+      type: object
+      description: 计划失效的结构化原因。external 表示需要用户确认后重新构建，routine 可由客户端自动重建。
+      additionalProperties: false
+      required: [code, tier, message]
+      properties:
+        code:
+          type: string
+          description: 失效原因的稳定机器码。
+          enum: [plan_expired, draft_advanced, remote_changed, pack_changed]
+        tier:
+          type: string
+          description: 失效处置层级。
+          enum: [routine, external]
+        message:
+          type: string
+          description: 面向用户的失效说明。
     PlanChangeKind:
       type: string
       enum: [created, updated, deleted, overridden]
@@ -3586,6 +3603,8 @@ components:
           format: date-time
         invalidation_reason:
           $ref: "#/components/schemas/PlanInvalidationReason"
+        invalidation:
+          $ref: "#/components/schemas/PlanInvalidation"
         content_digest:
           type: string
         remote_snapshot:

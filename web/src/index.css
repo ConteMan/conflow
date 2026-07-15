@@ -491,12 +491,9 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .release-placeholder p { margin: 0 0 13px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 .release-placeholder .button { width: 100%; }
 .release-placeholder small { display: block; margin-top: 8px; color: var(--text-muted); font-size: 11px; text-align: center; }
-.plan-invalid-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--warning); border-radius: var(--radius-md); color: var(--warning); background: var(--warning-soft); }
-.plan-invalid-actions > div { flex: 1; }
-.plan-invalid-actions p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
-.plan-invalid-dialog { display: grid; justify-items: center; gap: 16px; padding: 22px; text-align: center; }
-.plan-invalid-dialog > div { width: 100%; padding: 12px; border-radius: var(--radius-sm); color: var(--warning); background: var(--warning-soft); text-align: left; }
-.plan-invalid-dialog p { margin: 5px 0 0; color: var(--text); font-size: 13px; }
+.plan-invalidation-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--warning); border-left: 3px solid var(--warning); border-radius: var(--radius-sm); color: var(--warning); background: var(--warning-soft); }
+.plan-invalidation-banner > div { flex: 1; }
+.plan-invalidation-banner p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
 .risk-value--high, .risk-value--blocking { color: var(--danger); }
 .risk-value--medium { color: var(--warning); }
 .risk-value--low { color: var(--success); }
@@ -546,8 +543,8 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
   .configuration-actions .button { flex: 1; }
   .request-error { grid-template-columns: auto 1fr auto; }
   .request-error .link-button { grid-column: 2; justify-self: start; }
-  .validation-readiness, .stale-callout, .plan-status, .plan-invalid-actions { align-items: flex-start; flex-wrap: wrap; }
-  .validation-readiness .button, .stale-callout .button, .plan-invalid-actions .button { width: 100%; }
+  .validation-readiness, .stale-callout, .plan-status, .plan-invalidation-banner { align-items: flex-start; flex-wrap: wrap; }
+  .validation-readiness .button, .stale-callout .button, .plan-invalidation-banner .button { width: 100%; }
   .validation-skeleton { grid-template-columns: 1fr; }
   .validation-skeleton section { grid-column: auto; }
   .plan-sidebar { grid-template-columns: 1fr; }

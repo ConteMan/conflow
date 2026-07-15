@@ -1502,6 +1502,21 @@ export interface components {
         PlanStatus: "ready" | "preview_only" | "invalidated" | "expired";
         /** @enum {string} */
         PlanInvalidationReason: "draft_revision_changed" | "source_digest_changed" | "remote_etag_changed" | "remote_snapshot_unavailable" | "ttl_expired" | "provider_capability_changed";
+        /** @description 计划失效的结构化原因。external 表示需要用户确认后重新构建，routine 可由客户端自动重建。 */
+        PlanInvalidation: {
+            /**
+             * @description 失效原因的稳定机器码。
+             * @enum {string}
+             */
+            code: "plan_expired" | "draft_advanced" | "remote_changed" | "pack_changed";
+            /**
+             * @description 失效处置层级。
+             * @enum {string}
+             */
+            tier: "routine" | "external";
+            /** @description 面向用户的失效说明。 */
+            message: string;
+        };
         /** @enum {string} */
         PlanChangeKind: "created" | "updated" | "deleted" | "overridden";
         PlanNodeID: string;
@@ -1587,6 +1602,7 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
             invalidation_reason?: components["schemas"]["PlanInvalidationReason"];
+            invalidation?: components["schemas"]["PlanInvalidation"];
             content_digest: string;
             remote_snapshot: components["schemas"]["RemoteSnapshot"];
             semantic_changes: components["schemas"]["SemanticChange"][];

@@ -16,8 +16,11 @@ import (
 
 func TestPlanInvalidationInputsAndTTL(t *testing.T) {
 	tests := []struct {
-		name   string
-		change func(t *testing.T, service *Service, workspace string, planID string)
+		name       string
+		change     func(t *testing.T, service *Service, workspace string, planID string)
+		code       string
+		tier       string
+		legacyCode string
 	}{
 		{"draft revision", func(t *testing.T, s *Service, _ string, _ string) {
 			view, revision, err := s.GetDraft(context.Background(), "development")
@@ -28,13 +31,13 @@ func TestPlanInvalidationInputsAndTTL(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-		}},
+		}, "draft_advanced", "routine", "draft_revision_changed"},
 		{"source digest", func(t *testing.T, _ *Service, workspace, _ string) {
 			if err := os.WriteFile(filepath.Join(workspace, ".conflow", "data", "base.yaml"), []byte("feature_switches: []\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-		}},
-		{"remote etag", func(t *testing.T, _ *Service, workspace, _ string) { writeRemote(t, workspace, "etag-2") }},
+		}, "draft_advanced", "routine", "source_digest_changed"},
+		{"remote etag", func(t *testing.T, _ *Service, workspace, _ string) { writeRemote(t, workspace, "etag-2") }, "remote_changed", "external", "remote_etag_changed"},
 		{"ttl", func(t *testing.T, s *Service, _ string, id string) {
 			p, err := s.plans.Get(id)
 			if err != nil {
@@ -44,7 +47,19 @@ func TestPlanInvalidationInputsAndTTL(t *testing.T) {
 			if err := s.plans.Update(p); err != nil {
 				t.Fatal(err)
 			}
-		}},
+		}, "plan_expired", "routine", "ttl_expired"},
+		{"pack reference", func(t *testing.T, s *Service, _ string, _ string) {
+			snapshot, err := s.projects.Snapshot()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.projects.Update(snapshot.Revision, func(manifest *project.Manifest) error {
+				manifest.Pack.ID = "mobile-ad-monetization/v2"
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}, "pack_changed", "external", "pack_changed"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -55,16 +70,35 @@ func TestPlanInvalidationInputsAndTTL(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if test.name == "ttl" {
-				if got.Status != "expired" || got.InvalidationReason != "ttl_expired" {
-					t.Fatalf("ttl result %#v", got)
-				}
-				return
+			wantStatus := "invalidated"
+			if test.code == "plan_expired" {
+				wantStatus = "expired"
 			}
-			if got.Status != "invalidated" {
-				t.Fatalf("status=%s, want invalidated (%#v)", got.Status, got)
+			if got.Status != wantStatus || got.InvalidationReason != test.legacyCode || got.Invalidation == nil || got.Invalidation.Code != test.code || got.Invalidation.Tier != test.tier {
+				t.Fatalf("invalidation = %#v, want status=%s legacy=%s code=%s tier=%s", got, wantStatus, test.legacyCode, test.code, test.tier)
 			}
 		})
+	}
+}
+
+func TestPlanInvalidationExternalTierWins(t *testing.T) {
+	s, workspace := planService(t)
+	p := buildReadyPlan(t, s)
+	view, revision, err := s.GetDraft(context.Background(), "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.MutateDraft(context.Background(), "development", draft.Mutation{ExpectedRevision: revision, ExpectedSourceRevision: view.SourceRevision, Scope: draft.ScopeBaseline, Action: "reset"}); err != nil {
+		t.Fatal(err)
+	}
+	writeRemote(t, workspace, "etag-2")
+
+	got, err := s.GetPlan(context.Background(), p.PlanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Invalidation == nil || got.Invalidation.Code != "remote_changed" || got.Invalidation.Tier != "external" || got.InvalidationReason != "remote_etag_changed" {
+		t.Fatalf("invalidation = %#v, want remote external invalidation", got)
 	}
 }
 

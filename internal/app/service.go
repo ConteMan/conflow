@@ -694,7 +694,12 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		mode = "environment_id"
 	}
 	_, _ = s.operations.Update(operationID, "running", "analyzing", nil, nil, "unchanged")
-	built, err := plan.Build(plan.Input{EnvironmentID: environmentID, EnvironmentKind: environment.Kind, PackRef: view.PackRef, SourceDigest: view.SourceRevision, DraftRevision: revision, Desired: view.Effective, Baseline: baseline, BaseLayer: baseLayer, RemoteSnapshot: remoteSnapshot, ValidationReady: validationResult.Readiness == validation.ReadinessReady && validationResult.Status == validation.StatusFresh, ProductionLowRiskMode: mode})
+	definition, _, err := s.packRegistry.Resolve(view.PackRef)
+	if err != nil {
+		fail("analyzing", err)
+		return
+	}
+	built, err := plan.Build(plan.Input{EnvironmentID: environmentID, EnvironmentKind: environment.Kind, PackRef: view.PackRef, PackSchemaVersion: definition.Schema.Version, SourceDigest: view.SourceRevision, DraftRevision: revision, Desired: view.Effective, Baseline: baseline, BaseLayer: baseLayer, RemoteSnapshot: remoteSnapshot, ValidationReady: validationResult.Readiness == validation.ReadinessReady && validationResult.Status == validation.StatusFresh, ProductionLowRiskMode: mode})
 	if err != nil {
 		fail("analyzing", err)
 		return
@@ -781,34 +786,41 @@ func (s *Service) GetPlan(ctx context.Context, id string) (plan.Plan, error) {
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	if p.Status == "invalidated" || p.Status == "expired" {
-		return p, nil
-	}
+	invalidations := []planInvalidation{}
 	if !time.Now().UTC().Before(p.ExpiresAt) {
-		p.Status = "expired"
-		p.InvalidationReason = "ttl_expired"
-		_ = s.plans.Update(p)
-		return p, nil
+		invalidations = append(invalidations, routineInvalidation("ttl_expired", "plan_expired", "计划已过期，请重新构建。"))
 	}
-	_, revision, err := s.GetDraft(ctx, p.EnvironmentID)
+	manifest, err := s.projects.Snapshot()
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	if revision != p.DraftRevision {
-		p.Status = "invalidated"
-		p.InvalidationReason = "draft_revision_changed"
-		_ = s.plans.Update(p)
-		return p, nil
+	packChanged := manifest.Manifest.Pack.ID != p.PackRef
+	if packChanged {
+		invalidations = append(invalidations, externalInvalidation("pack_changed", "pack_changed", "配置包引用已变化，请重新构建计划。"))
+	} else {
+		definition, _, resolveErr := s.packRegistry.Resolve(manifest.Manifest.Pack.ID)
+		if resolveErr != nil {
+			return plan.Plan{}, resolveErr
+		}
+		if p.PackSchemaVersion() == 0 || definition.Schema.Version != p.PackSchemaVersion() {
+			invalidations = append(invalidations, externalInvalidation("pack_changed", "pack_changed", "配置包 schema 版本已变化，请重新构建计划。"))
+		}
 	}
-	info, err := s.SourceInfo(ctx)
-	if err != nil {
-		return plan.Plan{}, err
-	}
-	if info.Status.Digest != p.SourceDigest {
-		p.Status = "invalidated"
-		p.InvalidationReason = "source_digest_changed"
-		_ = s.plans.Update(p)
-		return p, nil
+	if !packChanged {
+		_, revision, err := s.GetDraft(ctx, p.EnvironmentID)
+		if err != nil {
+			return plan.Plan{}, err
+		}
+		if revision != p.DraftRevision {
+			invalidations = append(invalidations, routineInvalidation("draft_revision_changed", "draft_advanced", "本地草稿已更新，正在重新构建计划。"))
+		}
+		info, err := s.SourceInfo(ctx)
+		if err != nil {
+			return plan.Plan{}, err
+		}
+		if info.Status.Digest != p.SourceDigest {
+			invalidations = append(invalidations, routineInvalidation("source_digest_changed", "draft_advanced", "配置来源已变化，正在重新构建计划。"))
+		}
 	}
 	current, err := s.remote.Current(p.EnvironmentID)
 	if err != nil {
@@ -816,17 +828,50 @@ func (s *Service) GetPlan(ctx context.Context, id string) (plan.Plan, error) {
 	}
 	if p.RemoteETag != nil {
 		if current.Status != "available" {
-			p.Status = "invalidated"
-			p.InvalidationReason = "remote_snapshot_unavailable"
+			invalidations = append(invalidations, externalInvalidation("remote_snapshot_unavailable", "remote_changed", "无法读取线上配置，请重新构建计划。"))
 		} else if current.RemoteETag != *p.RemoteETag {
-			p.Status = "invalidated"
-			p.InvalidationReason = "remote_etag_changed"
-		}
-		if p.Status == "invalidated" {
-			_ = s.plans.Update(p)
+			message := "线上配置发生了 Conflow 之外的修改，请重新构建计划。"
+			if p.RemoteSnapshot.Version != "" && current.Version != "" {
+				message = fmt.Sprintf("线上配置发生了 Conflow 之外的修改（版本 %s -> %s）。", p.RemoteSnapshot.Version, current.Version)
+			}
+			invalidations = append(invalidations, externalInvalidation("remote_etag_changed", "remote_changed", message))
 		}
 	}
+	if invalidation, ok := selectPlanInvalidation(invalidations); ok {
+		p.Status = "invalidated"
+		if invalidation.Invalidation.Code == "plan_expired" {
+			p.Status = "expired"
+		}
+		p.InvalidationReason = invalidation.Reason
+		p.Invalidation = &invalidation.Invalidation
+		_ = s.plans.Update(p)
+	}
 	return p, nil
+}
+
+type planInvalidation struct {
+	Reason       string
+	Invalidation plan.Invalidation
+}
+
+func routineInvalidation(reason, code, message string) planInvalidation {
+	return planInvalidation{Reason: reason, Invalidation: plan.Invalidation{Code: code, Tier: "routine", Message: message}}
+}
+
+func externalInvalidation(reason, code, message string) planInvalidation {
+	return planInvalidation{Reason: reason, Invalidation: plan.Invalidation{Code: code, Tier: "external", Message: message}}
+}
+
+func selectPlanInvalidation(invalidations []planInvalidation) (planInvalidation, bool) {
+	for _, invalidation := range invalidations {
+		if invalidation.Invalidation.Tier == "external" {
+			return invalidation, true
+		}
+	}
+	if len(invalidations) == 0 {
+		return planInvalidation{}, false
+	}
+	return invalidations[0], true
 }
 
 func (s *Service) PlanArtifact(ctx context.Context, planID, name string) ([]byte, plan.ArtifactMetadata, plan.Plan, error) {
