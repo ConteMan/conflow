@@ -123,7 +123,8 @@ test("production identity comes from environment kind and remains explicit", asy
   await page.getByLabel("切换环境").selectOption("production");
   await expect(page.getByTestId("app-topbar")).toHaveClass(/app-topbar--production/);
   await expect(page.getByTestId("production-marker")).toHaveText("Production 环境");
-  await expect(page.getByText("你正在查看 Production")).toBeVisible();
+  // AppTopBar.tsx:19-31 marks Production through the top bar, selector class, and screen-reader marker.
+  await expect(page.getByLabel("切换环境")).toHaveClass(/context-environment--production/);
 });
 
 test("creates and edits an environment through the manifest API", async ({ page }) => {

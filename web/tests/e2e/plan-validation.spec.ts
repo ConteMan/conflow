@@ -61,7 +61,8 @@ test("发布计划显示 Operation 进度和三级展开树", async ({ page }) =
   await expect(page.getByText("2 项直接修改 · 2 个受影响实体 · 2 个远端参数")).toBeVisible();
   await page.getByRole("button", { name: /频控策略冷却时间/ }).click();
   await page.getByRole("button", { name: /广告位 · ad_interstitial_001/ }).click();
-  await expect(page.getByText("ad_frequency_inter_global_cap", { exact: true })).toBeVisible();
+  // ReleasePlan.tsx:118-147 renders this parameter in the expanded semantic tree; the preview table also contains it.
+  await expect(page.locator(".semantic-tree").getByText("ad_frequency_inter_global_cap", { exact: true })).toBeVisible();
 });
 
 test("预览计划明确不可发布", async ({ page }) => {
