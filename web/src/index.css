@@ -422,6 +422,11 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .plan-status--preview { border-color: var(--warning); color: var(--warning); background: var(--warning-soft); }
 .plan-status--invalid { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
 .plan-review--stale { opacity: .64; }
+.plan-empty { display: grid; min-height: calc(100vh - 260px); align-content: center; justify-items: center; gap: 9px; padding: 48px 20px; color: var(--success); text-align: center; }
+.plan-empty h2, .plan-empty p { margin: 0; }
+.plan-empty h2 { color: var(--text); font-size: 18px; }
+.plan-empty p { color: var(--text-muted); line-height: 1.6; }
+.plan-empty .button { margin-top: 7px; }
 .plan-metrics { margin-bottom: 16px; }
 .plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; align-items: start; gap: 20px; }
 .plan-main { display: grid; gap: 16px; min-width: 0; }

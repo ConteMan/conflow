@@ -89,6 +89,8 @@ function PlanReview({ plan, environment, onRebuild, onOpenConfiguration, onOpenR
   const [treeClosed, setTreeClosed] = useState(false);
   useEffect(() => setInvalidDialogOpen(invalid), [invalid, plan.plan_id]);
   const directChanges = plan.semantic_changes.length;
+  const isEmptyPlan = !invalid && directChanges === 0 && plan.affected_entities.length === 0 && plan.remote_parameter_changes.length === 0;
+  if (isEmptyPlan) return <section className="plan-empty"><CheckCircle2 size={32} /><h2>当前环境没有待发布的修改</h2><p>修改配置后可重新构建发布计划。</p><Button onClick={onOpenConfiguration}>返回配置</Button></section>;
   return <>
     <section className={`plan-status ${invalid ? "plan-status--invalid" : plan.status === "preview_only" ? "plan-status--preview" : "plan-status--ready"}`}>{invalid ? <><FileClock size={18} /><strong>这份发布计划已失效</strong><span>{invalidationText(plan.invalidation_reason)}</span></> : plan.status === "preview_only" ? <><CircleAlert size={18} /><strong>不可发布</strong><span>{plan.blocking_reasons.map((item) => item.summary).join("；") || "服务端仅允许预览此计划。"}</span></> : <><CheckCircle2 size={18} /><strong>计划可审阅</strong><span>风险与发布条件均以服务端结果为准。</span></>}</section>
     <section className={invalid ? "plan-review plan-review--stale" : "plan-review"}>
@@ -112,7 +114,6 @@ function PlanReview({ plan, environment, onRebuild, onOpenConfiguration, onOpenR
         </aside>
       </div>
       {invalid ? <section className="plan-invalid-actions"><AlertTriangle size={18} /><div><strong>旧计划保留为参考</strong><p>{invalidationText(plan.invalidation_reason)}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></section> : null}
-      {!invalid && plan.status === "ready" && !plan.semantic_changes.length ? <section className="validation-empty"><CheckCircle2 size={28} /><div><h2>当前环境没有待发布的修改</h2><p>修改配置后可重新构建发布计划。</p><Button onClick={onOpenConfiguration}>返回配置</Button></div></section> : null}
     </section>
     <Modal open={invalid && invalidDialogOpen} onOpenChange={setInvalidDialogOpen} title="这份发布计划已失效" description="配置或线上配置已变化。旧计划只能查看，不能继续发布。">
       <div className="plan-invalid-dialog"><div><strong>失效原因</strong><p>{invalidationText(plan.invalidation_reason)}</p></div><Button variant="primary" onClick={onRebuild} icon={<RefreshCw size={16} />}>重新构建计划</Button></div>
