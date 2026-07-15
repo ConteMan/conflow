@@ -509,9 +509,7 @@ func validateRecords(definition packs.Definition, metadata packs.EntityMetadata,
 		if err := validateEntityID(metadata, record.ID); err != nil {
 			return err
 		}
-		known := make(map[string]packs.FieldSchema, len(schema.Fields))
 		for _, field := range schema.Fields {
-			known[field.Name] = field
 			value, exists := record.Fields[field.Name]
 			if field.Required && !exists {
 				return validationError(scope, metadata.Collection, record.ID, field.Name, "required_field_missing")
@@ -530,11 +528,6 @@ func validateRecords(definition packs.Definition, metadata packs.EntityMetadata,
 			}
 			if !allowsEntityValue(value, field) {
 				return validationError(scope, metadata.Collection, record.ID, field.Name, "value_not_allowed")
-			}
-		}
-		for name := range record.Fields {
-			if _, exists := known[name]; !exists {
-				return validationError(scope, metadata.Collection, record.ID, name, "invalid_config_shape")
 			}
 		}
 	}

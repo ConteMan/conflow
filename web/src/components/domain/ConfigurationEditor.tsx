@@ -461,7 +461,7 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
         Promise.all(environments.map(async (item) => [item.id, (await listDraftEntities(item.id, "unit_binding", signal)).data] as const)),
         placementID ? getDraftEntity(environment.id, "placement", placementID, signal) : Promise.resolve(null),
       ]);
-      let initial = nextPlacement?.data.effective.value.fields ?? defaultsFor(placementSchema?.fields ?? []);
+      let initial = fieldsForSchema(nextPlacement?.data.effective.value.fields ?? defaultsFor(placementSchema?.fields ?? []), placementSchema?.fields ?? []);
       if (!nextPlacement && packRef !== "mobile-ad-monetization/v2" && !initial.frequency_policy_id && nextPolicies.data.length > 0) initial = { ...initial, frequency_policy_id: nextPolicies.data[0].entity_id };
       setDraft(nextDraft.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setBindings(Object.fromEntries(nextBindings)); setPlacement(nextPlacement?.data ?? null); setFields(initial);
     } catch (cause) {
@@ -486,12 +486,12 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
       return;
     }
     setSaving(true); setSystemError(null); setFieldErrors({});
-    const record: EntityRecord = { id, fields };
+    const record: EntityRecord = { id, fields: fieldsForSchema(fields, placementSchema.fields) };
     try {
       const response = placementID
         ? await replaceDraftEntity(environment.id, "placement", placementID, revision, { expected_source_revision: draft.source_revision, write_scope: "baseline", entity: record })
         : await createDraftEntity(environment.id, revision, { expected_source_revision: draft.source_revision, write_scope: "baseline", entity_type: "placement", entity: record });
-      setPlacement(response.data); setFields(response.data.effective.value.fields); onSaved(response.meta.revision, 1);
+      setPlacement(response.data); setFields(fieldsForSchema(response.data.effective.value.fields, placementSchema.fields)); onSaved(response.meta.revision, 1);
       if (!placementID) onBack();
     } catch (cause) {
       if (cause instanceof ConflowAPIError) {
@@ -507,7 +507,7 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
   const title = placementID ? String(fields.key ?? placementID) : "新建广告位";
   const allFields = (placementSchema?.fields ?? []).slice().sort((a, b) => a.ui.order - b.ui.order);
   const groups: Array<[string, readonly string[]]> = packRef === "mobile-ad-monetization/v2"
-    ? [["基础信息", ["client_id", "key", "ad_type", "description"]], ["启用控制", ["enabled_switch_id"]], ["频控", ["frequency_policy_type", "frequency_policy_id"]], ["投放", ["network_mode", "load_timeout_ms", "cache_policy", "cache_ttl", "fallback_behavior"]]]
+    ? [["基础信息", ["client_id", "key", "ad_type", "description"]], ["启用控制", ["enabled_switch_id"]], ["频控", ["frequency_policy_type", "frequency_policy_id"]], ["投放", ["network_mode", "load_timeout_ms", "cache_ttl", "fallback_behavior"]]]
     : [["基础信息", ["key", "ad_type"]], ["加载行为", ["enabled", "network_mode", "load_timeout_ms", "cache_policy", "fallback_behavior"]], ["频控", ["frequency_policy_id"]]];
   const diagnostics = placement ? diagnosticsForEntity(validation?.diagnostics ?? [], placement) : [];
 
@@ -582,6 +582,7 @@ function adTypeLabel(value: unknown) { return ({ app_open: "App Open", interstit
 function enumLabel(name: string, value: string) { if (name === "ad_type") return adTypeLabel(value); return value; }
 function fieldErrorCount(errors: Record<string, string>) { return Object.keys(errors).length; }
 function defaultsFor(fields: FieldSchema[]) { return Object.fromEntries(fields.map((field) => [field.name, field.default])); }
+function fieldsForSchema(fields: Record<string, unknown>, schema: FieldSchema[]) { return Object.fromEntries(schema.filter((field) => Object.prototype.hasOwnProperty.call(fields, field.name)).map((field) => [field.name, fields[field.name]])); }
 function diagnosticsForEntity(diagnostics: Diagnostic[], entity: EntityView) { return diagnostics.filter((diagnostic) => diagnostic.entity_ref === entity.entity_ref); }
 function diagnosticCategory(diagnostic: Diagnostic): DiagnosticCategory { return diagnostic.severity === "blocking" || diagnostic.severity === "error" ? "blocking" : diagnostic.severity; }
 function highestDiagnosticCategory(diagnostics: Diagnostic[]): DiagnosticCategory { return diagnostics.some((diagnostic) => diagnosticCategory(diagnostic) === "blocking") ? "blocking" : diagnostics.some((diagnostic) => diagnosticCategory(diagnostic) === "warning") ? "warning" : "info"; }

@@ -1,0 +1,14 @@
+# test log
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestRunDownloadAndReplace3917736015/001/conflow
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestRunDownloadAndReplace3917736015/001/.conflow-upgrade-3902534915
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestRunDownloadAndReplace3917736015/001/conflow
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestRunDownloadAndReplace3917736015/001/conflow
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestRunDownloadAndReplace3917736015/001/conflow
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T

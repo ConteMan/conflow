@@ -24,6 +24,8 @@
 | —（来自新增 placement 字段） | `network_mode`（String） | 新增 |
 | `unit_bindings: [{environment_id, platform, network, unit_id_ref}]` | `units: {<network>: {unit_id}}` | 结构重写 |
 
+> 维护者修订（2026-07-15）：placement schema 同步移除不在客户端产品合同中的 `cache_policy`；`cache_ttl` 保持不变。
+
 ### duration → seconds 转换规则
 
 `cache_ttl` 存储为 `{"unit": "seconds"|"minutes"|"hours"|"days", "value": N}` 或 `null`。编译时转换为秒数整数：

@@ -1,0 +1,19 @@
+# test log
+open ../../testdata/contracts/mobile-ad-monetization/v1/entities.json
+open ../../testdata/contracts/mobile-ad-monetization/v1/validation-overlays.json
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001/.conflow/validation-results.json
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001/.conflow
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001/.conflow/.validation-3360318026.tmp
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001/.conflow/validation-results.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestResultStoreStaleAndPersists2927405981/001/.conflow/validation-results.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json
+open ../../testdata/contracts/mobile-ad-monetization/v2/minimal-valid.json

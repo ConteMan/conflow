@@ -18,6 +18,16 @@ func TestValidateV2MinimalConfiguration(t *testing.T) {
 	}
 }
 
+func TestValidateV2IgnoresLegacyCachePolicy(t *testing.T) {
+	configuration := v2ValidationFixture(t)
+	v2RecordFields(t, configuration, "placements", "interstitial_main")["cache_policy"] = "disk"
+	for _, item := range Validate(v2ValidationInput(t, configuration)) {
+		if item.Path == "/placements/interstitial_main/cache_policy" {
+			t.Fatalf("legacy cache_policy diagnostic = %#v", item)
+		}
+	}
+}
+
 func TestValidateV2RequiresSingletons(t *testing.T) {
 	tests := []struct {
 		name, collection, code string

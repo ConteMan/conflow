@@ -1,0 +1,8 @@
+# test log
+getenv TMPDIR
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreSavesEnvironmentBaseline3314729204/001/released-baseline
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreSavesEnvironmentBaseline3314729204/001
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreSavesEnvironmentBaseline3314729204/001/released-baseline/.released-baseline-3567507634.tmp
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreSavesEnvironmentBaseline3314729204/001/released-baseline/development.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreSavesEnvironmentBaseline3314729204/001/released-baseline/development.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T

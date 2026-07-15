@@ -65,7 +65,6 @@ func mobileAdV2Definition() Definition {
 					field("frequency_policy_id", FieldTypeReference, true, true, "null", "频控策略", "引用 frequency_policy 实体 ID。", "select", "投放", 5, FieldValidation{}),
 					field("custom_frequency_policy", FieldTypeObject, true, true, "null", "自定义频控", "使用与频控策略相同的结构。", "object", "投放", 6, FieldValidation{}),
 					field("load_timeout_ms", FieldTypeInteger, true, false, "4000", "加载超时（毫秒）", "加载广告的最长等待时间。", "number", "投放", 7, FieldValidation{Minimum: &minimumOne}),
-					field("cache_policy", FieldTypeString, true, false, `"memory"`, "缓存策略", "广告素材缓存位置。", "select", "投放", 8, enum("memory", "disk", "none")),
 					field("cache_ttl", FieldTypeObject, true, true, "null", "缓存有效期", "缓存的有效期。", "duration", "投放", 9, FieldValidation{}),
 					field("fallback_behavior", FieldTypeString, true, false, `"continue"`, "兜底行为", "广告不可用时的业务动作。", "select", "投放", 10, enum("continue", "skip_slot", "show_empty_safe")),
 				}},
