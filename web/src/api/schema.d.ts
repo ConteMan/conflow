@@ -1670,6 +1670,8 @@ export interface components {
         RemoteProjection: {
             environment_id: string;
             snapshot_etag: string;
+            /** @description 最近一次拉取的线上快照版本号。 */
+            version: string;
             /** Format: date-time */
             observed_at: string;
             projections: components["schemas"]["RemoteValueProjection"][];
@@ -3563,6 +3565,7 @@ export interface operations {
                      *       "data": {
                      *         "environment_id": "production",
                      *         "snapshot_etag": "etag-remote-57",
+                     *         "version": "57",
                      *         "observed_at": "2026-07-11T10:00:02Z",
                      *         "projections": [
                      *           {

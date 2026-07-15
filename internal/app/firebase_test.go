@@ -211,6 +211,9 @@ func TestRemoteProjectionMapsEditorFieldsAndRedactsUnitIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if projection.Version != "2" {
+		t.Fatalf("projection version=%q, want 2", projection.Version)
+	}
 	encoded, _ := json.Marshal(projection)
 	if strings.Contains(string(encoded), "real-unit-id-must-not-escape") || strings.Contains(string(encoded), "secret-ref") {
 		t.Fatalf("projection leaked unit value: %s", encoded)
