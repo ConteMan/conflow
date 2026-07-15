@@ -1,0 +1,10 @@
+# test log
+open ../../testdata/contracts/drafts/v1/layering.json
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001/.conflow/draft.json
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001/.conflow
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001/.conflow/.draft-2655145719.tmp
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001/.conflow/draft.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePersistsExplicitEmptyReplacement3954486839/001/.conflow/draft.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T

@@ -1,0 +1,16 @@
+# test log
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreReadsLegacyRecordsAndDetectsCorruption1766592312/001/releases.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreReadsLegacyRecordsAndDetectsCorruption1766592312/001/releases.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreReadsLegacyRecordsAndDetectsCorruption1766592312/001/releases.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStoreReadsLegacyRecordsAndDetectsCorruption1766592312/001/releases.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T
+getenv TMPDIR
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001/releases.json
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001/.releases-3183800248.tmp
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001/releases.json
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001/.releases-4163886536.tmp
+stat /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T/TestStorePaginatesNewestFirst1367030127/001/releases.json
+open /var/folders/_4/rkgfk8r54wx9y3s71q1647rr0000gn/T

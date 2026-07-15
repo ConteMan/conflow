@@ -44,6 +44,11 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 	}
 
 	placement, _ := findSchema(definition, "placement")
+	for _, field := range placement.Fields {
+		if field.Name == "cache_policy" {
+			t.Fatal("placement schema must not declare cache_policy")
+		}
+	}
 	enabledSwitch := findField(t, placement, "enabled_switch_id")
 	if enabledSwitch.Type != FieldTypeReference {
 		t.Fatalf("enabled_switch_id type = %q", enabledSwitch.Type)

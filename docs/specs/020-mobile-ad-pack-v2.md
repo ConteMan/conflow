@@ -121,7 +121,6 @@
 | `frequency_policy_id` | reference | 是 | `preset` 时引用 `frequency_policy` |
 | `custom_frequency_policy` | object | 是 | `custom` 时使用与频控策略相同的结构 |
 | `load_timeout_ms` | integer | 否 | 广告加载超时；正整数毫秒 |
-| `cache_policy` | enum | 否 | `memory`、`disk`、`none` |
 | `cache_ttl` | Duration | 是 | 缓存有效期；不启用时为 `null` |
 | `fallback_behavior` | string | 否 | 广告不可用时的业务动作 |
 
@@ -130,7 +129,8 @@
 > 维护者修订（2026-07-15）：
 > - 新增可空 `description` 字段用于用途说明，仅存于基线，不参与编译输出；
 > - `network_mode`（Spec 022 新增）调整为可空 enum（`admob`、`max`），空表示继承全局 `ad_network_mode`；
-> - `fallback_behavior` 收敛为 enum：`continue`、`skip_slot`、`show_empty_safe`。
+> - `fallback_behavior` 收敛为 enum：`continue`、`skip_slot`、`show_empty_safe`；
+> - 移除不在客户端产品合同中的冗余 `cache_policy`；保留 `cache_ttl`。
 
 ### `unit_binding`
 
