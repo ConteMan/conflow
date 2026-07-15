@@ -2,6 +2,28 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.3.0] - 2026-07-15
+
+### Added
+
+- **Config Import** (Spec 021, #36): `ImportBundle` core types, preview/apply/export backend logic and HTTP endpoints, `conflow import export/preview/apply` CLI commands, and an import dialog in the UI.
+- **Plan Baseline from Last Release** (#46): plans now diff against the last published state instead of blank schema defaults.
+- **Entity descriptions**: optional `description` field on placements, frequency policies, and feature switches for readability; stored in the baseline only, never compiled into Firebase output.
+
+### Changed
+
+- **v2 placement compile format** (Spec 022): output now matches the client contract (`id` / `units` map / `enabled_config_key`), with environment-scoped unit resolution.
+- **Binding matrix columns** (Spec 023, #43): environment binding matrix columns changed from iOS/Android to MAX/AdMob; placement detail shows only the current environment's bindings.
+- **Key as identifier**: placement/frequency-policy/feature-switch keys now double as the internal entity ID; the redundant separate "stable ID" input was removed from the UI.
+- **Schema refinements**: `fallback_behavior` is now a select with `continue` / `skip_slot` / `show_empty_safe`; `network_mode` is nullable, where empty inherits the global `ad_network_mode`.
+
+### Fixed
+
+- Firebase validate-only requests send an `If-Match` header; published parameters set `valueType`.
+- Release plan: remote parameter count, binding completeness calculation, risk list distinction, parameter value preview, and layout/copy usability.
+- Entity table: long placement keys no longer push the "unpublished changes" column out of view.
+- Frontend asset embedding path corrected; `make build` now detects when `web/dist` and `internal/webui/assets` are out of sync.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added
