@@ -2,6 +2,13 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.5.0] - 2026-07-16
+
+### Added
+
+- **Custom Remote Config parameters** (Spec 027): a new `custom_parameter` entity type lets users create, edit, and delete arbitrary Firebase parameters (boolean / string / number / json) from the UI — no Pack code changes or Conflow releases needed. Keys are validated for global uniqueness against switch keys and layout parameter keys; values are type-checked; publishing a key that matches an existing unmanaged remote parameter raises a high-risk adoption prompt ("Conflow takes over this parameter"). Compiled parameters carry the correct Firebase `valueType` and participate in semantic diff, change baselines, audit, and rollback. A new `any` field type (`FieldTypeAny`) supports mixed-type values; `value_type` is immutable server-side.
+- **Network settings tab** (#63): `ad_network_mode` finally has a UI. The configuration page gained a single-instance form for the global ad-network switch, showing field origin and noting that placements inherit the value unless they override it locally. Mediation strategy and platforms stay out of the UI (values pass through unchanged); the copy clarifies the switch is independent of per-placement configuration.
+
 ## [0.4.2] - 2026-07-16
 
 ### Added
