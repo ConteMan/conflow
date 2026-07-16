@@ -141,7 +141,8 @@ test("overview and top bar use the draft summary after bootstrap", async ({ page
 test("production identity comes from environment kind and remains explicit", async ({ page }) => {
   await mockAPI(page);
   await page.goto("/");
-  await page.getByLabel("切换环境").selectOption("production");
+  await page.getByLabel("切换环境").click();
+  await page.getByRole("option", { name: "Production", exact: true }).click();
   await expect(page.getByTestId("app-topbar")).toHaveClass(/app-topbar--production/);
   await expect(page.getByTestId("production-marker")).toHaveText("Production 环境");
   // AppTopBar.tsx:19-31 marks Production through the top bar, selector class, and screen-reader marker.
@@ -154,7 +155,8 @@ test("creates and edits an environment through the manifest API", async ({ page 
   await page.getByRole("button", { name: "新建环境" }).click();
   await page.getByLabel("显示名称").fill("Staging");
   await page.getByLabel("环境 ID").fill("staging");
-  await page.getByLabel("环境类型").selectOption("staging");
+  await page.getByLabel("环境类型").click();
+  await page.getByRole("option", { name: "Staging", exact: true }).click();
   await page.getByLabel("Firebase 项目").fill("photo-editor-staging");
   await page.getByRole("button", { name: "保存环境" }).click();
   await expect(page.getByRole("row", { name: /Staging staging/ })).toBeVisible();
