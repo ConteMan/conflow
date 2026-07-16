@@ -8,7 +8,7 @@ import (
 )
 
 // compileV2Parameters reads the v2 effective config and returns the managed
-// parameter map: paramKey -> Go value (bool, string, or JSON string).
+// parameter map: paramKey -> Go value (bool, string, number, or JSON string).
 func compileV2Parameters(desired map[string]any, environmentID string) map[string]any {
 	values := map[string]any{}
 	layout, found := records(desired["remote_config_layouts"])["default"]
@@ -22,6 +22,20 @@ func compileV2Parameters(desired map[string]any, environmentID string) map[strin
 		if keyOK && key != "" && valueOK {
 			values[key] = value
 		}
+	}
+
+	for _, parameter := range sortedRecords(desired, "custom_parameters") {
+		key, keyOK := parameter.Fields["key"].(string)
+		valueType, typeOK := parameter.Fields["value_type"].(string)
+		value, valueOK := parameter.Fields["value"]
+		if !keyOK || key == "" || !typeOK || !valueOK {
+			continue
+		}
+		if valueType == "json" {
+			values[key] = marshalV2JSON(value)
+			continue
+		}
+		values[key] = value
 	}
 
 	network, networkFound := records(desired["network_settings"])["default"]

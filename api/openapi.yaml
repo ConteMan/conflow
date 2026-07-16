@@ -1726,29 +1726,38 @@ components:
             $ref: "#/components/schemas/EntityResponse"
           example:
             data:
-              entity_ref: entity:mobile-ad-monetization/v1:frequency_policy:launch_cap
-              entity_type: frequency_policy
-              entity_id: launch_cap
+              entity_ref: entity:mobile-ad-monetization/v2:custom_parameter:min_supported_version
+              entity_type: custom_parameter
+              entity_id: min_supported_version
               source:
                 present: false
               draft:
                 present: true
                 value:
-                  id: launch_cap
+                  id: min_supported_version
                   fields:
-                    cooldown_ms: 30000
+                    key: min_supported_version
+                    value_type: string
+                    value: 2.4.0
+                    description: 最低支持版本
               resolved:
                 present: true
                 value:
-                  id: launch_cap
+                  id: min_supported_version
                   fields:
-                    cooldown_ms: 30000
+                    key: min_supported_version
+                    value_type: string
+                    value: 2.4.0
+                    description: 最低支持版本
               effective:
                 present: true
                 value:
-                  id: launch_cap
+                  id: min_supported_version
                   fields:
-                    cooldown_ms: 30000
+                    key: min_supported_version
+                    value_type: string
+                    value: 2.4.0
+                    description: 最低支持版本
               origin: draft_baseline
               source_revision: src_01JEXAMPLE
             meta:
@@ -2489,6 +2498,7 @@ components:
     EntityType:
       type: string
       pattern: "^[a-z][a-z0-9_]{0,62}$"
+      enum: [remote_config_layout, network_settings, feature_switch, custom_parameter, frequency_policy, placement, unit_binding]
       description: Pack-declared entity type. Clients treat it as opaque outside schema-driven display.
     EntityRef:
       type: string
@@ -2673,7 +2683,7 @@ components:
           type: string
         type:
           type: string
-          enum: [string, boolean, integer, number, object, array, reference]
+          enum: [string, boolean, integer, number, object, array, any, reference]
         required:
           type: boolean
         nullable:
@@ -3537,7 +3547,7 @@ components:
           $ref: "#/components/schemas/RiskSeverity"
         reason_code:
           type: string
-          enum: [shared_frequency_policy_relaxed, global_feature_switch_changed, production_network_mode_changed, unit_binding_changed, managed_parameter_deleted, unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
+          enum: [shared_frequency_policy_relaxed, global_feature_switch_changed, production_network_mode_changed, unit_binding_changed, managed_parameter_deleted, custom_parameter_changed, custom_parameter_deleted, custom_parameter_adopted, unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
         summary:
           type: string
         entity_ref:

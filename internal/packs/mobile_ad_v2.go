@@ -18,6 +18,7 @@ func mobileAdV2Definition() Definition {
 			EntityTypes: []EntityMetadata{
 				defaultEntity("remote_config_layout", "remote_config_layouts", "远端配置布局", "定义广告聚合参数布局。", nil),
 				entityMetadata("feature_switch", "feature_switches", "功能开关", "定义稳定的广告功能开关。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
+				entityMetadata("custom_parameter", "custom_parameters", "自定义参数", "定义独立受管的 Firebase Remote Config 参数。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				defaultEntity("network_settings", "network_settings", "网络设置", "定义当前广告网络和聚合策略。", []string{"active_network", "mediation_strategy"}),
 				entityMetadata("frequency_policy", "frequency_policies", "频控策略", "定义结构化广告展示频率限制。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
@@ -40,6 +41,12 @@ func mobileAdV2Definition() Definition {
 					field("risk_level", FieldTypeString, true, false, `"medium"`, "风险等级", "变更该开关的业务风险。", "select", "治理", 2, enum("low", "medium", "high")),
 					field("rollback_method", FieldTypeString, true, false, `""`, "回滚方式", "发生风险时的标准回滚操作。", "input", "治理", 3, FieldValidation{}),
 					field("description", FieldTypeString, false, true, "null", "描述", "功能开关用途说明。", "input", "基础", 4, FieldValidation{}),
+				}},
+				{Name: "custom_parameter", Fields: []FieldSchema{
+					field("key", FieldTypeString, true, false, `""`, "参数键", "Firebase Remote Config 参数键，同时作为实体 ID。", "input", "基础", 0, FieldValidation{}),
+					field("value_type", FieldTypeString, true, false, `"string"`, "值类型", "创建后不可修改；如需更换类型，请删除后重新创建。", "select", "基础", 1, enum("boolean", "string", "number", "json")),
+					field("value", FieldTypeAny, true, false, `""`, "值", "与值类型匹配的 Remote Config 默认值。", "custom_parameter_value", "基础", 2, FieldValidation{}),
+					field("description", FieldTypeString, false, true, "null", "描述", "参数用途说明，不参与发布编译。", "input", "基础", 3, FieldValidation{}),
 				}},
 				{Name: "network_settings", Fields: []FieldSchema{
 					field("active_network", FieldTypeString, true, false, `""`, "当前网络", "当前生效网络或聚合平台的稳定 ID。", "input", "网络", 0, FieldValidation{}),

@@ -1,10 +1,15 @@
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+var v2RemoteConfigKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
 func validateV2(input Input) []Diagnostic {
 	layouts := records(input.Effective, "remote_config_layouts")
@@ -13,6 +18,7 @@ func validateV2(input Input) []Diagnostic {
 	policies := records(input.Effective, "frequency_policies")
 	placements := records(input.Effective, "placements")
 	bindings := records(input.Effective, "unit_bindings")
+	customParameters := records(input.Effective, "custom_parameters")
 	diagnostics := []Diagnostic{}
 
 	layout, layoutOK := v2Singleton(layouts)
@@ -63,6 +69,20 @@ func validateV2(input Input) []Diagnostic {
 			continue
 		}
 		seenSwitchKeys[key] = true
+	}
+
+	for _, parameter := range customParameters {
+		key, keyOK := parameter.Fields["key"].(string)
+		if !keyOK || !v2RemoteConfigKeyPattern.MatchString(key) {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "custom_parameter_key_invalid", "custom_parameter", "custom_parameters", parameter.ID, "key", SeverityBlocking, "自定义参数键不符合 Remote Config 命名规则", "使用小写字母开头，并只包含小写字母、数字和下划线的参数键。"))
+		} else if key != parameter.ID {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "custom_parameter_key_id_mismatch", "custom_parameter", "custom_parameters", parameter.ID, "key", SeverityBlocking, "自定义参数键必须与实体 ID 一致", "将参数键设置为实体 ID。"))
+		} else {
+			diagnostics = v2AddParameterKeyDiagnostic(input, diagnostics, parameterKeys, key, "custom_parameter", "custom_parameters", parameter.ID, "key")
+		}
+		if !v2CustomParameterValueValid(parameter.Fields["value_type"], parameter.Fields["value"]) {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "custom_parameter_value_type_mismatch", "custom_parameter", "custom_parameters", parameter.ID, "value", SeverityBlocking, "自定义参数值与声明的值类型不匹配", "按值类型填写布尔值、字符串、有限数值或 JSON 对象/数组。"))
+		}
 	}
 
 	policyIDs := ids(policies)
@@ -203,6 +223,30 @@ func v2AddParameterKeyDiagnostic(input Input, diagnostics []Diagnostic, keys map
 	}
 	keys[key] = "/" + collection + "/" + entityID + "/" + field
 	return diagnostics
+}
+
+func v2CustomParameterValueValid(valueType, value any) bool {
+	switch valueType {
+	case "boolean":
+		_, ok := value.(bool)
+		return ok
+	case "string":
+		_, ok := value.(string)
+		return ok
+	case "number":
+		number, ok := value.(float64)
+		return ok && !math.IsNaN(number) && !math.IsInf(number, 0)
+	case "json":
+		switch value.(type) {
+		case map[string]any, []any:
+			encoded, err := json.Marshal(value)
+			return err == nil && json.Valid(encoded)
+		default:
+			return false
+		}
+	default:
+		return false
+	}
 }
 
 func validDuration(value any) bool {

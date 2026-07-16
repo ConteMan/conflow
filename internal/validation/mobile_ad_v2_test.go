@@ -80,6 +80,22 @@ func TestValidateV2RejectsInvalidDuration(t *testing.T) {
 	}
 }
 
+func TestValidateV2RejectsCustomParameterKeyConflict(t *testing.T) {
+	configuration := v2ValidationFixture(t)
+	configuration["custom_parameters"] = []any{map[string]any{"id": "ads_enabled", "fields": map[string]any{"key": "ads_enabled", "value_type": "string", "value": "manual", "description": nil}}}
+	if !hasV2Diagnostic(Validate(v2ValidationInput(t, configuration)), "parameter_key_conflict", SeverityBlocking) {
+		t.Fatal("missing custom parameter key conflict diagnostic")
+	}
+}
+
+func TestValidateV2RejectsCustomParameterValueTypeMismatch(t *testing.T) {
+	configuration := v2ValidationFixture(t)
+	configuration["custom_parameters"] = []any{map[string]any{"id": "min_version", "fields": map[string]any{"key": "min_version", "value_type": "number", "value": "42", "description": nil}}}
+	if !hasV2Diagnostic(Validate(v2ValidationInput(t, configuration)), "custom_parameter_value_type_mismatch", SeverityBlocking) {
+		t.Fatal("missing custom parameter value type mismatch diagnostic")
+	}
+}
+
 func v2ValidationInput(t *testing.T, configuration map[string]any) Input {
 	t.Helper()
 	return Input{PackRef: "mobile-ad-monetization/v2", EnvironmentID: "development", EnvironmentKind: "development", Effective: configuration}

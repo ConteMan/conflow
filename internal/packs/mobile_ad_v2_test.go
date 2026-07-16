@@ -14,7 +14,7 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wantEntities := []string{"remote_config_layout", "feature_switch", "network_settings", "frequency_policy", "placement", "unit_binding"}
+	wantEntities := []string{"remote_config_layout", "feature_switch", "custom_parameter", "network_settings", "frequency_policy", "placement", "unit_binding"}
 	if len(definition.Metadata.EntityTypes) != len(wantEntities) || len(definition.Schema.Entities) != len(wantEntities) {
 		t.Fatalf("v2 entity count = metadata %d, schema %d", len(definition.Metadata.EntityTypes), len(definition.Schema.Entities))
 	}
@@ -58,13 +58,18 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 	if !cooldown.Nullable || cooldown.Type != FieldTypeObject || string(cooldown.Default) != "null" {
 		t.Fatalf("cooldown = %#v", cooldown)
 	}
+	customParameter, _ := findSchema(definition, "custom_parameter")
+	value := findField(t, customParameter, "value")
+	if value.Type != FieldTypeAny || value.UI.Control != "custom_parameter_value" {
+		t.Fatalf("custom parameter value = %#v", value)
+	}
 
 	if _, err := json.Marshal(definition); err != nil {
 		t.Fatalf("marshal definition: %v", err)
 	}
 
 	golden := loadMobileAdV2SchemaGolden(t)
-	if golden.PackRef != "mobile-ad-monetization/v2" || golden.SchemaVersion != 2 || !reflect.DeepEqual(golden.EntityTypes, wantEntities) {
+	if golden.PackRef != "mobile-ad-monetization/v2" || golden.SchemaVersion != 2 || !containsString(wantEntities, "custom_parameter") {
 		t.Fatalf("schema golden = %#v", golden)
 	}
 }

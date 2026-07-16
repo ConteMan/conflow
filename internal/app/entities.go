@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	ErrEntityNotFound    = errors.New("entity not found")
-	ErrEntityTypeInvalid = errors.New("entity type is not declared by the Pack")
-	ErrEntityIDInvalid   = errors.New("entity ID is invalid")
-	ErrEntityIDImmutable = errors.New("entity ID is immutable")
-	ErrEntityExists      = errors.New("entity already exists")
+	ErrEntityNotFound                    = errors.New("entity not found")
+	ErrEntityTypeInvalid                 = errors.New("entity type is not declared by the Pack")
+	ErrEntityIDInvalid                   = errors.New("entity ID is invalid")
+	ErrEntityIDImmutable                 = errors.New("entity ID is immutable")
+	ErrCustomParameterValueTypeImmutable = errors.New("custom parameter value type is immutable")
+	ErrEntityExists                      = errors.New("entity already exists")
 )
 
 // EntityRecord is the Pack-neutral record representation exposed by the
@@ -180,6 +181,18 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 				}
 				if mutation.Entity.ID != mutation.EntityID {
 					return nil, ErrEntityIDImmutable
+				}
+				if metadata.Name == "custom_parameter" {
+					key, _ := mutation.Entity.Fields["key"].(string)
+					if key != mutation.EntityID {
+						return nil, ErrEntityIDImmutable
+					}
+					if mutation.Action == "replace" {
+						current, exists := findRecord(records(current.Effective, metadata.Collection), mutation.EntityID)
+						if exists && current.Fields["value_type"] != mutation.Entity.Fields["value_type"] {
+							return nil, ErrCustomParameterValueTypeImmutable
+						}
+					}
 				}
 			}
 			if metadata.Name == "unit_binding" && mutation.Scope != draft.ScopeEnvironmentOverride {
@@ -567,6 +580,8 @@ func matchesEntityType(value any, fieldType packs.FieldType) bool {
 	case packs.FieldTypeObject:
 		_, ok := value.(map[string]any)
 		return ok
+	case packs.FieldTypeAny:
+		return true
 	default:
 		return false
 	}

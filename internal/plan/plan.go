@@ -198,6 +198,7 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 	collections := map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"}
 	if in.PackRef == "mobile-ad-monetization/v2" {
 		collections = map[string]string{
+			"custom_parameters":     "custom_parameter",
 			"remote_config_layouts": "remote_config_layout",
 			"network_settings":      "network_settings",
 			"frequency_policies":    "frequency_policy",
@@ -218,7 +219,17 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 		}
 		ordered := keys(ids)
 		for _, entityID := range ordered {
-			before, after := oldRecords[entityID], newRecords[entityID]
+			before, beforeOK := oldRecords[entityID]
+			after, afterOK := newRecords[entityID]
+			if entityType == "custom_parameter" {
+				if change := customParameterSemanticChange(in, scope, entityID, before, beforeOK, after, afterOK); change != nil {
+					if len(change.RemoteParameterNodeIDs) > 0 {
+						p.RemoteParameterChanges = append(p.RemoteParameterChanges, customParameterRemoteChange(in, scope, *change, before, beforeOK, after, afterOK))
+					}
+					changes = append(changes, *change)
+				}
+				continue
+			}
 			fields := map[string]bool{}
 			for k := range before.Fields {
 				fields[k] = true
@@ -287,6 +298,70 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 	return changes
 }
 
+func customParameterSemanticChange(in Input, scope, entityID string, before entities.Record, beforeOK bool, after entities.Record, afterOK bool) *SemanticChange {
+	if beforeOK == afterOK && equal(before.Fields, after.Fields) {
+		return nil
+	}
+	changeKind := "updated"
+	if !afterOK {
+		changeKind = "deleted"
+	} else if !beforeOK {
+		changeKind = "added"
+	}
+	keyRecord := after
+	if !afterOK {
+		keyRecord = before
+	}
+	key, _ := keyRecord.Fields["key"].(string)
+	remoteChanged := key != "" && (!beforeOK || !afterOK || !equal(before.Fields["key"], after.Fields["key"]) || !equal(before.Fields["value_type"], after.Fields["value_type"]) || !equal(before.Fields["value"], after.Fields["value"]))
+	fieldPath := "/description"
+	beforeSummary, afterSummary := summary(before.Fields["description"]), summary(after.Fields["description"])
+	if remoteChanged {
+		fieldPath = "/value"
+		beforeSummary, afterSummary = summary(before.Fields["value"]), summary(after.Fields["value"])
+	}
+	change := &SemanticChange{
+		NodeID:                 "node_" + id("semantic", scope, "custom_parameter", entityID, "value"),
+		ChangeKind:             changeKind,
+		Summary:                fmt.Sprintf("custom_parameter %s changed", entityID),
+		DirectEntityRef:        entityRef(in.PackRef, "custom_parameter", entityID),
+		FieldPath:              fieldPath,
+		BeforeSummary:          beforeSummary,
+		AfterSummary:           afterSummary,
+		AffectedEntityIDs:      []string{},
+		AffectedEntityNodeIDs:  []string{},
+		RemoteParameterNodeIDs: []string{},
+	}
+	if !remoteChanged || in.RemoteSnapshot.Status != "available" {
+		return change
+	}
+	change.RemoteParameterNodeIDs = []string{"node_" + id("remote", scope, "custom_parameter", entityID, "value")}
+	return change
+}
+
+func customParameterRemoteChange(in Input, scope string, semantic SemanticChange, before entities.Record, beforeOK bool, after entities.Record, afterOK bool) RemoteParameterChange {
+	keyRecord := after
+	if !afterOK {
+		keyRecord = before
+	}
+	key, _ := keyRecord.Fields["key"].(string)
+	beforeValue := before.Fields["value"]
+	if remoteValue, exists := in.RemoteSnapshot.Parameters[key]; exists {
+		beforeValue = remoteValue
+	}
+	afterValue := any(nil)
+	if afterOK {
+		afterValue = compileV2Parameters(in.Desired, in.EnvironmentID)[key]
+	}
+	changeKind := semantic.ChangeKind
+	if changeKind == "added" {
+		if _, exists := in.RemoteSnapshot.Parameters[key]; exists {
+			changeKind = "updated"
+		}
+	}
+	return RemoteParameterChange{NodeID: semantic.RemoteParameterNodeIDs[0], ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(beforeValue), AfterSummary: summary(afterValue), Managed: true, CausedBySemanticChangeIDs: []string{semantic.NodeID}, AffectedEntityNodeIDs: []string{}}
+}
+
 func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterChange) []RiskItem {
 	result := []RiskItem{}
 	for _, c := range changes {
@@ -304,6 +379,21 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 		}
 		if in.PackRef == "mobile-ad-monetization/v2" {
 			switch {
+			case strings.Contains(c.DirectEntityRef, ":custom_parameter:") && len(c.RemoteParameterNodeIDs) > 0:
+				severity, code, summary := "medium", "custom_parameter_changed", "自定义参数已变更"
+				if c.ChangeKind == "deleted" {
+					severity, code, summary = "high", "custom_parameter_deleted", "自定义参数将从远端移除"
+				} else if c.ChangeKind == "added" {
+					for _, remoteChange := range remoteChanges {
+						if remoteChange.CausedBySemanticChangeIDs[0] == c.NodeID {
+							if _, exists := in.RemoteSnapshot.Parameters[remoteChange.ParameterKey]; exists {
+								severity, code, summary = "high", "custom_parameter_adopted", "发布后该参数由 Conflow 接管，远端当前值将被覆盖"
+							}
+							break
+						}
+					}
+				}
+				result = append(result, RiskItem{RiskItemID: "risk_" + id(code, c.NodeID), Severity: severity, ReasonCode: code, Summary: summary, EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 			case strings.Contains(c.DirectEntityRef, ":frequency_policy:"):
 				result = append(result, RiskItem{RiskItemID: "risk_" + id("v2_frequency_policy", c.NodeID), Severity: "high", ReasonCode: "frequency_policy_changed", Summary: "频控策略已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 			case strings.Contains(c.DirectEntityRef, ":feature_switch:") && c.FieldPath == "/default_value":
@@ -331,6 +421,9 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 		var entityRef string
 		if len(remoteChange.CausedBySemanticChangeIDs) > 0 {
 			entityRef = changesByID[remoteChange.CausedBySemanticChangeIDs[0]].DirectEntityRef
+		}
+		if strings.Contains(entityRef, ":custom_parameter:") {
+			continue
 		}
 		result = append(result, RiskItem{RiskItemID: "risk_" + id("managed_parameter_deleted", remoteChange.NodeID), Severity: "blocking", ReasonCode: "managed_parameter_deleted", Summary: "受管远端参数将被删除", EntityRef: entityRef, SemanticChangeIDs: append([]string{}, remoteChange.CausedBySemanticChangeIDs...), RemoteParameterNodeIDs: []string{remoteChange.NodeID}})
 	}
