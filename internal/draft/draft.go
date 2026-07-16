@@ -383,6 +383,8 @@ func matchesType(value any, fieldType string) bool {
 	case "array":
 		_, ok := value.([]any)
 		return ok
+	case "any":
+		return true
 	default:
 		return false
 	}

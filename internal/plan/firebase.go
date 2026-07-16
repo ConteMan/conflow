@@ -3,6 +3,7 @@ package plan
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ConteMan/conflow/internal/entities"
@@ -44,6 +45,10 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	for _, key := range keys {
 		value, exists := values[key]
 		if !exists {
+			if changeKind(changes, key) == "deleted" {
+				delete(parameters, key)
+				continue
+			}
 			return nil, fmt.Errorf("managed parameter %q has no desired value", key)
 		}
 		parameter, ok := parameters[key].(map[string]any)
@@ -59,6 +64,15 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 		return nil, fmt.Errorf("encode remote template: %w", err)
 	}
 	return merged, nil
+}
+
+func changeKind(changes []RemoteParameterChange, key string) string {
+	for _, change := range changes {
+		if change.ParameterKey == key {
+			return change.ChangeKind
+		}
+	}
+	return ""
 }
 
 func desiredParameterValues(desired map[string]any, packRef, environmentID string) map[string]any {
@@ -98,9 +112,9 @@ func firebaseValue(value any) string {
 	case string:
 		return value
 	case float64:
-		return fmt.Sprintf("%.0f", value)
+		return strconv.FormatFloat(value, 'f', -1, 64)
 	case float32:
-		return fmt.Sprintf("%.0f", value)
+		return strconv.FormatFloat(float64(value), 'f', -1, 32)
 	default:
 		return fmt.Sprint(value)
 	}

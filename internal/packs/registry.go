@@ -299,6 +299,8 @@ func matchesFieldType(raw json.RawMessage, fieldType FieldType) bool {
 	case FieldTypeArray:
 		_, ok := value.([]any)
 		return ok
+	case FieldTypeAny:
+		return true
 	default:
 		return false
 	}
@@ -306,7 +308,7 @@ func matchesFieldType(raw json.RawMessage, fieldType FieldType) bool {
 
 func validFieldType(fieldType FieldType) bool {
 	switch fieldType {
-	case FieldTypeString, FieldTypeBoolean, FieldTypeInteger, FieldTypeNumber, FieldTypeObject, FieldTypeArray, FieldTypeReference:
+	case FieldTypeString, FieldTypeBoolean, FieldTypeInteger, FieldTypeNumber, FieldTypeObject, FieldTypeArray, FieldTypeAny, FieldTypeReference:
 		return true
 	default:
 		return false

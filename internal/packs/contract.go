@@ -79,12 +79,15 @@ type FieldSchema struct {
 type FieldType string
 
 const (
-	FieldTypeString    FieldType = "string"
-	FieldTypeBoolean   FieldType = "boolean"
-	FieldTypeInteger   FieldType = "integer"
-	FieldTypeNumber    FieldType = "number"
-	FieldTypeObject    FieldType = "object"
-	FieldTypeArray     FieldType = "array"
+	FieldTypeString  FieldType = "string"
+	FieldTypeBoolean FieldType = "boolean"
+	FieldTypeInteger FieldType = "integer"
+	FieldTypeNumber  FieldType = "number"
+	FieldTypeObject  FieldType = "object"
+	FieldTypeArray   FieldType = "array"
+	// FieldTypeAny accepts every non-null JSON value. Domain validators retain
+	// responsibility for narrowing the allowed value based on sibling fields.
+	FieldTypeAny       FieldType = "any"
 	FieldTypeReference FieldType = "reference"
 )
 

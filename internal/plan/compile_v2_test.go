@@ -37,6 +37,54 @@ func TestCompileV2ParametersFeatureSwitch(t *testing.T) {
 	}
 }
 
+func TestCompileV2ParametersCustomParameters(t *testing.T) {
+	desired := v2CompileFixture(t)
+	desired["custom_parameters"] = []any{
+		map[string]any{"id": "feature_flag", "fields": map[string]any{"key": "feature_flag", "value_type": "boolean", "value": true}},
+		map[string]any{"id": "welcome_text", "fields": map[string]any{"key": "welcome_text", "value_type": "string", "value": "hello"}},
+		map[string]any{"id": "min_version", "fields": map[string]any{"key": "min_version", "value_type": "number", "value": 12.5}},
+		map[string]any{"id": "rollout_rules", "fields": map[string]any{"key": "rollout_rules", "value_type": "json", "value": map[string]any{"regions": []any{"cn", "us"}, "enabled": true}}},
+	}
+	values := compileV2Parameters(desired, "development")
+	if values["feature_flag"] != true || values["welcome_text"] != "hello" || values["min_version"] != 12.5 {
+		t.Fatalf("custom parameter values = %#v", values)
+	}
+	if got := values["rollout_rules"]; got != `{"enabled":true,"regions":["cn","us"]}` {
+		t.Fatalf("custom JSON value = %#v", got)
+	}
+
+	encoded, err := json.Marshal(desired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, err := MergeFirebaseTemplate([]byte(`{"parameters":{}}`), encoded, []RemoteParameterChange{{ParameterKey: "feature_flag", Managed: true}, {ParameterKey: "welcome_text", Managed: true}, {ParameterKey: "min_version", Managed: true}, {ParameterKey: "rollout_rules", Managed: true}}, "mobile-ad-monetization/v2", "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Parameters map[string]struct {
+			DefaultValue struct {
+				Value string `json:"value"`
+			} `json:"defaultValue"`
+			ValueType string `json:"valueType"`
+		} `json:"parameters"`
+	}
+	if err := json.Unmarshal(merged, &document); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]struct{ value, valueType string }{
+		"feature_flag":  {"true", "BOOLEAN"},
+		"welcome_text":  {"hello", "STRING"},
+		"min_version":   {"12.5", "NUMBER"},
+		"rollout_rules": {`{"enabled":true,"regions":["cn","us"]}`, "JSON"},
+	} {
+		got := document.Parameters[key]
+		if got.DefaultValue.Value != want.value || got.ValueType != want.valueType {
+			t.Fatalf("%s Firebase parameter = %#v", key, got)
+		}
+	}
+}
+
 func TestCompileV2ParametersFrequencyPolicies(t *testing.T) {
 	desired := v2CompileFixture(t)
 	desired["frequency_policies"] = append(desired["frequency_policies"].([]any), map[string]any{"id": "alpha_cap", "fields": map[string]any{"cooldown": nil, "interval": nil, "max_count": nil, "shift_count": nil, "positions": []any{"z", "a", "a"}}})
@@ -195,6 +243,62 @@ func TestBuildV2MapsFrequencyChangeToAggregateParameter(t *testing.T) {
 	}
 	if !mapped || !hasRisk(built.Plan, "frequency_policy_changed") {
 		t.Fatalf("v2 plan = %#v", built.Plan)
+	}
+}
+
+func TestBuildV2CustomParameterAdoptionIsHighRisk(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	desired := v2CompileClone(t, baseline)
+	desired["custom_parameters"] = []any{map[string]any{"id": "min_version", "fields": map[string]any{"key": "min_version", "value_type": "number", "value": 12.5}}}
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: map[string]any{"min_version": "10"}, Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRisk(built.Plan, "custom_parameter_adopted") {
+		t.Fatalf("custom parameter adoption risk is missing: %#v", built.Plan.RiskItems)
+	}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		if change.ParameterKey == "min_version" && change.Managed && change.ChangeKind == "updated" {
+			return
+		}
+	}
+	t.Fatalf("custom parameter is not in managed remote changes: %#v", built.Plan.RemoteParameterChanges)
+}
+
+func TestBuildV2CustomParameterDeletionIsHighRiskAndRemovesFirebaseParameter(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	baseline["custom_parameters"] = []any{map[string]any{"id": "min_version", "fields": map[string]any{"key": "min_version", "value_type": "number", "value": 12.5}}}
+	desired := v2CompileClone(t, baseline)
+	desired["custom_parameters"] = []any{}
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: map[string]any{"min_version": "12.5"}, Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRisk(built.Plan, "custom_parameter_deleted") || hasRisk(built.Plan, "managed_parameter_deleted") {
+		t.Fatalf("custom parameter deletion risks = %#v", built.Plan.RiskItems)
+	}
+	encoded, err := json.Marshal(desired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, err := MergeFirebaseTemplate([]byte(`{"parameters":{"min_version":{"defaultValue":{"value":"12.5"},"valueType":"NUMBER"}}}`), encoded, built.Plan.RemoteParameterChanges, "mobile-ad-monetization/v2", "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Parameters map[string]any `json:"parameters"`
+	}
+	if err := json.Unmarshal(merged, &document); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := document.Parameters["min_version"]; exists {
+		t.Fatalf("deleted custom parameter remains in Firebase template: %#v", document.Parameters)
 	}
 }
 

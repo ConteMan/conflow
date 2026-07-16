@@ -1055,8 +1055,11 @@ export interface components {
             entities: components["schemas"]["EntitySchema"][];
             migrations: components["schemas"]["SchemaMigration"][];
         };
-        /** @description Pack-declared entity type. Clients treat it as opaque outside schema-driven display. */
-        EntityType: string;
+        /**
+         * @description Pack-declared entity type. Clients treat it as opaque outside schema-driven display.
+         * @enum {string}
+         */
+        EntityType: "remote_config_layout" | "network_settings" | "feature_switch" | "custom_parameter" | "frequency_policy" | "placement" | "unit_binding";
         /** @description Stable opaque entity reference in entity:{pack_ref}:{entity_type}:{entity_id} format. */
         EntityRef: string;
         EntityRecord: {
@@ -1145,7 +1148,7 @@ export interface components {
         FieldSchema: {
             name: string;
             /** @enum {string} */
-            type: "string" | "boolean" | "integer" | "number" | "object" | "array" | "reference";
+            type: "string" | "boolean" | "integer" | "number" | "object" | "array" | "any" | "reference";
             required: boolean;
             /** @description Whether an explicit JSON null is a valid configured value. This is independent of required. */
             nullable: boolean;
@@ -1574,7 +1577,7 @@ export interface components {
             risk_item_id: string;
             severity: components["schemas"]["RiskSeverity"];
             /** @enum {string} */
-            reason_code: "shared_frequency_policy_relaxed" | "global_feature_switch_changed" | "production_network_mode_changed" | "unit_binding_changed" | "managed_parameter_deleted" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            reason_code: "shared_frequency_policy_relaxed" | "global_feature_switch_changed" | "production_network_mode_changed" | "unit_binding_changed" | "managed_parameter_deleted" | "custom_parameter_changed" | "custom_parameter_deleted" | "custom_parameter_adopted" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
             summary: string;
             entity_ref?: components["schemas"]["EntityRef"];
             semantic_change_ids: components["schemas"]["PlanNodeID"][];
@@ -1980,36 +1983,45 @@ export interface components {
                 /**
                  * @example {
                  *       "data": {
-                 *         "entity_ref": "entity:mobile-ad-monetization/v1:frequency_policy:launch_cap",
-                 *         "entity_type": "frequency_policy",
-                 *         "entity_id": "launch_cap",
+                 *         "entity_ref": "entity:mobile-ad-monetization/v2:custom_parameter:min_supported_version",
+                 *         "entity_type": "custom_parameter",
+                 *         "entity_id": "min_supported_version",
                  *         "source": {
                  *           "present": false
                  *         },
                  *         "draft": {
                  *           "present": true,
                  *           "value": {
-                 *             "id": "launch_cap",
+                 *             "id": "min_supported_version",
                  *             "fields": {
-                 *               "cooldown_ms": 30000
+                 *               "key": "min_supported_version",
+                 *               "value_type": "string",
+                 *               "value": "2.4.0",
+                 *               "description": "最低支持版本"
                  *             }
                  *           }
                  *         },
                  *         "resolved": {
                  *           "present": true,
                  *           "value": {
-                 *             "id": "launch_cap",
+                 *             "id": "min_supported_version",
                  *             "fields": {
-                 *               "cooldown_ms": 30000
+                 *               "key": "min_supported_version",
+                 *               "value_type": "string",
+                 *               "value": "2.4.0",
+                 *               "description": "最低支持版本"
                  *             }
                  *           }
                  *         },
                  *         "effective": {
                  *           "present": true,
                  *           "value": {
-                 *             "id": "launch_cap",
+                 *             "id": "min_supported_version",
                  *             "fields": {
-                 *               "cooldown_ms": 30000
+                 *               "key": "min_supported_version",
+                 *               "value_type": "string",
+                 *               "value": "2.4.0",
+                 *               "description": "最低支持版本"
                  *             }
                  *           }
                  *         },

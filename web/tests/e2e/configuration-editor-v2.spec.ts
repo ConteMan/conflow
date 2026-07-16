@@ -34,8 +34,32 @@ test("v2 编辑保存会剔除遗留 cache_policy", async ({ page }) => {
   expect(submittedFields).toMatchObject({ cache_ttl: null, fallback_behavior: "continue" });
 });
 
-async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>) => void) {
+test("v2 自定义参数可创建、编辑和删除", async ({ page }) => {
+  const events: string[] = [];
+  await mockV2ConfigurationAPI(page, () => undefined, events);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "自定义参数" }).click();
+  await page.getByRole("button", { name: "新建参数" }).click();
+  await page.getByLabel("参数键").fill("min_supported_version");
+  await page.getByLabel("参数值").fill("2.4.0");
+  await page.getByLabel("描述").fill("最低支持版本");
+  await page.getByRole("button", { name: "创建参数" }).click();
+  await expect(page.getByRole("button", { name: "编辑自定义参数 min_supported_version" })).toBeVisible();
+
+  await page.getByRole("button", { name: "编辑自定义参数 min_supported_version" }).click();
+  await page.getByLabel("参数值").fill("2.5.0");
+  await page.getByRole("button", { name: "保存参数" }).click();
+  await expect(page.getByText("2.5.0")).toBeVisible();
+
+  await page.getByRole("button", { name: "删除自定义参数 min_supported_version" }).click();
+  await page.getByRole("button", { name: "确认删除" }).click();
+  await expect(page.getByText("还没有自定义参数。")).toBeVisible();
+  expect(events).toEqual(["create:min_supported_version", "replace:min_supported_version", "delete:min_supported_version"]);
+});
+
+async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>) => void, events: string[] = []) {
   let revision = 1;
+  const customParameters: Array<{ id: string; fields: Record<string, unknown> }> = [];
   const environment = { id: "development", name: "Development", kind: "development", provider: { type: "firebase-remote-config", project_id: "photo-editor-dev" }, publish: { requires_confirmation: false } };
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
@@ -51,6 +75,26 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
       if (entityType === "frequency_policy") return json(route, { data: [view("frequency_policy", { id: "global_cap", fields: {} })], meta: meta(revision) });
       if (entityType === "feature_switch") return json(route, { data: [view("feature_switch", { id: "ads_enabled", fields: {} })], meta: meta(revision) });
       if (entityType === "unit_binding") return json(route, { data: [], meta: meta(revision) });
+      if (entityType === "custom_parameter") return json(route, { data: customParameters.map((parameter) => view("custom_parameter", parameter, "modified")), meta: meta(revision) });
+    }
+    if (path === "/api/v1/drafts/development/entities" && method === "POST") {
+      const input = request.postDataJSON() as { entity_type: string; entity: { id: string; fields: Record<string, unknown> } };
+      if (input.entity_type !== "custom_parameter") return json(route, { error: { code: "route_not_found", message: "missing test route", request_id: "req_missing" } }, 404);
+      customParameters.push(input.entity); events.push(`create:${input.entity.id}`); revision += 1;
+      return json(route, { data: view("custom_parameter", input.entity, "created"), meta: meta(revision) }, 201);
+    }
+    if (path.startsWith("/api/v1/drafts/development/entities/custom_parameter/") && method === "PUT") {
+      const input = request.postDataJSON() as { entity: { id: string; fields: Record<string, unknown> } };
+      const id = path.split("/").at(-1)!;
+      const index = customParameters.findIndex((parameter) => parameter.id === id);
+      customParameters[index] = input.entity; events.push(`replace:${id}`); revision += 1;
+      return json(route, { data: view("custom_parameter", input.entity, "modified"), meta: meta(revision) });
+    }
+    if (path.startsWith("/api/v1/drafts/development/entities/custom_parameter/") && method === "DELETE") {
+      const id = path.split("/").at(-1)!;
+      const index = customParameters.findIndex((parameter) => parameter.id === id);
+      const [removed] = customParameters.splice(index, 1); events.push(`delete:${id}`); revision += 1;
+      return json(route, { data: view("custom_parameter", removed, "modified"), meta: meta(revision) });
     }
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "GET") return json(route, { data: view("placement", placement), meta: meta(revision) });
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "PUT") {
