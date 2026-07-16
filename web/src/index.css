@@ -277,6 +277,14 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .configuration-empty-guide li strong { font-size: 14px; }
 .configuration-empty-guide li p { font-size: 12px; }
 .configuration-empty-guide .button { min-width: 128px; }
+.network-settings-form { display: grid; gap: 18px; max-width: 720px; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.network-settings-form > header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.network-settings-form h2, .network-settings-form p { margin: 0; }
+.network-settings-form header p { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--text-muted); font-size: 12px; }
+.network-settings-fields { display: grid; gap: 16px; }
+.network-settings-risk { display: flex; gap: 8px; align-items: flex-start; margin: -4px 0 0; padding: 11px 12px; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 13px; line-height: 1.5; }
+.network-settings-risk svg { flex: 0 0 auto; margin-top: 2px; }
+.network-settings-form > footer { display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border); }
 
 .placement-detail { width: min(100% - 80px, 1360px); padding-top: 30px; }
 .detail-heading, .detail-heading-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

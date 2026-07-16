@@ -34,7 +34,7 @@ import { RequestError } from "../ui/StateViews";
 import { ImportDialog } from "./ImportDialog";
 
 type EditorRoute = { mode: "list" } | { mode: "detail"; id?: string; section?: "bindings" };
-type EditorTab = "placement" | "frequency_policy" | "feature_switch" | "unit_binding" | "custom_parameter";
+type EditorTab = "placement" | "frequency_policy" | "feature_switch" | "unit_binding" | "custom_parameter" | "network_settings";
 type EntityConflict = { local: EntityRecord; state: DraftView; revision: number; entityType?: string };
 type BindingLoad = Record<string, EntityView[]>;
 type DeleteTarget = { entity: EntityView; entityType: "placement" | "frequency_policy" | "feature_switch" | "custom_parameter" };
@@ -58,6 +58,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   const [policies, setPolicies] = useState<EntityView[]>([]);
   const [switches, setSwitches] = useState<EntityView[]>([]);
   const [customParameters, setCustomParameters] = useState<EntityView[]>([]);
+  const [networkSettings, setNetworkSettings] = useState<EntityView[]>([]);
   const [draft, setDraft] = useState<DraftView | null>(null);
   const [bindings, setBindings] = useState<BindingLoad>({});
   const [tab, setTab] = useState<EditorTab>("placement");
@@ -81,17 +82,18 @@ export function ConfigurationEditor({ environment, environments, revision, packR
         if (cause instanceof ConflowAPIError && cause.code === "validation_not_found") return null;
         throw cause;
       });
-      const [nextSchema, nextPlacements, nextPolicies, nextSwitches, nextCustomParameters, nextDraft, nextBindings, nextDiagnostics] = await Promise.all([
+      const [nextSchema, nextPlacements, nextPolicies, nextSwitches, nextCustomParameters, nextNetworkSettings, nextDraft, nextBindings, nextDiagnostics] = await Promise.all([
         getPackSchema(packRef, signal),
         listDraftEntities(environment.id, "placement", signal),
         listDraftEntities(environment.id, "frequency_policy", signal),
         listDraftEntities(environment.id, "feature_switch", signal),
         packRef === "mobile-ad-monetization/v2" ? listDraftEntities(environment.id, "custom_parameter", signal) : Promise.resolve({ data: [] as EntityView[] }),
+        packRef === "mobile-ad-monetization/v2" ? listDraftEntities(environment.id, "network_settings", signal) : Promise.resolve({ data: [] as EntityView[] }),
         getDraft(environment.id, signal),
         Promise.all(environments.map(async (item) => [item.id, (await listDraftEntities(item.id, "unit_binding", signal)).data] as const)),
         diagnostics,
       ]);
-      setSchema(nextSchema.data); setPlacements(nextPlacements.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setCustomParameters(nextCustomParameters.data); setDraft(nextDraft.data); setBindings(Object.fromEntries(nextBindings)); setValidation(nextDiagnostics?.data ?? null); onValidation?.(nextDiagnostics?.data ?? null);
+      setSchema(nextSchema.data); setPlacements(nextPlacements.data); setPolicies(nextPolicies.data); setSwitches(nextSwitches.data); setCustomParameters(nextCustomParameters.data); setNetworkSettings(nextNetworkSettings.data); setDraft(nextDraft.data); setBindings(Object.fromEntries(nextBindings)); setValidation(nextDiagnostics?.data ?? null); onValidation?.(nextDiagnostics?.data ?? null);
       onRevision(nextDraft.meta.revision, nextDraft.data.changed_entity_count);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -108,6 +110,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
     else if (entityType === "frequency_policy") { setTab("frequency_policy"); const policy = policies.find((item) => item.entity_id === entityID); if (policy) setFrequencyDrawer({ mode: "edit", policy }); }
     else if (entityType === "feature_switch") { setTab("feature_switch"); const featureSwitch = switches.find((item) => item.entity_id === entityID); if (featureSwitch) setFeatureSwitchDrawer({ mode: "edit", featureSwitch }); }
     else if (entityType === "custom_parameter") { setTab("custom_parameter"); const parameter = customParameters.find((item) => item.entity_id === entityID); if (parameter) setCustomParameterDrawer({ mode: "edit", parameter }); }
+    else if (entityType === "network_settings") setTab("network_settings");
     else if (entityType === "unit_binding") setTab("unit_binding");
   }, [customParameters, focusEntityRef, policies, switches]);
 
@@ -130,7 +133,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
     if (reference.entity_type === "placement") setRoute({ mode: "detail", id: reference.entity_id });
   };
   return <>
-    <ConfigurationList packRef={packRef} tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} customParameters={customParameters} draft={draft} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: false })} onOpenPolicy={(policy) => setFrequencyDrawer({ mode: "edit", policy })} onCreateSwitch={() => setFeatureSwitchDrawer({ mode: "create" })} onOpenSwitch={(featureSwitch) => setFeatureSwitchDrawer({ mode: "edit", featureSwitch })} onCreateCustomParameter={() => setCustomParameterDrawer({ mode: "create" })} onOpenCustomParameter={(parameter) => setCustomParameterDrawer({ mode: "edit", parameter })} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} onImport={() => setImportOpen(true)} />
+    <ConfigurationList packRef={packRef} tab={tab} onTabChange={setTab} placements={placements} policies={policies} switches={switches} customParameters={customParameters} networkSettings={networkSettings} schema={schema} draft={draft} environment={environment} bindings={bindings} environments={environments} revision={revision} loading={loading} error={error} validation={validation} validating={validating} validationError={validationError} onRetry={() => void loadList()} onValidate={() => void runValidation()} onDismissValidationError={() => setValidationError(null)} onOpenPlacement={(id) => setRoute({ mode: "detail", id })} onOpenBinding={(id) => setRoute({ mode: "detail", id, section: "bindings" })} onCreate={() => setRoute({ mode: "detail" })} onCreatePolicy={() => setFrequencyDrawer({ mode: "create", returnToPlacement: false })} onOpenPolicy={(policy) => setFrequencyDrawer({ mode: "edit", policy })} onCreateSwitch={() => setFeatureSwitchDrawer({ mode: "create" })} onOpenSwitch={(featureSwitch) => setFeatureSwitchDrawer({ mode: "edit", featureSwitch })} onCreateCustomParameter={() => setCustomParameterDrawer({ mode: "create" })} onOpenCustomParameter={(parameter) => setCustomParameterDrawer({ mode: "edit", parameter })} onDelete={(entity, entityType) => setDeleting({ entity, entityType })} onSwitchSaved={() => void loadList()} onNetworkSettingsSaved={() => void loadList()} onImport={() => setImportOpen(true)} />
     <FrequencyDrawer packRef={packRef} state={frequencyDrawer} environment={environment} revision={revision} draft={draft} diagnostics={validation?.diagnostics ?? []} onClose={() => setFrequencyDrawer(null)} onSaved={() => { setFrequencyDrawer(null); void loadList(); }} onDelete={(entity) => { setFrequencyDrawer(null); setDeleting({ entity, entityType: "frequency_policy" }); }} onOpenReference={openReference} />
     <FeatureSwitchDrawer state={featureSwitchDrawer} environment={environment} revision={revision} draft={draft} onClose={() => setFeatureSwitchDrawer(null)} onSaved={() => { setFeatureSwitchDrawer(null); void loadList(); }} />
     <CustomParameterDrawer state={customParameterDrawer} environment={environment} revision={revision} draft={draft} onClose={() => setCustomParameterDrawer(null)} onSaved={() => { setCustomParameterDrawer(null); void loadList(); }} />
@@ -140,7 +143,7 @@ export function ConfigurationEditor({ environment, environments, revision, packR
   </>;
 }
 
-function ConfigurationList({ packRef, tab, onTabChange, placements, policies, switches, customParameters, draft, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onCreatePolicy, onOpenPolicy, onCreateSwitch, onOpenSwitch, onCreateCustomParameter, onOpenCustomParameter, onDelete, onSwitchSaved, onImport }: {
+function ConfigurationList({ packRef, tab, onTabChange, placements, policies, switches, customParameters, networkSettings, schema, draft, environment, bindings, environments, revision, loading, error, validation, validating, validationError, onRetry, onValidate, onDismissValidationError, onOpenPlacement, onOpenBinding, onCreate, onCreatePolicy, onOpenPolicy, onCreateSwitch, onOpenSwitch, onCreateCustomParameter, onOpenCustomParameter, onDelete, onSwitchSaved, onNetworkSettingsSaved, onImport }: {
   packRef: string;
   tab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
@@ -148,7 +151,10 @@ function ConfigurationList({ packRef, tab, onTabChange, placements, policies, sw
   policies: EntityView[];
   switches: EntityView[];
   customParameters: EntityView[];
+  networkSettings: EntityView[];
+  schema: PackSchema | null;
   draft: DraftView | null;
+  environment: Environment;
   bindings: BindingLoad;
   environments: Environment[];
   revision: number;
@@ -171,10 +177,11 @@ function ConfigurationList({ packRef, tab, onTabChange, placements, policies, sw
   onOpenCustomParameter: (parameter: EntityView) => void;
   onDelete: (entity: EntityView, entityType: "placement" | "frequency_policy" | "feature_switch" | "custom_parameter") => void;
   onSwitchSaved: () => void;
+  onNetworkSettingsSaved: () => void;
   onImport: () => void;
 }) {
-  const title = ({ placement: "配置", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定", custom_parameter: "自定义参数" } as Record<EditorTab, string>)[tab];
-  const description = ({ placement: "按业务对象维护广告位配置。", frequency_policy: "通用频控值会影响引用它的广告位。", feature_switch: "开关默认值的风险与回滚方式由配置包定义。", unit_binding: "跨广告位查看各环境的广告单元绑定。", custom_parameter: "维护独立受管的 Firebase Remote Config 参数。" } as Record<EditorTab, string>)[tab];
+  const title = ({ placement: "配置", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定", custom_parameter: "自定义参数", network_settings: "网络设置" } as Record<EditorTab, string>)[tab];
+  const description = ({ placement: "按业务对象维护广告位配置。", frequency_policy: "通用频控值会影响引用它的广告位。", feature_switch: "开关默认值的风险与回滚方式由配置包定义。", unit_binding: "跨广告位查看各环境的广告单元绑定。", custom_parameter: "维护独立受管的 Firebase Remote Config 参数。", network_settings: "维护当前广告网络、聚合策略和发布就绪检查平台。" } as Record<EditorTab, string>)[tab];
   const allEntitiesEmpty = !loading && placements.length === 0 && policies.length === 0 && switches.length === 0 && customParameters.length === 0 && Object.values(bindings).every((items) => items.length === 0);
   return <main className="page-container configuration-page">
     <header className="page-heading configuration-heading"><div><h1>{title}</h1><p>{description}</p></div><div className="configuration-actions"><Button icon={<Download size={16} />} onClick={onImport}>导入配置</Button><Button icon={validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} disabled={validating || loading} onClick={onValidate}>{validating ? "正在校验" : validation?.status === "stale" ? "重新运行校验" : "运行校验"}</Button>{tab === "placement" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreate}>新建广告位</Button> : null}{tab === "frequency_policy" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreatePolicy}>新建频控策略</Button> : null}{tab === "feature_switch" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreateSwitch}>新建开关</Button> : null}{tab === "custom_parameter" ? <Button variant="primary" icon={<Plus size={17} />} onClick={onCreateCustomParameter}>新建参数</Button> : null}</div></header>
@@ -184,6 +191,7 @@ function ConfigurationList({ packRef, tab, onTabChange, placements, policies, sw
       <TabButton active={tab === "feature_switch"} onClick={() => onTabChange("feature_switch")}>功能开关</TabButton>
       <TabButton active={tab === "unit_binding"} onClick={() => onTabChange("unit_binding")}>广告单元绑定</TabButton>
       {packRef === "mobile-ad-monetization/v2" ? <TabButton active={tab === "custom_parameter"} onClick={() => onTabChange("custom_parameter")}>自定义参数</TabButton> : null}
+      {packRef === "mobile-ad-monetization/v2" ? <TabButton active={tab === "network_settings"} onClick={() => onTabChange("network_settings")}>网络设置</TabButton> : null}
     </div>
     {validation ? <ValidationSummary result={validation} validating={validating} onValidate={onValidate} /> : null}
     {error ? <RequestError {...error} onDismiss={onRetry} /> : null}
@@ -194,6 +202,7 @@ function ConfigurationList({ packRef, tab, onTabChange, placements, policies, sw
     {tab === "feature_switch" ? <FeatureSwitchTable switches={switches} diagnostics={validation?.diagnostics ?? []} environment={environments.find((item) => item.id === draft?.environment_id) ?? environments[0]} revision={revision} draft={draft} loading={loading} onSaved={onSwitchSaved} onOpen={onOpenSwitch} onDelete={onDelete} /> : null}
     {tab === "unit_binding" ? <BindingOverview placements={placements} bindings={bindings} diagnostics={validation?.diagnostics ?? []} environment={environments.find((e) => e.id === draft?.environment_id) ?? environments[0]} loading={loading} onOpen={onOpenBinding} /> : null}
     {tab === "custom_parameter" ? <CustomParameterTable parameters={customParameters} diagnostics={validation?.diagnostics ?? []} loading={loading} onOpen={onOpenCustomParameter} onDelete={onDelete} /> : null}
+    {tab === "network_settings" ? <NetworkSettingsForm entity={networkSettings.find((item) => item.entity_id === "default") ?? null} schema={schema?.entities.find((item) => item.name === "network_settings") ?? null} draft={draft} environment={environment} revision={revision} loading={loading} onSaved={onNetworkSettingsSaved} /> : null}
   </main>;
 }
 
@@ -338,6 +347,60 @@ function CustomParameterTable({ parameters, diagnostics, loading, onOpen, onDele
     { id: "actions", header: () => <span className="sr-only">操作</span>, enableSorting: false, size: 80, minSize: 80, maxSize: 80, cell: (info) => { const item = info.row.original; const key = String(item.effective.value.fields.key ?? item.entity_id); return <div className="row-actions"><button className="icon-button row-open" aria-label={`编辑自定义参数 ${key}`} onClick={(event) => { event.stopPropagation(); onOpen(item); }}><ChevronRight size={18} /></button><button className="icon-button row-delete" aria-label={`删除自定义参数 ${key}`} onClick={(event) => { event.stopPropagation(); onDelete(item, "custom_parameter"); }}><Trash2 size={16} /></button></div>; } },
   ], [diagnostics, onDelete, onOpen]);
   return <><EntityTableToolbar total={parameters.length} matched={rows.length} label="自定义参数" query={query} onQueryChange={setQuery} dirtyOnly={dirtyOnly} onDirtyOnlyChange={setDirtyOnly} />{loading ? <TableSkeleton /> : <section className="table-panel"><DataTable ariaLabel="自定义参数列表" columns={columns} data={rows} defaultSorting={[{ id: "key", desc: false }]} emptyState={parameters.length === 0 ? "还没有自定义参数。" : "没有符合当前筛选条件的自定义参数。"} getRowId={(item) => item.entity_id} minTableWidth={720} onRowClick={onOpen} /></section>}</>;
+}
+
+function NetworkSettingsForm({ entity, schema, draft, environment, revision, loading, onSaved }: { entity: EntityView | null; schema: PackSchema["entities"][number] | null; draft: DraftView | null; environment: Environment; revision: number; loading: boolean; onSaved: () => void }) {
+  const [fields, setFields] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [systemError, setSystemError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<EntityConflict | null>(null);
+  const schemaFields = useMemo(() => (schema?.fields ?? []).slice().sort((left, right) => left.ui.order - right.ui.order), [schema]);
+  const activeNetwork = schemaFields.find((field) => field.name === "active_network");
+  const mediationStrategy = schemaFields.find((field) => field.name === "mediation_strategy");
+  const platforms = schemaFields.find((field) => field.name === "platforms");
+
+  useEffect(() => {
+    if (!entity || !schema) return;
+    setFields(fieldsForSchema(entity.effective.value.fields, schema.fields)); setErrors({}); setSystemError(null);
+  }, [entity, schema]);
+
+  const update = (name: string, value: unknown) => setFields((current) => ({ ...current, [name]: value }));
+  const save = async () => {
+    if (!entity || !schema || !draft) return;
+    const record: EntityRecord = { id: entity.entity_id, fields: fieldsForSchema(fields, schema.fields) };
+    setSaving(true); setErrors({}); setSystemError(null);
+    try {
+      await replaceDraftEntity(environment.id, "network_settings", entity.entity_id, revision, { expected_source_revision: draft.source_revision, write_scope: "baseline", entity: record });
+      onSaved();
+    } catch (cause) {
+      if (cause instanceof ConflowAPIError && (cause.code === "revision_mismatch" || cause.code === "source_revision_mismatch") && cause.currentState && isDraftView(cause.currentState)) setConflict({ local: record, state: cause.currentState, revision: cause.currentRevision ?? revision, entityType: "network_settings" });
+      else if (cause instanceof ConflowAPIError && cause.code === "validation_failed") setErrors(errorsForEntity(cause.details ?? [], entity.entity_ref, entity.entity_id));
+      else setSystemError(cause instanceof ConflowAPIError ? cause.message : "保存网络设置失败，请重试。");
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <TableSkeleton />;
+  if (!entity || !schema || !activeNetwork || !mediationStrategy || !platforms) return <section className="network-settings-form"><p className="muted-copy">未找到默认网络设置。</p></section>;
+  const activeNetworkOptions = activeNetwork.validation.enum.length > 0 ? activeNetwork.validation.enum.map(String) : ["admob", "max"];
+  const mediationOptions = mediationStrategy.validation.enum.length > 0 ? mediationStrategy.validation.enum.map(String) : ["hybrid", "bidding", "waterfall"];
+  const activeCaption = `${fieldCaption(draft, entity.entity_id, activeNetwork.name)} · 值将编译为 ad_network_mode 参数`;
+
+  return <section className="network-settings-form" aria-label="网络设置表单">
+    <header><div><h2>默认网络设置</h2><p><code>{entity.entity_id}</code> <ChangeStatusChip status={entity.change_status} /></p></div></header>
+    <div className="network-settings-fields">
+      <label className={errors[activeNetwork.name] ? "form-field form-field--error" : "form-field"}><span>{activeNetwork.ui.label}</span>
+        {activeNetwork.ui.control === "select" ? <SelectField ariaLabel={activeNetwork.ui.label} value={String(fields[activeNetwork.name] ?? "")} onChange={(value) => update(activeNetwork.name, value)} options={activeNetworkOptions.map((value) => ({ value, label: value }))} /> : <input aria-label={activeNetwork.ui.label} value={String(fields[activeNetwork.name] ?? "")} onChange={(event) => update(activeNetwork.name, event.target.value)} />}
+        <small>{activeCaption}</small>{errors[activeNetwork.name] ? <span className="field-error" role="alert">{errors[activeNetwork.name]}</span> : null}
+      </label>
+      <p className="network-settings-risk" role="note"><ShieldAlert size={16} />切换将改变所有广告位的默认链路，生产发布时为高风险项</p>
+      <label className={errors[mediationStrategy.name] ? "form-field form-field--error" : "form-field"}><span>{mediationStrategy.ui.label}</span><SelectField ariaLabel={mediationStrategy.ui.label} value={String(fields[mediationStrategy.name] ?? "")} onChange={(value) => update(mediationStrategy.name, value || null)} options={[{ value: "", label: "（未使用）" }, ...mediationOptions.map((value) => ({ value, label: value }))]} /><small>{fieldCaption(draft, entity.entity_id, mediationStrategy.name)} · {mediationStrategy.ui.description}</small>{errors[mediationStrategy.name] ? <span className="field-error" role="alert">{errors[mediationStrategy.name]}</span> : null}</label>
+      <label className={errors[platforms.name] ? "form-field form-field--error" : "form-field"}><span>{platforms.ui.label}</span><input aria-label={platforms.ui.label} value={arrayValue(fields[platforms.name]).join(", ")} onChange={(event) => update(platforms.name, event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /><small>{fieldCaption(draft, entity.entity_id, platforms.name)} · 以逗号分隔</small>{errors[platforms.name] ? <span className="field-error" role="alert">{errors[platforms.name]}</span> : null}</label>
+    </div>
+    {systemError ? <p className="binding-error" role="alert">{systemError}</p> : null}
+    <footer><Button variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void save()}>{saving ? "正在保存" : "保存网络设置"}</Button></footer>
+    <EntityConflictDialog conflict={conflict} onClose={() => setConflict(null)} onReload={() => { setConflict(null); onSaved(); }} />
+  </section>;
 }
 
 function BindingOverview({ placements, bindings, diagnostics, environment, loading, onOpen }: { placements: EntityView[]; bindings: BindingLoad; diagnostics: Diagnostic[]; environment: Environment; loading: boolean; onOpen: (id: string) => void }) {
@@ -654,7 +717,7 @@ function BindingMatrix({ environments, bindings, diagnostics, placementID, revis
 
 function EntityConflictDialog({ conflict, onClose, onReload }: { conflict: EntityConflict | null; onClose: () => void; onReload: () => void }) {
   const current = conflict ? findEntity(conflict.state, conflict.local.id, conflict.entityType ?? "placement") : undefined;
-  const label = conflict?.entityType === "frequency_policy" ? "频控策略" : "广告位";
+  const label = ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", custom_parameter: "自定义参数", network_settings: "网络设置" } as Record<string, string>)[conflict?.entityType ?? "placement"] ?? "配置实体";
   return <Modal open={conflict !== null} onOpenChange={(open) => { if (!open) onClose(); }} title={`${label}已被其他操作修改`} description={`服务端当前版本 ${conflict?.revision ?? "未知"}。重新加载前不会覆盖服务端当前值。`}><div className="conflict-icon"><CircleAlert size={18} /></div><div className="conflict-grid"><section><span>我的修改</span><code>{JSON.stringify(conflict?.local.fields ?? {}, null, 2)}</code></section><section><span>服务端当前值</span><code>{JSON.stringify(current?.fields ?? `${label}已删除`, null, 2)}</code></section></div><footer className="dialog-actions"><Button onClick={onClose}>保留我的输入</Button><Button variant="primary" onClick={onReload}>重新加载当前值</Button></footer></Modal>;
 }
 
@@ -673,7 +736,7 @@ function highestDiagnosticCategory(diagnostics: Diagnostic[]): DiagnosticCategor
 function diagnosticCategoryLabel(category: DiagnosticCategory) { return ({ blocking: "阻断", warning: "警告", info: "建议" } as const)[category]; }
 function diagnosticCounts(diagnostics: Diagnostic[]): Record<DiagnosticCategory, number> { return diagnostics.reduce<Record<DiagnosticCategory, number>>((counts, diagnostic) => { counts[diagnosticCategory(diagnostic)] += 1; return counts; }, { blocking: 0, warning: 0, info: 0 }); }
 function formatValidatedAt(value: string) { return value.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC"); }
-function findEntity(state: DraftView, id: string, entityType: string): EntityRecord | undefined { const key = ({ placement: "placements", frequency_policy: "frequency_policies", feature_switch: "feature_switches", custom_parameter: "custom_parameters" } as Record<string, string>)[entityType] ?? `${entityType}s`; const collection = state.effective[key]; return Array.isArray(collection) ? collection.find((item): item is EntityRecord => Boolean(item && typeof item === "object" && "id" in item && (item as EntityRecord).id === id)) : undefined; }
+function findEntity(state: DraftView, id: string, entityType: string): EntityRecord | undefined { const key = ({ placement: "placements", frequency_policy: "frequency_policies", feature_switch: "feature_switches", custom_parameter: "custom_parameters", network_settings: "network_settings" } as Record<string, string>)[entityType] ?? `${entityType}s`; const collection = state.effective[key]; return Array.isArray(collection) ? collection.find((item): item is EntityRecord => Boolean(item && typeof item === "object" && "id" in item && (item as EntityRecord).id === id)) : undefined; }
 function isDraftView(value: unknown): value is DraftView { return Boolean(value && typeof value === "object" && "environment_id" in value && "effective" in value); }
 function fieldCaption(draft: DraftView | null, entityID: string | undefined, field: string) {
   const states = draft?.field_states ?? [];

@@ -15,8 +15,19 @@ const placementFields = [
   field("custom_frequency_policy", "object", "自定义频控", "object", null, [], true), field("load_timeout_ms", "integer", "加载超时（毫秒）", "number", 4000), field("cache_ttl", "object", "缓存有效期", "duration", null, [], true), field("fallback_behavior", "string", "兜底行为", "select", "continue", ["continue", "skip_slot", "show_empty_safe"]),
 ];
 
-function field(name: string, type: string, label: string, control: string, defaultValue: unknown, values: string[] = [], nullable = false, required = true) {
-  return { name, type, required, nullable, default: defaultValue, sensitivity: "public", ui: { label, description: "测试字段", control, group: "投放", order: placementFieldsOrder(name) }, validation: { enum: values } };
+const networkSettings = {
+  id: "default",
+  fields: { active_network: "admob", mediation_strategy: null, platforms: ["android"] },
+};
+
+const networkSettingsFields = [
+  field("active_network", "string", "当前网络", "input", "", [], false, true, 0),
+  field("mediation_strategy", "string", "聚合策略", "select", null, ["hybrid", "bidding", "waterfall"], true, true, 1),
+  field("platforms", "array", "平台", "tags", [], [], false, true, 2),
+];
+
+function field(name: string, type: string, label: string, control: string, defaultValue: unknown, values: string[] = [], nullable = false, required = true, order = placementFieldsOrder(name)) {
+  return { name, type, required, nullable, default: defaultValue, sensitivity: "public", ui: { label, description: "测试字段", control, group: "投放", order }, validation: { enum: values } };
 }
 
 function placementFieldsOrder(name: string) { return ["client_id", "key", "ad_type", "description", "enabled_switch_id", "frequency_policy_type", "network_mode", "frequency_policy_id", "custom_frequency_policy", "load_timeout_ms", "cache_ttl", "fallback_behavior"].indexOf(name); }
@@ -57,16 +68,39 @@ test("v2 自定义参数可创建、编辑和删除", async ({ page }) => {
   expect(events).toEqual(["create:min_supported_version", "replace:min_supported_version", "delete:min_supported_version"]);
 });
 
-async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>) => void, events: string[] = []) {
+test("v2 网络设置可加载并保存基线草稿", async ({ page }) => {
+  let submittedFields: Record<string, unknown> | undefined;
+  let submittedScope: string | undefined;
+  await mockV2ConfigurationAPI(page, (fields, scope) => { submittedFields = fields; submittedScope = scope; });
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "网络设置" }).click();
+
+  await expect(page.getByLabel("当前网络")).toHaveValue("admob");
+  await expect(page.getByText("通用值", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("值将编译为 ad_network_mode 参数")).toBeVisible();
+  await expect(page.getByText("切换将改变所有广告位的默认链路，生产发布时为高风险项")).toBeVisible();
+  await page.getByLabel("当前网络").fill("max");
+  await page.getByLabel("聚合策略").click();
+  await page.getByRole("option", { name: "bidding", exact: true }).click();
+  await page.getByLabel("平台").fill("android, ios, android");
+  await page.getByRole("button", { name: "保存网络设置" }).click();
+
+  await expect.poll(() => submittedFields).toMatchObject({ active_network: "max", mediation_strategy: "bidding", platforms: ["android", "ios", "android"] });
+  expect(submittedScope).toBe("baseline");
+  await expect(page.getByText("已修改")).toBeVisible();
+});
+
+async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>, writeScope?: string) => void, events: string[] = []) {
   let revision = 1;
   const customParameters: Array<{ id: string; fields: Record<string, unknown> }> = [];
+  let networkSettingsChanged = false;
   const environment = { id: "development", name: "Development", kind: "development", provider: { type: "firebase-remote-config", project_id: "photo-editor-dev" }, publish: { requires_confirmation: false } };
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const method = request.method();
     if (path === "/api/v1/bootstrap") return json(route, { data: { project: { id: "photo-editor", name: "Photo Editor", pack_ref: "mobile-ad-monetization/v2", source_type: "managed-file" }, environments: [environment], capabilities: { project_edit: true, environment_manage: true } }, meta: meta(revision) });
-    if (path === "/api/v1/packs/mobile-ad-monetization/versions/v2/schema") return json(route, { data: { version: 2, entities: [{ name: "placement", fields: placementFields }], migrations: [] }, meta: meta(revision) });
+    if (path === "/api/v1/packs/mobile-ad-monetization/versions/v2/schema") return json(route, { data: { version: 2, entities: [{ name: "placement", fields: placementFields }, { name: "network_settings", fields: networkSettingsFields }], migrations: [] }, meta: meta(revision) });
     if (path === "/api/v1/drafts/development/diagnostics") return json(route, { error: { code: "validation_not_found", message: "尚未运行完整校验", request_id: "req_validation" } }, 404);
     if (path === "/api/v1/drafts/development") return json(route, { data: draft(), meta: meta(revision) });
     if (path === "/api/v1/drafts/development/entities" && method === "GET") {
@@ -76,6 +110,7 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
       if (entityType === "feature_switch") return json(route, { data: [view("feature_switch", { id: "ads_enabled", fields: {} })], meta: meta(revision) });
       if (entityType === "unit_binding") return json(route, { data: [], meta: meta(revision) });
       if (entityType === "custom_parameter") return json(route, { data: customParameters.map((parameter) => view("custom_parameter", parameter, "modified")), meta: meta(revision) });
+      if (entityType === "network_settings") return json(route, { data: [view("network_settings", networkSettings, networkSettingsChanged ? "modified" : "unchanged")], meta: meta(revision) });
     }
     if (path === "/api/v1/drafts/development/entities" && method === "POST") {
       const input = request.postDataJSON() as { entity_type: string; entity: { id: string; fields: Record<string, unknown> } };
@@ -96,6 +131,13 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
       const [removed] = customParameters.splice(index, 1); events.push(`delete:${id}`); revision += 1;
       return json(route, { data: view("custom_parameter", removed, "modified"), meta: meta(revision) });
     }
+    if (path === "/api/v1/drafts/development/entities/network_settings/default" && method === "PUT") {
+      const input = request.postDataJSON() as { write_scope: string; entity: { fields: Record<string, unknown> } };
+      onSave(input.entity.fields, input.write_scope);
+      networkSettings.fields = input.entity.fields as typeof networkSettings.fields;
+      networkSettingsChanged = true; revision += 1;
+      return json(route, { data: view("network_settings", networkSettings, "modified"), meta: meta(revision) });
+    }
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "GET") return json(route, { data: view("placement", placement), meta: meta(revision) });
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "PUT") {
       const input = request.postDataJSON() as { entity: { fields: Record<string, unknown> } };
@@ -114,7 +156,11 @@ function view(type: string, entity: { id: string; fields: Record<string, unknown
 }
 
 function draft() {
-  return { environment_id: "development", pack_ref: "mobile-ad-monetization/v2", source_revision: "source_1", dirty: false, dirty_scopes: [], baseline: { source: { present: true, value: {} }, draft: { present: false }, resolved: { present: true, value: {} }, dirty: false }, environment_override: { source: { present: false }, draft: { present: false }, resolved: { present: false }, dirty: false }, effective: { placements: [{ id: placement.id, fields: placement.fields }] }, field_states: [], affected_environments: [] };
+  return { environment_id: "development", pack_ref: "mobile-ad-monetization/v2", source_revision: "source_1", dirty: false, dirty_scopes: [], baseline: { source: { present: true, value: {} }, draft: { present: false }, resolved: { present: true, value: {} }, dirty: false }, environment_override: { source: { present: false }, draft: { present: false }, resolved: { present: false }, dirty: false }, effective: { placements: [{ id: placement.id, fields: placement.fields }], network_settings: [{ id: networkSettings.id, fields: networkSettings.fields }] }, field_states: [
+    { path: "/network_settings/default/active_network", origin: "baseline" },
+    { path: "/network_settings/default/mediation_strategy", origin: "baseline" },
+    { path: "/network_settings/default/platforms", origin: "baseline" },
+  ], affected_environments: [] };
 }
 
 function meta(revision: number) { return { request_id: "req_configuration", revision }; }
