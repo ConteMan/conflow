@@ -357,8 +357,6 @@ function NetworkSettingsForm({ entity, schema, draft, environment, revision, loa
   const [conflict, setConflict] = useState<EntityConflict | null>(null);
   const schemaFields = useMemo(() => (schema?.fields ?? []).slice().sort((left, right) => left.ui.order - right.ui.order), [schema]);
   const activeNetwork = schemaFields.find((field) => field.name === "active_network");
-  const mediationStrategy = schemaFields.find((field) => field.name === "mediation_strategy");
-  const platforms = schemaFields.find((field) => field.name === "platforms");
 
   useEffect(() => {
     if (!entity || !schema) return;
@@ -381,9 +379,8 @@ function NetworkSettingsForm({ entity, schema, draft, environment, revision, loa
   };
 
   if (loading) return <TableSkeleton />;
-  if (!entity || !schema || !activeNetwork || !mediationStrategy || !platforms) return <section className="network-settings-form"><p className="muted-copy">未找到默认网络设置。</p></section>;
+  if (!entity || !schema || !activeNetwork) return <section className="network-settings-form"><p className="muted-copy">未找到默认网络设置。</p></section>;
   const activeNetworkOptions = activeNetwork.validation.enum.length > 0 ? activeNetwork.validation.enum.map(String) : ["admob", "max"];
-  const mediationOptions = mediationStrategy.validation.enum.length > 0 ? mediationStrategy.validation.enum.map(String) : ["hybrid", "bidding", "waterfall"];
   const activeCaption = `${fieldCaption(draft, entity.entity_id, activeNetwork.name)} · 值将编译为 ad_network_mode 参数`;
 
   return <section className="network-settings-form" aria-label="网络设置表单">
@@ -393,9 +390,7 @@ function NetworkSettingsForm({ entity, schema, draft, environment, revision, loa
         {activeNetwork.ui.control === "select" ? <SelectField ariaLabel={activeNetwork.ui.label} value={String(fields[activeNetwork.name] ?? "")} onChange={(value) => update(activeNetwork.name, value)} options={activeNetworkOptions.map((value) => ({ value, label: value }))} /> : <input aria-label={activeNetwork.ui.label} value={String(fields[activeNetwork.name] ?? "")} onChange={(event) => update(activeNetwork.name, event.target.value)} />}
         <small>{activeCaption}</small>{errors[activeNetwork.name] ? <span className="field-error" role="alert">{errors[activeNetwork.name]}</span> : null}
       </label>
-      <p className="network-settings-risk" role="note"><ShieldAlert size={16} />切换将改变所有广告位的默认链路，生产发布时为高风险项</p>
-      <label className={errors[mediationStrategy.name] ? "form-field form-field--error" : "form-field"}><span>{mediationStrategy.ui.label}</span><SelectField ariaLabel={mediationStrategy.ui.label} value={String(fields[mediationStrategy.name] ?? "")} onChange={(value) => update(mediationStrategy.name, value || null)} options={[{ value: "", label: "（未使用）" }, ...mediationOptions.map((value) => ({ value, label: value }))]} /><small>{fieldCaption(draft, entity.entity_id, mediationStrategy.name)} · {mediationStrategy.ui.description}</small>{errors[mediationStrategy.name] ? <span className="field-error" role="alert">{errors[mediationStrategy.name]}</span> : null}</label>
-      <label className={errors[platforms.name] ? "form-field form-field--error" : "form-field"}><span>{platforms.ui.label}</span><input aria-label={platforms.ui.label} value={arrayValue(fields[platforms.name]).join(", ")} onChange={(event) => update(platforms.name, event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /><small>{fieldCaption(draft, entity.entity_id, platforms.name)} · 以逗号分隔</small>{errors[platforms.name] ? <span className="field-error" role="alert">{errors[platforms.name]}</span> : null}</label>
+      <p className="network-settings-note" role="note">全局广告链路开关，独立于各广告位配置；广告位默认继承此值，也可在自身「广告链路」字段单独覆盖。</p>
     </div>
     {systemError ? <p className="binding-error" role="alert">{systemError}</p> : null}
     <footer><Button variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void save()}>{saving ? "正在保存" : "保存网络设置"}</Button></footer>

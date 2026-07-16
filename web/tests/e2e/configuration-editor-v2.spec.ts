@@ -78,14 +78,14 @@ test("v2 网络设置可加载并保存基线草稿", async ({ page }) => {
   await expect(page.getByLabel("当前网络")).toHaveValue("admob");
   await expect(page.getByText("通用值", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("值将编译为 ad_network_mode 参数")).toBeVisible();
-  await expect(page.getByText("切换将改变所有广告位的默认链路，生产发布时为高风险项")).toBeVisible();
+  await expect(page.getByText("全局广告链路开关，独立于各广告位配置", { exact: false })).toBeVisible();
+  // Mediation strategy and platforms stay out of the UI; their stored values pass through unchanged on save.
+  await expect(page.getByLabel("聚合策略")).toHaveCount(0);
+  await expect(page.getByLabel("平台")).toHaveCount(0);
   await page.getByLabel("当前网络").fill("max");
-  await page.getByLabel("聚合策略").click();
-  await page.getByRole("option", { name: "bidding", exact: true }).click();
-  await page.getByLabel("平台").fill("android, ios, android");
   await page.getByRole("button", { name: "保存网络设置" }).click();
 
-  await expect.poll(() => submittedFields).toMatchObject({ active_network: "max", mediation_strategy: "bidding", platforms: ["android", "ios", "android"] });
+  await expect.poll(() => submittedFields).toMatchObject({ active_network: "max", mediation_strategy: null, platforms: ["android"] });
   expect(submittedScope).toBe("baseline");
   await expect(page.getByText("已修改")).toBeVisible();
 });

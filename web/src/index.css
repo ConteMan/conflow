@@ -282,8 +282,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .network-settings-form h2, .network-settings-form p { margin: 0; }
 .network-settings-form header p { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--text-muted); font-size: 12px; }
 .network-settings-fields { display: grid; gap: 16px; }
-.network-settings-risk { display: flex; gap: 8px; align-items: flex-start; margin: -4px 0 0; padding: 11px 12px; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 13px; line-height: 1.5; }
-.network-settings-risk svg { flex: 0 0 auto; margin-top: 2px; }
+.network-settings-note { margin: -4px 0 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 .network-settings-form > footer { display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border); }
 
 .placement-detail { width: min(100% - 80px, 1360px); padding-top: 30px; }
