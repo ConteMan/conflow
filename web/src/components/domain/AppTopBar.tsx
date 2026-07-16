@@ -1,17 +1,17 @@
-import { ChevronDown, Layers3, Menu, X } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { Layers3, Menu, X } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { Environment, Project, ValidationResult } from "../../api/client";
+import { SelectField } from "../ui/SelectField";
 
 export type Page = "overview" | "configuration" | "environments" | "project" | "validation" | "plan" | "release" | "releases" | "rollback";
 
-export function AppTopBar({ project, environments, selectedEnvironment, page, draftDirty, validation, environmentSelectRef, onEnvironmentChange, onPageChange }: {
+export function AppTopBar({ project, environments, selectedEnvironment, page, draftDirty, validation, onEnvironmentChange, onPageChange }: {
   project: Project;
   environments: Environment[];
   selectedEnvironment: Environment;
   page: Page;
   draftDirty: boolean | null;
   validation: ValidationResult | null;
-  environmentSelectRef: RefObject<HTMLSelectElement | null>;
   onEnvironmentChange: (id: string) => void;
   onPageChange: (page: Page) => void;
 }) {
@@ -25,11 +25,8 @@ export function AppTopBar({ project, environments, selectedEnvironment, page, dr
         <span className="sr-only">当前环境</span>
         <OverflowProjectName name={project.name} />
         <span className="context-separator">/</span>
-        <select ref={environmentSelectRef} className={production ? "context-environment context-environment--production" : "context-environment"} aria-label="切换环境" value={selectedEnvironment.id} onChange={(event) => onEnvironmentChange(event.target.value)}>
-          {environments.map((environment) => <option value={environment.id} key={environment.id}>{environment.name}</option>)}
-        </select>
+        <SelectField className={production ? "context-environment context-environment--production" : "context-environment"} ariaLabel="切换环境" value={selectedEnvironment.id} onChange={onEnvironmentChange} options={environments.map((environment) => ({ value: environment.id, label: environment.name }))} />
         {production ? <span className="sr-only" data-testid="production-marker">Production 环境</span> : null}
-        <ChevronDown size={14} aria-hidden="true" />
       </label>
       <nav className="desktop-nav" aria-label="主导航">
         <NavButton label="概览" page="overview" active={page === "overview"} onClick={onPageChange} />

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CreateEnvironmentInput, Environment, EnvironmentKind, UpdateEnvironmentInput } from "../../api/client";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Dialog";
+import { SelectField } from "../ui/SelectField";
 import { kindLabel } from "./Overview";
 
 type SubmitPayload = { mode: "create"; value: CreateEnvironmentInput } | { mode: "edit"; id: string; value: UpdateEnvironmentInput };
@@ -77,7 +78,7 @@ function EnvironmentForm({ mode, environment, busy, readOnly, onCancel, onSubmit
       <form onSubmit={(event) => { event.preventDefault(); if (!valid) return; if (mode === "create") onSubmit({ mode, value: { id: id.trim(), name: name.trim(), kind, provider: { type: "firebase-remote-config", project_id: projectId.trim() }, publish: { requires_confirmation: requiresConfirmation } } }); else if (environment) onSubmit({ mode, id: environment.id, value: { name: name.trim(), provider: { type: "firebase-remote-config", project_id: projectId.trim() }, publish: { requires_confirmation: requiresConfirmation } } }); }}>
         <label>显示名称<input ref={nameRef} value={name} maxLength={120} disabled={readOnly} onChange={(event) => setName(event.target.value)} required /></label>
         <label>环境 ID<div className="locked-input"><input value={id} disabled={mode === "edit" || readOnly} pattern="[a-z][a-z0-9-]{1,62}" onChange={(event) => setId(event.target.value)} required />{mode === "edit" ? <LockKeyhole size={15} /> : null}</div><small>{mode === "edit" ? "创建后不可修改" : "2–63 位小写字母、数字或连字符"}</small></label>
-        <label>环境类型<select value={kind} disabled={mode === "edit" || readOnly} onChange={(event) => setKind(event.target.value as EnvironmentKind)}>{(["development", "staging", "production", "custom"] as EnvironmentKind[]).map((value) => <option value={value} key={value}>{kindLabel(value)}</option>)}</select><small>{mode === "edit" ? "类型由服务端保留，无法修改" : "只有 Production 会触发持续风险标识"}</small></label>
+        <label>环境类型<SelectField ariaLabel="环境类型" value={kind} disabled={mode === "edit" || readOnly} onChange={(value) => setKind(value as EnvironmentKind)} options={(["development", "staging", "production", "custom"] as EnvironmentKind[]).map((value) => ({ value, label: kindLabel(value) }))} /><small>{mode === "edit" ? "类型由服务端保留，无法修改" : "只有 Production 会触发持续风险标识"}</small></label>
         <label>Firebase 项目<input value={projectId} maxLength={128} disabled={readOnly} onChange={(event) => setProjectId(event.target.value)} /><small>可在初始化时留空；连接或拉取前必须填写。</small></label>
         <div className="policy-info-card"><ShieldCheck size={18} /><span><strong>发布确认强度</strong><b>遵循项目级策略</b><small>连接与发布操作会按此环境单独校验。</small></span></div>
         <div className="form-actions">{mode === "create" ? <Button type="button" onClick={onCancel}>取消</Button> : environment ? <Button type="button" variant="ghost" disabled={!canDelete || readOnly} icon={<Trash2 size={16} />} onClick={() => onRequestDelete(environment)}>删除</Button> : null}<Button type="submit" variant="primary" disabled={!valid || busy || readOnly} icon={<Save size={16} />}>{busy ? "保存中…" : "保存环境"}</Button></div>

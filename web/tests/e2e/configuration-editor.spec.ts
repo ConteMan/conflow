@@ -135,9 +135,10 @@ test("列表加载后可按类型和文本筛选", async ({ page }) => {
   const table = page.getByRole("table", { name: "广告位列表" });
   await expect(table.getByRole("row", { name: /app_open_cold_start/ })).toBeVisible();
   await expect(page.getByText("总计 4 个广告位 · 筛选命中 4 个", { exact: true })).toBeVisible();
-  await page.getByLabel("按类型筛选").selectOption("native");
+  await page.getByLabel("按类型筛选").click();
+  await page.getByRole("option", { name: "原生", exact: true }).click();
   await expect(table.getByRole("row", { name: /app_open_cold_start/ })).toHaveCount(0);
-  await page.getByLabel("按类型筛选").selectOption("all"); await page.getByPlaceholder("搜索名称或 key").fill("warm_resume");
+  await page.getByLabel("按类型筛选").click(); await page.getByRole("option", { name: "全部类型", exact: true }).click(); await page.getByPlaceholder("搜索名称或 key").fill("warm_resume");
   await expect(table.getByRole("row", { name: /app_open_warm_resume/ })).toBeVisible();
   await expect(page.getByText("总计 4 个广告位 · 筛选命中 1 个", { exact: true })).toBeVisible();
 });
@@ -174,7 +175,7 @@ test("新建广告位后回到列表并显示未发布修改", async ({ page }) 
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
   // A new placement ID is derived directly from its key.
   await page.getByLabel("广告位键").fill("interstitial_test_entry");
-  await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
+  await page.getByLabel("频控策略").click(); await page.getByRole("option", { name: "inter_global_cap", exact: true }).click(); await page.getByRole("button", { name: "保存修改" }).click();
   const createdRow = page.getByRole("row", { name: /interstitial_test_entry/ });
   // The list row retains the description fallback and dirty state.
   await expect(createdRow).toBeVisible(); await expect(createdRow.getByText("未填写描述", { exact: true })).toBeVisible(); await expect(createdRow.getByText("已修改", { exact: true })).toBeVisible();
@@ -215,6 +216,14 @@ test("频控抽屉可编辑并展示受影响广告位", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "编辑频控策略 inter_global_cap" })).toHaveCount(0);
 });
 
+test("频控抽屉显示遮罩并支持 Esc 关闭", async ({ page }) => {
+  await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("tab", { name: "频控策略" }).click();
+  await page.getByRole("button", { name: "编辑频控策略 inter_global_cap" }).click();
+  await expect(page.locator(".drawer-backdrop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "编辑频控策略 inter_global_cap" })).toHaveCount(0);
+});
+
 test("功能开关翻转后保存", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("tab", { name: "功能开关" }).click();
   const toggle = page.getByRole("switch", { name: "切换 use_amazon_bidding" });
@@ -236,7 +245,7 @@ test("未被引用频控可删除", async ({ page }) => {
 
 test("创建后的广告位键为只读通用值", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration"); await page.getByRole("button", { name: "新建广告位" }).click();
-  await page.getByLabel("广告位键").fill("interstitial_test_entry"); await page.getByLabel("频控策略").selectOption("inter_global_cap"); await page.getByRole("button", { name: "保存修改" }).click();
+  await page.getByLabel("广告位键").fill("interstitial_test_entry"); await page.getByLabel("频控策略").click(); await page.getByRole("option", { name: "inter_global_cap", exact: true }).click(); await page.getByRole("button", { name: "保存修改" }).click();
   await page.getByRole("button", { name: "编辑 interstitial_test_entry" }).click();
   // Existing placement keys remain read-only.
   await expect(page.getByLabel("广告位键")).toHaveJSProperty("readOnly", true); await expect(page.getByText("所有环境一致，不可修改").first()).toBeVisible();
@@ -255,7 +264,7 @@ test("全空引导可创建频控和广告位并通过校验", async ({ page }) 
   await expect(policyDrawer).toHaveCount(0);
   await page.getByRole("button", { name: "新建广告位" }).click();
   // The placement entity ID is derived from the new key.
-  await page.getByLabel("广告位键").fill("interstitial_first_entry"); await page.getByLabel("频控策略").selectOption("first_frequency"); await page.getByRole("button", { name: "保存修改" }).click();
+  await page.getByLabel("广告位键").fill("interstitial_first_entry"); await page.getByLabel("频控策略").click(); await page.getByRole("option", { name: "first_frequency", exact: true }).click(); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_first_entry/ })).toBeVisible();
   await page.getByRole("button", { name: /运行校验/ }).first().click(); await expect(page.getByText("可发布", { exact: true })).toBeVisible();
 });
@@ -269,7 +278,7 @@ test("广告位空频控提示可直达创建并自动回填", async ({ page }) 
   // The frequency entity ID is exposed as "频控键".
   await policyDrawer.getByLabel("频控键").fill("placement_frequency"); await policyDrawer.getByRole("button", { name: "创建策略" }).click();
   await expect(page.getByRole("dialog", { name: "新建频控策略" })).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "频控策略" })).toHaveValue("placement_frequency");
+  await expect(page.getByRole("combobox", { name: "频控策略" })).toHaveText("placement_frequency");
   // The placement entity ID is derived from the new key.
   await page.getByLabel("广告位键").fill("interstitial_direct_entry"); await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("row", { name: /interstitial_direct_entry/ })).toBeVisible();
@@ -308,7 +317,7 @@ async function json(route: Route, body: unknown, status = 200) { await route.ful
 test("已有频控时新建广告位默认选中策略且状态一致", async ({ page }) => {
   await mockConfigurationAPI(page); await page.goto("/#configuration");
   await page.getByRole("button", { name: "新建广告位" }).click();
-  await expect(page.getByLabel("频控策略")).toHaveValue("inter_global_cap");
+  await expect(page.getByLabel("频控策略")).toContainText("inter_global_cap");
   // The placement key becomes the entity ID for a new placement.
   await page.getByLabel("广告位键").fill("default_ref_entry");
   await page.getByRole("button", { name: "保存修改" }).click();

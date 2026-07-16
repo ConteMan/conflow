@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ConflowAPIError,
   ConflowNetworkError,
@@ -48,7 +48,6 @@ export default function App() {
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [changedEntityCount, setChangedEntityCount] = useState<number | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
-  const environmentSelectRef = useRef<HTMLSelectElement>(null);
   const updateDraftState = useCallback((nextRevision: number, nextChangedEntityCount: number) => {
     setRevision(nextRevision);
     setChangedEntityCount(nextChangedEntityCount);
@@ -161,7 +160,7 @@ export default function App() {
   );
   return (
     <div className="app-shell">
-      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={changedEntityCount === null ? null : changedEntityCount > 0} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} environmentSelectRef={environmentSelectRef} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
+      <AppTopBar project={data.project} environments={data.environments} selectedEnvironment={selectedEnvironment} page={page} draftDirty={changedEntityCount === null ? null : changedEntityCount > 0} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} onEnvironmentChange={setSelectedEnvironmentId} onPageChange={selectPage} />
       {requestError ? <div className="error-container"><RequestError {...requestError} onDismiss={() => setRequestError(null)} /></div> : null}
       {page === "overview" ? <Overview project={data.project} selectedEnvironment={selectedEnvironment} pack={pack} validation={validation?.environment_id === selectedEnvironment.id ? validation : null} draftDirty={changedEntityCount === null ? null : changedEntityCount > 0} revision={revision} onManageProject={() => selectPage("project")} onSaveEnvironment={(environment) => saveEnvironment({ mode: "edit", id: environment.id, value: { name: environment.name, provider: environment.provider, publish: environment.publish } })} /> : null}
       {page === "environments" ? <EnvironmentManager environments={data.environments} selectedEnvironmentId={selectedEnvironment.id} busy={busy} readOnly={!data.capabilities.environment_manage} onSelect={setSelectedEnvironmentId} onSubmit={saveEnvironment} onDelete={removeEnvironment} /> : null}

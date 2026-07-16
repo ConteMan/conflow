@@ -12,6 +12,7 @@ import {
 } from "../../api/client";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Dialog";
+import { SelectField } from "../ui/SelectField";
 
 type Step = "upload" | "preview" | "decisions" | "result";
 
@@ -28,6 +29,7 @@ export function ImportDialog({
 }) {
   const [step, setStep] = useState<Step>("upload");
   const [bundle, setBundle] = useState<ImportBundle | null>(null);
+  const [fileName, setFileName] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [conflictMode, setConflictMode] = useState<"replace" | "merge" | "skip">("replace");
   const [previewing, setPreviewing] = useState(false);
@@ -42,6 +44,7 @@ export function ImportDialog({
   const reset = () => {
     setStep("upload");
     setBundle(null);
+    setFileName("");
     setParseError(null);
     setConflictMode("replace");
     setPreviewing(false);
@@ -61,6 +64,7 @@ export function ImportDialog({
     if (!file) return;
     setParseError(null);
     setBundle(null);
+    setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -125,17 +129,21 @@ export function ImportDialog({
     <Modal open={open} onOpenChange={(o) => { if (!o) handleClose(); }} title={stepTitle[step]}>
       {step === "upload" && (
         <div className="import-dialog-body">
-          <label className="import-upload-area" aria-label="选择 Bundle 文件">
-            <Upload size={24} aria-hidden="true" />
-            <p>点击选择或拖拽 Bundle JSON 文件</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="sr-only"
-              onChange={handleFileChange}
-            />
-          </label>
+          <div className="import-upload-control">
+            <label className="import-upload-area" aria-label="选择 Bundle 文件">
+              <Upload size={24} aria-hidden="true" />
+              <strong>{bundle ? fileName : "点击选择或拖拽 Bundle JSON 文件"}</strong>
+              <span>{bundle ? "已选择文件" : "支持 Conflow Bundle JSON（.json）"}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="sr-only"
+                onChange={handleFileChange}
+              />
+            </label>
+            {bundle ? <button type="button" className="link-button import-upload-replace" onClick={() => fileInputRef.current?.click()}>替换文件</button> : null}
+          </div>
           {parseError && <p className="binding-error" role="alert">{parseError}</p>}
           {bundle && (
             <dl className="import-bundle-info">
@@ -147,17 +155,19 @@ export function ImportDialog({
               )}
             </dl>
           )}
-          <label className="form-field">
+          <label className="form-field import-conflict-field">
             <span>冲突模式</span>
-            <select
-              aria-label="冲突模式"
+            <SelectField
+              ariaLabel="冲突模式"
               value={conflictMode}
-              onChange={(e) => setConflictMode(e.target.value as "replace" | "merge" | "skip")}
-            >
-              <option value="replace">Replace — 覆盖已有同 ID 实体</option>
-              <option value="merge">Merge — 仅写入不存在的实体</option>
-              <option value="skip">Skip — 跳过所有冲突</option>
-            </select>
+              onChange={(value) => setConflictMode(value as "replace" | "merge" | "skip")}
+              options={[
+                { value: "replace", label: "Replace", description: "覆盖已有同 ID 实体" },
+                { value: "merge", label: "Merge", description: "仅写入不存在的实体" },
+                { value: "skip", label: "Skip", description: "跳过所有冲突" },
+              ]}
+            />
+            <small>用于处理导入内容与当前配置中同 ID 实体的冲突。</small>
           </label>
           {previewError && <p className="binding-error" role="alert">{previewError}</p>}
           <footer className="dialog-actions">
@@ -323,16 +333,7 @@ function DecisionField({
         <span><code>{decision.key}</code></span>
         <small>{decision.reason}</small>
         {enumValues ? (
-          <select
-            aria-label={decision.key}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          >
-            <option value="">请选择</option>
-            {enumValues.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
+          <SelectField ariaLabel={decision.key} value={value} onChange={onChange} options={[{ value: "", label: "请选择" }, ...enumValues.map((item) => ({ value: item, label: item }))]} />
         ) : (
           <input
             aria-label={decision.key}
