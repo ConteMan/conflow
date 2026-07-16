@@ -2,6 +2,19 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.4.2] - 2026-07-16
+
+### Added
+
+- **Unified select component** (#59): all native dropdowns (environment switcher, list filters, form enums, import conflict mode) were replaced with a Base UI Select wrapper featuring option descriptions, selected-state checkmarks, and keyboard navigation.
+- **Drawer overlay** (#60): the frequency-policy and feature-switch drawers migrated to a Base UI Dialog primitive with a dimmed backdrop that blocks background interaction, closes on backdrop click / Esc, and traps focus.
+
+### Changed
+
+- **Import dialog layout** (#58): a proper dashed drop zone (centered icon, primary/secondary copy, selected-file name with a replace affordance) and a standalone conflict-mode field with per-option explanations.
+- **Placement binding table** (#62): the redundant environment column was removed (subtitle names the current environment); editable cells show a persistent pencil hint with hover state, and unbound cells read "点击绑定".
+- **Placement schema** (#61): the `cache_policy` field — absent from the product contract and never compiled to Firebase — was removed from the v2 schema and UI. Legacy values in existing drafts are tolerated by validation and dropped on the next save; v1 keeps the field.
+
 ## [0.4.1] - 2026-07-15
 
 ### Fixed
