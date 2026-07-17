@@ -2,6 +2,13 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.5.1] - 2026-07-17
+
+### Fixed
+
+- **Plan diff accuracy** (#64): remote parameter changes are now derived from actual compiled-output differences. Baseline-only fields (entity descriptions, network-settings platforms) never project remote parameter entries or trigger compile-related risks; parameter `change_kind` is decoupled from field-level kinds (existing remote key → `updated`, missing → `added`); compiled values are compared against the remote snapshot with JSON normalization so no-op edits produce zero remote changes. A description-only edit of 69 entities previously reported 32 bogus parameter changes (`added: true → true`) and 11 false high risks — it now reports none, and a mixed edit attributes exactly the one real change.
+- **Plan page horizontal overflow** (#65): wide JSON previews no longer push the sidebar out of the viewport; the layout keeps `min-width` constraints, the publish button wraps, baseline values stay visible, and long entity refs break within the risk list.
+
 ## [0.5.0] - 2026-07-16
 
 ### Added
