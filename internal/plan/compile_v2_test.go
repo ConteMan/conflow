@@ -269,6 +269,40 @@ func TestBuildV2SkipsRemoteChangesForDescriptionOnlyEdit(t *testing.T) {
 	}
 }
 
+func TestBuildV2DescriptionEditProjectsNoRemoteChangeEvenWhenParameterDiffers(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	desired := v2CompileClone(t, baseline)
+	policy := desired["frequency_policies"].([]any)[0].(map[string]any)["fields"].(map[string]any)
+	policy["description"] = "描述与真实值同时变化"
+	policy["cooldown"] = map[string]any{"unit": "seconds", "value": float64(240)}
+	parameters := compileV2Parameters(baseline, "development")
+	var frequencyPayload any
+	if err := json.Unmarshal([]byte(parameters["ad_frequency_policies_config"].(string)), &frequencyPayload); err != nil {
+		t.Fatal(err)
+	}
+	parameters["ad_frequency_policies_config"] = frequencyPayload
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: parameters, Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the cooldown edit feeds the compiled output: exactly one remote
+	// change, and it must not be attributed to the description node.
+	if len(built.Plan.RemoteParameterChanges) != 1 {
+		t.Fatalf("remote changes = %#v", built.Plan.RemoteParameterChanges)
+	}
+	if built.Plan.RemoteParameterChanges[0].ChangeKind != "updated" {
+		t.Fatalf("change kind = %s", built.Plan.RemoteParameterChanges[0].ChangeKind)
+	}
+	for _, change := range built.Plan.SemanticChanges {
+		if change.FieldPath == "/description" && len(change.RemoteParameterNodeIDs) != 0 {
+			t.Fatalf("description change projected remote nodes: %#v", change)
+		}
+	}
+}
+
 func TestBuildV2AddsRemoteParameterForNewEntityWhenKeyIsAbsent(t *testing.T) {
 	baseline := v2CompileFixture(t)
 	desired := v2CompileClone(t, baseline)

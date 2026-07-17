@@ -221,3 +221,10 @@ func marshalV2JSON(value any) string {
 	}
 	return string(encoded)
 }
+
+// v2FieldCompiled reports whether a v2 entity field feeds the compiled
+// Firebase output. Baseline-only fields (description, network_settings
+// platforms) never change remote parameters.
+func v2FieldCompiled(field string) bool {
+	return field != "description" && field != "platforms"
+}

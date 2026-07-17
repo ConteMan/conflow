@@ -276,6 +276,12 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 					remoteChangeKind := changeKind
 					skipRemoteChange := false
 					if in.PackRef == "mobile-ad-monetization/v2" {
+						// Baseline-only fields never feed the compiled output, so their
+						// changes must not project remote parameter changes even when the
+						// parameter itself differs because of other fields.
+						if !v2FieldCompiled(field) {
+							skipRemoteChange = true
+						}
 						key = affectedParameterKey(in.PackRef, entityType, entityID, in.Desired)
 						remoteBefore, remoteExists = in.RemoteSnapshot.Parameters[key]
 						if value, exists := compiledV2[key]; exists {
