@@ -187,6 +187,10 @@ func Build(in Input) (BuildResult, error) {
 
 func semanticChanges(in Input, p *Plan) []SemanticChange {
 	changes := []SemanticChange{}
+	compiledV2 := map[string]any(nil)
+	if in.PackRef == "mobile-ad-monetization/v2" {
+		compiledV2 = compileV2Parameters(in.Desired, in.EnvironmentID)
+	}
 	scope := in.scope
 	if scope == "" {
 		scope = "baseline"
@@ -224,7 +228,11 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 			if entityType == "custom_parameter" {
 				if change := customParameterSemanticChange(in, scope, entityID, before, beforeOK, after, afterOK); change != nil {
 					if len(change.RemoteParameterNodeIDs) > 0 {
-						p.RemoteParameterChanges = append(p.RemoteParameterChanges, customParameterRemoteChange(in, scope, *change, before, beforeOK, after, afterOK))
+						if remoteChange, changed := customParameterRemoteChange(in, scope, *change, before, beforeOK, after, afterOK); changed {
+							p.RemoteParameterChanges = append(p.RemoteParameterChanges, remoteChange)
+						} else {
+							change.RemoteParameterNodeIDs = []string{}
+						}
 					}
 					changes = append(changes, *change)
 				}
@@ -263,23 +271,33 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 				if in.RemoteSnapshot.Status == "available" {
 					remoteNode := "node_" + id("remote", scope, entityType, entityID, field)
 					key := parameterKey(entityType, entityID, field)
+					remoteBefore, remoteExists := in.RemoteSnapshot.Parameters[key]
+					remoteAfter := av
+					remoteChangeKind := changeKind
+					skipRemoteChange := false
 					if in.PackRef == "mobile-ad-monetization/v2" {
 						key = affectedParameterKey(in.PackRef, entityType, entityID, in.Desired)
-					}
-					remoteBefore := bv
-					if value, ok := in.RemoteSnapshot.Parameters[key]; ok {
-						remoteBefore = value
-					}
-					if in.PackRef == "mobile-ad-monetization/v2" {
-						if value, exists := compileV2Parameters(in.Desired, in.EnvironmentID)[key]; exists {
-							if changeKind == "deleted" {
-								changeKind = "updated"
+						remoteBefore, remoteExists = in.RemoteSnapshot.Parameters[key]
+						if value, exists := compiledV2[key]; exists {
+							remoteAfter = value
+							if remoteValuesEqual(remoteBefore, remoteAfter) {
+								skipRemoteChange = true
 							}
-							av = value
+							if !skipRemoteChange && remoteChangeKind == "deleted" {
+								remoteChangeKind = "updated"
+							} else if !skipRemoteChange && remoteExists {
+								remoteChangeKind = "updated"
+							} else if !skipRemoteChange {
+								remoteChangeKind = "added"
+							}
 						}
+					} else if !remoteExists {
+						remoteBefore = bv
 					}
-					p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(av), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
-					c.RemoteParameterNodeIDs = []string{remoteNode}
+					if !skipRemoteChange {
+						p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: remoteChangeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(remoteAfter), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
+						c.RemoteParameterNodeIDs = []string{remoteNode}
+					}
 				}
 				changes = append(changes, c)
 			}
@@ -339,7 +357,7 @@ func customParameterSemanticChange(in Input, scope, entityID string, before enti
 	return change
 }
 
-func customParameterRemoteChange(in Input, scope string, semantic SemanticChange, before entities.Record, beforeOK bool, after entities.Record, afterOK bool) RemoteParameterChange {
+func customParameterRemoteChange(in Input, scope string, semantic SemanticChange, before entities.Record, beforeOK bool, after entities.Record, afterOK bool) (RemoteParameterChange, bool) {
 	keyRecord := after
 	if !afterOK {
 		keyRecord = before
@@ -353,18 +371,27 @@ func customParameterRemoteChange(in Input, scope string, semantic SemanticChange
 	if afterOK {
 		afterValue = compileV2Parameters(in.Desired, in.EnvironmentID)[key]
 	}
+	_, remoteExists := in.RemoteSnapshot.Parameters[key]
+	if afterOK && remoteExists && remoteValuesEqual(beforeValue, afterValue) {
+		return RemoteParameterChange{}, false
+	}
 	changeKind := semantic.ChangeKind
-	if changeKind == "added" {
-		if _, exists := in.RemoteSnapshot.Parameters[key]; exists {
+	if changeKind != "deleted" {
+		if remoteExists {
 			changeKind = "updated"
+		} else {
+			changeKind = "added"
 		}
 	}
-	return RemoteParameterChange{NodeID: semantic.RemoteParameterNodeIDs[0], ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(beforeValue), AfterSummary: summary(afterValue), Managed: true, CausedBySemanticChangeIDs: []string{semantic.NodeID}, AffectedEntityNodeIDs: []string{}}
+	return RemoteParameterChange{NodeID: semantic.RemoteParameterNodeIDs[0], ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: changeKind, BeforeSummary: summary(beforeValue), AfterSummary: summary(afterValue), Managed: true, CausedBySemanticChangeIDs: []string{semantic.NodeID}, AffectedEntityNodeIDs: []string{}}, true
 }
 
 func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterChange) []RiskItem {
 	result := []RiskItem{}
 	for _, c := range changes {
+		if in.PackRef == "mobile-ad-monetization/v2" && len(c.RemoteParameterNodeIDs) == 0 {
+			continue
+		}
 		if in.PackRef != "mobile-ad-monetization/v2" && strings.Contains(c.DirectEntityRef, ":frequency_policy:") && c.FieldPath == "/cooldown_ms" {
 			result = append(result, RiskItem{RiskItemID: "risk_" + id("shared_frequency", c.NodeID), Severity: "high", ReasonCode: "shared_frequency_policy_relaxed", Summary: "共享频控已放宽", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 		}
@@ -561,6 +588,20 @@ func summary(v any) string {
 	return string(b)
 }
 func equal(a, b any) bool { return string(canonical(a)) == string(canonical(b)) }
+func remoteValuesEqual(a, b any) bool {
+	return equal(normalizeJSONValue(a), normalizeJSONValue(b))
+}
+func normalizeJSONValue(value any) any {
+	text, ok := value.(string)
+	if !ok {
+		return value
+	}
+	var parsed any
+	if json.Unmarshal([]byte(text), &parsed) != nil {
+		return value
+	}
+	return parsed
+}
 func keys[V any](m map[string]V) []string {
 	r := make([]string, 0, len(m))
 	for k := range m {

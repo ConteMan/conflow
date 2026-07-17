@@ -181,6 +181,28 @@ func TestRuntimeEntityShapeReadsSemanticDiffFields(t *testing.T) {
 	}
 }
 
+func TestV1FieldChangesKeepFieldParameterProjection(t *testing.T) {
+	baseline := configuration("frequency_policies", record("inter_global_cap", "cooldown_ms", 30000))
+	desired := clone(t, baseline)
+	setField(desired, "frequency_policies", "inter_global_cap", "cooldown_ms", 120000)
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v1", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-1", Parameters: map[string]any{"ad_frequency_inter_global_cap": 30000}, Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		if change.ParameterKey == "ad_frequency_inter_global_cap" {
+			if change.ChangeKind != "updated" || change.BeforeSummary != summary(30000) || change.AfterSummary != summary(120000) {
+				t.Fatalf("v1 remote change = %#v", change)
+			}
+			return
+		}
+	}
+	t.Fatalf("v1 remote change is missing: %#v", built.Plan.RemoteParameterChanges)
+}
+
 func TestSnapshotTokenIsOpaqueAndBoundToSnapshotState(t *testing.T) {
 	input := Input{EnvironmentID: "development", PackRef: "pack/v1", DraftRevision: 17, SourceDigest: "sha256:source-secret", Baseline: map[string]any{}, Desired: map[string]any{"key": "desired-value"}, ValidationReady: true, Now: time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC), RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-secret", Summary: &remote.Summary{}}}
 	first, err := Build(input)
