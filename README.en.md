@@ -2,9 +2,18 @@
 
 [中文](README.md) | **English**
 
-> A local-first ConfigOps workbench for managing application configuration through business forms, validation, diffs, and controlled publishing.
+> A local-first ConfigOps workbench: manage Firebase Remote Config through business forms, validation, semantic diffs, and controlled publishing.
 
-Conflow is a single Go binary with both a CLI and a local web GUI. It represents configuration as business entities such as ad placements, frequency policies, and feature flags, rather than asking teams to copy long Firebase Remote Config JSON values directly.
+Conflow is a single Go binary with both a CLI and a local web GUI. It represents remote configuration as business entities — ad placements, frequency policies, feature switches, custom parameters — instead of asking teams to edit long JSON values in the Firebase console. The single source of truth lives in your local workspace (optionally under Git); Firebase is the publish target and audit object.
+
+**Highlights**
+
+- **Business-shaped editing**: domain forms with field validation, descriptions, and reference-integrity checks
+- **Release plans**: every publish starts from a semantic diff with risk analysis, down to field-level changes and the exact remote parameters they touch
+- **Controlled publishing**: ETag concurrency protection, validate-only preflight, explicit production confirmation
+- **Audit & rollback**: immutable release records; any successful release can be rolled back and re-verified in one step
+- **Multiple environments**: each environment binds its own Firebase project; business config stays single-sourced while release cadence stays independent
+- **Local-first**: data lives in your workspace, credentials never enter the repo; no server dependency, a single binary works out of the box
 
 ## Installation
 
@@ -23,76 +32,104 @@ scoop install conflow
 
 **Direct download**
 
-Download the archive for your platform from [GitHub Releases](https://github.com/ConteMan/conflow/releases/latest), extract, and place `conflow` in your `$PATH`.
+Download the tar.gz/zip for your platform from [GitHub Releases](https://github.com/ConteMan/conflow/releases/latest), extract it, and put `conflow` on your `$PATH`.
 
-> macOS unsigned binary: downloads are quarantined by Gatekeeper. Run once before first use:
+> Unsigned binary note on macOS: directly downloaded binaries are flagged by Gatekeeper. Run once before first use:
 > ```sh
 > xattr -dr com.apple.quarantine conflow
 > ```
-> Homebrew installation handles this automatically.
+> Homebrew installs handle this automatically.
 
 **Updating**
 
 ```sh
-conflow update          # direct install
+conflow update          # direct installs
 brew upgrade conflow    # Homebrew
 scoop update conflow    # Scoop
 ```
 
-## Quick Start
+## Quick start
+
+```sh
+# Create a project workspace interactively. Creates development and production
+# environments by default; Firebase project IDs can be filled in later.
+conflow init --dir ./my-app-config
+
+# Start the local web GUI (binds to 127.0.0.1 only)
+conflow serve --workspace ./my-app-config
+```
+
+Open the local address printed in the terminal. For automation, use non-interactive mode:
+
+```sh
+conflow init --non-interactive --dir ./my-app-config \
+  --project-id my-app --project-name "My App" --json
+```
+
+## Connecting Firebase
+
+Fill in the project ID and service-account JSON path in the environment manager or the Firebase connection card on the overview page, or use the CLI:
+
+```sh
+conflow provider connect --workspace ./my-app-config \
+  --environment development --path "$HOME/.config/conflow/firebase.json"
+
+conflow pull --workspace ./my-app-config --environment development
+```
+
+The service-account JSON always stays at its local path; Conflow only stores a path reference in the ignored `.conflow/` local state. Connecting validates existence, readability, JSON shape, `type=service_account`, and required fields first — nothing is written or overwritten if any step fails. Remote connectivity is checked on `pull`.
+
+**Never commit service-account JSON, access tokens, or absolute credential paths to the repository or logs.**
+
+## Daily workflow
+
+Configuration changes follow one controlled flow, identical in the GUI and CLI:
+
+```
+edit → validate → build a release plan (semantic diff + risks) → publish → post-publish verification
+```
+
+```sh
+conflow validate  --workspace . --environment development
+conflow plan      --workspace . --environment development
+conflow publish   --workspace . --environment development   # production requires explicit confirmation
+conflow release list --workspace . --environment development
+conflow rollback  --workspace . --environment development --release <id> --confirm --idempotency-key <key>
+```
+
+Other common commands: `conflow import` (cross-workspace config import), `conflow source`, `conflow environment`. Every command supports `--json` for a stable automation envelope; see `conflow --help`.
+
+## Developer guide
+
+The sections below are for contributors working on Conflow itself.
+
+**Requirements**: Go 1.25+, Node.js 24+ (development builds only; releases remain a single Go binary).
 
 ```sh
 git clone https://github.com/ConteMan/conflow.git
 cd conflow
-make bootstrap
-make check
+make bootstrap     # install dependencies
+make check         # full checks: contracts, build, Go tests, e2e
 
-# Interactively create a project. Development and production are created by default; Firebase project IDs can be added later.
-go run ./cmd/conflow init --dir ./examples/photo-editor
-
-# Automation must provide explicit project values; missing required values exit with code 64.
-# --json returns project_path and a next_steps array.
-go run ./cmd/conflow init --non-interactive --dir ./examples/photo-editor \
-  --project-id photo-editor --project-name "Photo Editor" --json
-
-go run ./cmd/conflow serve --workspace ./examples/photo-editor
+# Common targets
+make web-dev       # Vite dev server
+make web-build     # build the React UI and sync it as embedded Go assets
+make test          # Go tests
+make check-ci      # CI check set (without e2e)
 ```
 
-Open the local address printed by the terminal. The overview page can create additional environments. Firebase project ID may be blank initially, but must be completed in Environment Management before connecting or pulling.
+The frontend uses React, TypeScript, Tailwind, and Base UI primitives; tables are built on TanStack Table. API contracts live in `api/openapi.yaml`; run `make api-generate` after changes to sync TypeScript types. Feature work is organized around [implementation specs](docs/specs/README.md) — one focused PR per spec.
 
-## Connect Firebase
+**Documentation**
 
-Service account JSON remains at its local path. Conflow stores only a path reference in ignored local `.conflow/` state. Connect first validates existence, readability, JSON syntax, `type=service_account`, and required fields; a failure never writes or replaces an existing reference. The GUI Firebase connection card clears the input after submission and displays only a redacted tail such as `…/firebase.json`. Remote connectivity is checked by `pull`.
-
-```sh
-go run ./cmd/conflow provider connect --workspace ./examples/photo-editor \
-  --environment development --path "$HOME/.config/conflow/firebase.json"
-
-go run ./cmd/conflow pull --workspace ./examples/photo-editor --environment development
-```
-
-Do not commit service account JSON, access tokens, or absolute credential paths to the repository or logs.
-
-## Development
-
-```sh
-make web-dev       # Vite development server
-make web-build     # Build React UI and sync Go embedded assets
-make test
-make check
-```
-
-The frontend uses React, TypeScript, Tailwind, and shadcn/ui Base UI primitives. Node is only used for development builds; releases remain single Go binaries.
-
-## Documentation
-
-- [Architecture](docs/design/architecture.md)
+- [Architecture overview](docs/design/architecture.md)
 - [Configuration model](docs/design/config-model.md)
-- [Frontend/backend HTTP API contract](docs/design/http-api.md)
-- [UI design direction and prototyping workflow](DESIGN.md)
-- [Architecture decisions](docs/decisions/README.md)
+- [HTTP API between frontend and backend](docs/design/http-api.md)
+- [Implementation specs](docs/specs/README.md)
+- [UI design direction and prototype flows](DESIGN.md)
+- [Architecture decision records](docs/decisions/README.md)
 - [Roadmap](docs/roadmap.md)
-- [Contributing](CONTRIBUTING.md)
+- [Contributing guide](CONTRIBUTING.md)
 
 ## License
 
