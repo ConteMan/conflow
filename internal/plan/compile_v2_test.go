@@ -222,9 +222,7 @@ func TestBuildV2MapsFrequencyChangeToAggregateParameter(t *testing.T) {
 		Baseline:        baseline,
 		Desired:         desired,
 		ValidationReady: true,
-		RemoteSnapshot: remote.Snapshot{
-			Status: "available", RemoteETag: "etag-v2", Summary: &remote.Summary{},
-		},
+		RemoteSnapshot:  remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -244,6 +242,53 @@ func TestBuildV2MapsFrequencyChangeToAggregateParameter(t *testing.T) {
 	if !mapped || !hasRisk(built.Plan, "frequency_policy_changed") {
 		t.Fatalf("v2 plan = %#v", built.Plan)
 	}
+}
+
+func TestBuildV2SkipsRemoteChangesForDescriptionOnlyEdit(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	desired := v2CompileClone(t, baseline)
+	desired["frequency_policies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["description"] = "Only the entity description changed"
+	parameters := compileV2Parameters(baseline, "development")
+	var frequencyPayload any
+	if err := json.Unmarshal([]byte(parameters["ad_frequency_policies_config"].(string)), &frequencyPayload); err != nil {
+		t.Fatal(err)
+	}
+	parameters["ad_frequency_policies_config"] = frequencyPayload
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: parameters, Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(built.Plan.SemanticChanges) == 0 || len(built.Plan.RemoteParameterChanges) != 0 {
+		t.Fatalf("description-only plan = %#v", built.Plan)
+	}
+	if hasRisk(built.Plan, "frequency_policy_changed") {
+		t.Fatalf("description-only plan has frequency risk: %#v", built.Plan.RiskItems)
+	}
+}
+
+func TestBuildV2AddsRemoteParameterForNewEntityWhenKeyIsAbsent(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	desired := v2CompileClone(t, baseline)
+	desired["feature_switches"] = append(desired["feature_switches"].([]any), map[string]any{"id": "new_switch", "fields": map[string]any{"key": "new_entity_switch", "default_value": true}})
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		if change.ParameterKey == "new_entity_switch" {
+			if change.ChangeKind != "added" || change.AfterSummary != summary(true) {
+				t.Fatalf("new entity remote change = %#v", change)
+			}
+			return
+		}
+	}
+	t.Fatalf("new entity remote change is missing: %#v", built.Plan.RemoteParameterChanges)
 }
 
 func TestBuildV2CustomParameterAdoptionIsHighRisk(t *testing.T) {

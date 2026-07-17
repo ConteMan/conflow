@@ -468,7 +468,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .plan-empty p { color: var(--text-muted); line-height: 1.6; }
 .plan-empty .button { margin-top: 7px; }
 .plan-metrics { margin-bottom: 16px; }
-.plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; align-items: start; gap: 20px; }
+.plan-layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) 306px; align-items: start; gap: 20px; }
 .plan-main { display: grid; gap: 16px; min-width: 0; }
 .semantic-tree { padding: 0; overflow: hidden; }
 .panel-section-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 18px; border: 0; border-bottom: 1px solid var(--border); background: transparent; cursor: pointer; text-align: left; color: var(--text); }
@@ -495,18 +495,18 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .remote-parameter code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .remote-parameter span { color: var(--text-muted); }
 .remote-parameter strong { font-weight: 500; overflow-wrap: anywhere; }
-.plan-sidebar { display: grid; gap: 14px; position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; }
+.plan-sidebar { display: grid; min-width: 0; max-width: 100%; gap: 14px; position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-x: hidden; overflow-y: auto; }
 .remote-baseline, .risk-panel, .artifact-panel, .release-placeholder { padding: 17px; }
 .remote-baseline h2, .risk-panel h2, .artifact-panel h2, .release-placeholder h2 { margin-bottom: 13px; }
 .remote-baseline dl { display: grid; margin: 0; }
 .remote-baseline dl div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 12px; }
 .remote-baseline dt { color: var(--text-muted); }
-.remote-baseline dd { margin: 0; font-weight: 650; }
+.remote-baseline dd { min-width: 0; flex: 1; margin: 0; overflow-wrap: anywhere; font-weight: 650; text-align: right; }
 .remote-baseline p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
 .risk-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .risk-group h3 { margin: 0 0 7px; }
 .risk-group p, .blocking-reasons p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
-.risk-group p code { margin-left: 4px; font-size: 11px; color: var(--text-muted); }
+.risk-group p code { margin-left: 4px; overflow-wrap: anywhere; word-break: break-all; font-size: 11px; color: var(--text-muted); }
 .blocking-reasons { padding: 11px; border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 12px; }
 .blocking-reasons p { color: var(--text); }
 .risk-tag--blocking { color: var(--danger); background: var(--danger-soft); }
@@ -528,7 +528,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .param-value--after { color: var(--text); }
 .artifact-panel a { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); color: var(--accent); font-size: 13px; font-weight: 650; text-decoration: none; }
 .release-placeholder p { margin: 0 0 13px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
-.release-placeholder .button { width: 100%; }
+.release-placeholder .button { width: 100%; min-height: 40px; height: auto; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; line-height: 1.35; white-space: normal; }
 .release-placeholder small { display: block; margin-top: 8px; color: var(--text-muted); font-size: 11px; text-align: center; }
 .plan-invalidation-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--warning); border-left: 3px solid var(--warning); border-radius: var(--radius-sm); color: var(--warning); background: var(--warning-soft); }
 .plan-invalidation-banner > div { flex: 1; }
