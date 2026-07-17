@@ -2,6 +2,12 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.5.2] - 2026-07-17
+
+### Changed
+
+- **Semantic diff rows name the changed field** (#66): each change in the release plan now shows a Chinese field label (e.g. 描述, 缓存策略) derived from `field_path`, so deletions like the one-time legacy `cache_policy` cleanup are self-explanatory instead of an anonymous `"memory" → null`.
+
 ## [0.5.1] - 2026-07-17
 
 ### Fixed
