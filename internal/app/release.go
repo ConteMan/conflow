@@ -644,7 +644,7 @@ func (s *Service) Defaults(_ context.Context, environmentID, format string) ([]b
 		}
 		return append(content, '\n'), "defaults.json", "application/json", nil
 	case "xml":
-		return defaultsXML(metadata, snapshot.Parameters), "defaults.xml", "application/xml", nil
+		return defaultsXML(snapshot.Parameters), "defaults.xml", "application/xml", nil
 	case "plist":
 		return defaultsPlist(metadata, snapshot.Parameters), "defaults.plist", "application/x-plist", nil
 	default:
@@ -676,28 +676,23 @@ func xmlEscape(b *bytes.Buffer, value string) error {
 	}
 	return nil
 }
-func defaultsXML(metadata map[string]string, values map[string]any) []byte {
+func escapeXMLText(value string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(value)
+}
+func defaultsXML(values map[string]any) []byte {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	var b strings.Builder
-	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<defaults")
-	for _, key := range []string{"source_version", "source_etag", "digest"} {
-		b.WriteString(" ")
-		b.WriteString(key)
-		b.WriteString("=\"")
-		b.WriteString(escapeXML(metadata[key]))
-		b.WriteString("\"")
-	}
-	b.WriteString(">\n")
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?><defaults>\n")
 	for _, key := range keys {
-		b.WriteString("  <entry key=\"")
-		b.WriteString(escapeXML(key))
-		b.WriteString("\" value=\"")
-		b.WriteString(escapeXML(fmt.Sprint(values[key])))
-		b.WriteString("\"/>\n")
+		b.WriteString("  <entry>\n    <key>")
+		b.WriteString(escapeXMLText(key))
+		b.WriteString("</key>\n    <value>")
+		b.WriteString(escapeXMLText(fmt.Sprint(values[key])))
+		b.WriteString("</value>\n  </entry>\n")
 	}
 	b.WriteString("</defaults>\n")
 	return []byte(b.String())

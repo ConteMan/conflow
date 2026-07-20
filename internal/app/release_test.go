@@ -350,7 +350,7 @@ func TestRollbackPreviewETagRecoveryAndNewRelease(t *testing.T) {
 	}
 }
 
-func TestDefaultsExportFormatsCarrySourceDigest(t *testing.T) {
+func TestDefaultsExportFormats(t *testing.T) {
 	s, _ := releaseService(t)
 	p := buildReadyPlan(t, s)
 	started, err := s.StartRelease(context.Background(), "development", "publish-key-defaults-0001", releaseRequest(p))
@@ -362,8 +362,14 @@ func TestDefaultsExportFormatsCarrySourceDigest(t *testing.T) {
 	}
 	for _, format := range []string{"json", "xml", "plist"} {
 		content, filename, _, err := s.Defaults(context.Background(), "development", format)
-		if err != nil || filename == "" || !strings.Contains(string(content), "sha256:") || !strings.Contains(string(content), "unmanaged") {
+		if err != nil || filename == "" || !strings.Contains(string(content), "unmanaged") {
 			t.Fatalf("format=%s filename=%s err=%v content=%s", format, filename, err, content)
+		}
+		if format != "xml" && !strings.Contains(string(content), "sha256:") {
+			t.Fatalf("format=%s should carry source digest: %s", format, content)
+		}
+		if format == "xml" && strings.Contains(string(content), "sha256:") {
+			t.Fatalf("firebase-compatible XML should not carry Conflow metadata: %s", content)
 		}
 	}
 }
@@ -380,7 +386,7 @@ func TestDefaultsGoldenFormatsAndDigest(t *testing.T) {
 	const digest = "sha256:2e069d117170e22fac69a1e9367509a40b5cad1e856c5b3da692d2105514246a"
 	wants := map[string]string{
 		"json":  "{\n  \"defaults\": {\n    \"alpha\": \"on\",\n    \"beta\": \"2\"\n  },\n  \"metadata\": {\n    \"digest\": \"" + digest + "\",\n    \"source_etag\": \"etag-golden\",\n    \"source_version\": \"7\"\n  }\n}\n",
-		"xml":   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<defaults source_version=\"7\" source_etag=\"etag-golden\" digest=\"" + digest + "\">\n  <entry key=\"alpha\" value=\"on\"/>\n  <entry key=\"beta\" value=\"2\"/>\n</defaults>\n",
+		"xml":   "<?xml version=\"1.0\" encoding=\"UTF-8\"?><defaults>\n  <entry>\n    <key>alpha</key>\n    <value>on</value>\n  </entry>\n  <entry>\n    <key>beta</key>\n    <value>2</value>\n  </entry>\n</defaults>\n",
 		"plist": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict>\n<key>_conflow_metadata</key><dict><key>source_version</key><string>7</string><key>source_etag</key><string>etag-golden</string><key>digest</key><string>" + digest + "</string></dict>\n<key>alpha</key><string>on</string>\n<key>beta</key><string>2</string>\n</dict></plist>\n",
 	}
 	for format, want := range wants {
@@ -388,6 +394,14 @@ func TestDefaultsGoldenFormatsAndDigest(t *testing.T) {
 		if err != nil || string(content) != want {
 			t.Fatalf("format=%s err=%v\nwant:\n%s\ngot:\n%s", format, err, want, content)
 		}
+	}
+}
+
+func TestDefaultsXMLUsesFirebaseTextNodesAndEscaping(t *testing.T) {
+	got := string(defaultsXML(map[string]any{`key & <tag> "quoted"`: `{"enabled":true,"note":"A & B < C > D's"}`}))
+	want := "<?xml version=\"1.0\" encoding=\"UTF-8\"?><defaults>\n  <entry>\n    <key>key &amp; &lt;tag&gt; \"quoted\"</key>\n    <value>{\"enabled\":true,\"note\":\"A &amp; B &lt; C &gt; D's\"}</value>\n  </entry>\n</defaults>\n"
+	if got != want {
+		t.Fatalf("want:\n%s\ngot:\n%s", want, got)
 	}
 }
 
