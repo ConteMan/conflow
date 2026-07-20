@@ -2,6 +2,12 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [0.5.3] - 2026-07-20
+
+### Fixed
+
+- **Firebase-compatible XML defaults** (#67): XML exports now use Firebase's `<defaults><entry><key>…</key><value>…</value></entry></defaults>` structure, omit Conflow-only root metadata, preserve stable key ordering, and escape text content without encoding JSON quotes. JSON and plist exports continue to include source version and digest metadata.
+
 ## [0.5.2] - 2026-07-17
 
 ### Changed

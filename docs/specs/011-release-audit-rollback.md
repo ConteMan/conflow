@@ -12,7 +12,7 @@
 - Release 记录：项目、环境、Pack、操作者、时间、source digest、plan digest、远端前后版本和 ETag。
 - 发布前/后模板摘要与语义 diff；敏感数据脱敏。
 - Firebase 版本列表与回滚；回滚本身创建新的 Release 记录。
-- 下载 XML / JSON / plist 默认值，并带来源版本 metadata。
+- 下载 XML / JSON / plist 默认值。JSON 与 plist 带来源版本 metadata；XML 与 Firebase 后台导出格式保持一致，不嵌入 Conflow metadata。
 - 审计保留策略、导出和损坏检测。
 
 ## Release 历史与审计资源
@@ -42,6 +42,8 @@
 - `POST /api/v1/environments/{environment_id}/releases/{release_id}:rollback`
 - `GET /api/v1/environments/{environment_id}/defaults?format=xml|json|plist`
 
+XML 响应使用 Firebase 客户端默认值结构：根节点为无属性的 `defaults`，每个参数使用 `entry` 下的 `key` 与 `value` 文本子元素。参数按 key 稳定排序，并进行 XML 文本转义；不得通过根节点属性或额外 entry 注入 Conflow metadata。来源版本和 digest 继续由 JSON 与 plist 格式提供。
+
 ## CLI
 
 - `conflow release list/show`
@@ -61,7 +63,7 @@
 
 - 发布、失败发布和回滚的审计语义不同且可检索。
 - 回滚仍受 ETag、幂等和 Production 确认保护。
-- 默认值文件与指定远端版本一致，并可通过 digest 验证。
+- 默认值文件与指定远端版本一致；JSON 与 plist 可通过内嵌 digest 验证，XML 与 Firebase 后台导出格式兼容。
 - 删除本地敏感凭据不影响历史审计可读性。
 - 回滚 preview 显示目标版本、当前远端基线、差异、风险与服务端确认要求；只有未失效 preview 能提交回滚。
 - 成功回滚生成新的 `kind=rollback` Release 并链接目标 Release；失败回滚保留失败审计与 Operation failure，不改写旧 Release。
