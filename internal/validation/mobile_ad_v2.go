@@ -59,6 +59,9 @@ func validateV2(input Input) []Diagnostic {
 		} else {
 			diagnostics = v2AddParameterKeyDiagnostic(input, diagnostics, parameterKeys, key, "ad_strategy_settings", "ad_strategy_settings", "default", "parameter_key")
 		}
+		if version, ok := integer(strategySettingsRecord.Fields["payload_version"]); !ok || version < 1 {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "ad_strategy_payload_version_invalid", "ad_strategy_settings", "ad_strategy_settings", "default", "payload_version", SeverityBlocking, "广告策略负载版本必须是大于等于 1 的整数", "填写大于等于 1 的整数负载版本。"))
+		}
 	}
 
 	switchIDs := ids(switches)

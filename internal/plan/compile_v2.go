@@ -61,7 +61,10 @@ func compileV2Parameters(desired map[string]any, environmentID string) map[strin
 	strategies := sortedRecords(desired, "ad_strategies")
 	if settingsFound && len(strategies) > 0 {
 		if key, ok := settings.Fields["parameter_key"].(string); ok && key != "" {
-			version, _ := settings.Fields["payload_version"].(float64)
+			version := float64(1)
+			if configured, ok := settings.Fields["payload_version"].(float64); ok && configured >= 1 && configured == float64(int64(configured)) {
+				version = configured
+			}
 			values[key] = marshalV2JSON(map[string]any{
 				"version":             version,
 				"default_strategy_id": settings.Fields["default_strategy_id"],

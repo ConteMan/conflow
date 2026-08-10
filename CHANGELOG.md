@@ -2,6 +2,18 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- **Reusable ad strategy collection** (Spec 028, #69): `mobile-ad-monetization/v2` schema 3 adds optional strategy settings and arbitrary strategy entities, typed placement references, sparse frequency overrides, deterministic client-ID compilation, Plan risks, import round-trips, desktop editing, narrow-screen summaries, and Pen/Playwright visual baselines.
+
+### Fixed
+
+- **Remote Config plan accuracy**: renaming a v2 layout parameter key now reports the old key as deleted and the new key as added, with a high `remote_parameter_key_changed` risk; mediation strategy changes map to `mediation_strategy_parameter_key` instead of the active-network key.
+- **Strategy editing integrity**: saving settings preserves the imported payload version, new-strategy pages ignore diagnostics from unrelated entities, empty allowlists remain saveable, and invalid payload versions are blocked instead of compiling as version `0`.
+- **API and Pack contract coverage**: the OpenAPI risk-code enum now includes the existing `frequency_policy_changed`, `production_network_settings_changed`, and `remote_parameter_key_changed` codes; the v2 schema golden test now checks the golden entity list and therefore covers the previously omitted `custom_parameter` entity.
+
 ## [0.5.3] - 2026-07-20
 
 ### Fixed

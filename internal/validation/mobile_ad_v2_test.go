@@ -138,6 +138,42 @@ func TestValidateV2AdStrategyRules(t *testing.T) {
 			t.Fatal("missing strategy parameter key conflict diagnostic")
 		}
 	})
+
+	t.Run("empty allowlist", func(t *testing.T) {
+		valid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, valid, "ad_strategies", "balanced")
+		fields["allowlist_placement_ids"] = []any{}
+		fields["frequency_policy_overrides"] = map[string]any{}
+		if diagnostics := Validate(v2ValidationInput(t, valid)); hasV2Diagnostic(diagnostics, "ad_strategy_override_outside_allowlist", SeverityBlocking) || hasV2Diagnostic(diagnostics, "ad_strategy_frequency_override_invalid", SeverityBlocking) {
+			t.Fatalf("empty allowlist diagnostics = %#v", diagnostics)
+		}
+	})
+
+	t.Run("payload version two", func(t *testing.T) {
+		valid := v2Clone(t, configuration).(map[string]any)
+		v2RecordFields(t, valid, "ad_strategy_settings", "default")["payload_version"] = float64(2)
+		if hasV2Diagnostic(Validate(v2ValidationInput(t, valid)), "ad_strategy_payload_version_invalid", SeverityBlocking) {
+			t.Fatal("payload version 2 must remain valid")
+		}
+	})
+
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{name: "missing", value: nil},
+		{name: "zero", value: float64(0)},
+		{name: "fractional", value: 1.5},
+		{name: "wrong type", value: "2"},
+	} {
+		t.Run("invalid payload version "+test.name, func(t *testing.T) {
+			invalid := v2Clone(t, configuration).(map[string]any)
+			v2RecordFields(t, invalid, "ad_strategy_settings", "default")["payload_version"] = test.value
+			if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_payload_version_invalid", SeverityBlocking) {
+				t.Fatal("missing invalid strategy payload version diagnostic")
+			}
+		})
+	}
 }
 
 func TestValidateV2SharedStrategyFixture(t *testing.T) {

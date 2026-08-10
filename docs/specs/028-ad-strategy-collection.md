@@ -24,7 +24,7 @@
 | 字段 | 类型 | 可空 | 说明 |
 |---|---|---|---|
 | `parameter_key` | string | 否 | 广告策略聚合参数 key |
-| `payload_version` | integer | 否 | 聚合 JSON 顶层版本，默认 `1` |
+| `payload_version` | integer | 否 | 聚合 JSON 顶层版本，必须大于等于 `1`，默认 `1` |
 | `default_strategy_id` | reference | 是 | 默认策略；`null` 表示客户端不启用默认策略 |
 
 该实体不可按环境覆盖。`parameter_key` 必须与所有 Pack 受管参数 key 全局唯一。

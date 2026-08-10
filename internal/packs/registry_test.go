@@ -187,6 +187,26 @@ func TestRegistryRejectsSchemaTypeAndMigrationMismatches(t *testing.T) {
 	}
 }
 
+func TestRegistryRejectsInvalidAndDuplicateReferenceRules(t *testing.T) {
+	t.Run("unknown shape", func(t *testing.T) {
+		definition := mobileAdV2Definition()
+		definition.Metadata.EntityTypes[1].ReferenceRules[0].Shape = ReferenceShape("unknown")
+		registry, err := NewRegistry(definition)
+		if registry != nil || !errors.Is(err, ErrInvalidDefinition) {
+			t.Fatalf("registry = %#v, err = %v", registry, err)
+		}
+	})
+
+	t.Run("same field", func(t *testing.T) {
+		definition := mobileAdV2Definition()
+		definition.Metadata.EntityTypes[1].ReferenceRules = append(definition.Metadata.EntityTypes[1].ReferenceRules, definition.Metadata.EntityTypes[1].ReferenceRules[0])
+		registry, err := NewRegistry(definition)
+		if registry != nil || !errors.Is(err, ErrInvalidDefinition) {
+			t.Fatalf("registry = %#v, err = %v", registry, err)
+		}
+	})
+}
+
 func testDefinition(name string) Definition {
 	return Definition{
 		Metadata: Metadata{

@@ -265,17 +265,24 @@ func validatedCopy(definition Definition) (Definition, error) {
 				return Definition{}, fmt.Errorf("%w: reference rule %q", ErrInvalidDefinition, rule.Field)
 			}
 			sourceField := schemaField(schema, rule.Field)
-			if rule.Shape == ReferenceShapeScalar && sourceField.Type != FieldTypeReference || rule.Shape == ReferenceShapeArrayItems && sourceField.Type != FieldTypeArray || rule.Shape == ReferenceShapeObjectKeys && sourceField.Type != FieldTypeObject {
+			expectedType := FieldType("")
+			switch rule.Shape {
+			case ReferenceShapeScalar:
+				expectedType = FieldTypeReference
+			case ReferenceShapeArrayItems:
+				expectedType = FieldTypeArray
+			case ReferenceShapeObjectKeys:
+				expectedType = FieldTypeObject
+			default:
 				return Definition{}, fmt.Errorf("%w: reference rule shape %q", ErrInvalidDefinition, rule.Field)
 			}
-			if rule.Shape != ReferenceShapeScalar && rule.Shape != ReferenceShapeArrayItems && rule.Shape != ReferenceShapeObjectKeys {
+			if sourceField.Type != expectedType {
 				return Definition{}, fmt.Errorf("%w: reference rule shape %q", ErrInvalidDefinition, rule.Field)
 			}
-			key := rule.Field + ":" + string(rule.Shape)
-			if seenReferenceRules[key] {
+			if seenReferenceRules[rule.Field] {
 				return Definition{}, fmt.Errorf("%w: duplicated reference rule %q", ErrInvalidDefinition, rule.Field)
 			}
-			seenReferenceRules[key] = true
+			seenReferenceRules[rule.Field] = true
 		}
 		if _, exists := entities[entity.Name]; exists {
 			return Definition{}, fmt.Errorf("%w: duplicated entity metadata %q", ErrInvalidDefinition, entity.Name)

@@ -39,6 +39,7 @@
 - 两个页面均由本地真实 API 数据和 React 实现通过 Pen 内置浏览器导入，不是静态重画。
 - 导出基线：[策略列表](2026-08-10-ad-strategy-ui-baseline/vYBSq.png)、[策略详情](2026-08-10-ad-strategy-ui-baseline/TWNsH.png)。
 - 当前导入视口宽度为 947px，用于验证实现与设计资源可双向转换；1440/1280/390 仍以 E2E 截图作为最终响应式验收证据。
+- 中等宽度提前折叠与表格裁切已登记为 [GitHub Issue #70](https://github.com/ConteMan/conflow/issues/70)，按 `design-gap` 独立跟踪，不静默留在审计文档中。
 
 ## 可复用经验
 

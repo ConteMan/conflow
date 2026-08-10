@@ -44,6 +44,22 @@ func TestCompileV2ParametersKeepsStrategyFeatureOptional(t *testing.T) {
 	}
 }
 
+func TestCompileV2AdStrategiesFallsBackFromInvalidPayloadVersion(t *testing.T) {
+	desired := v2CompileFixture(t)
+	addV2Strategy(desired, map[string]any{})
+	desired["ad_strategy_settings"].([]any)[0].(map[string]any)["fields"].(map[string]any)["payload_version"] = "invalid"
+	raw := compileV2Parameters(desired, "development")["ad_strategies_config"].(string)
+	var payload struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Version != 1 {
+		t.Fatalf("strategy payload version = %d", payload.Version)
+	}
+}
+
 func TestCompileV2AdStrategiesAppliesSparseOverrides(t *testing.T) {
 	desired := v2CompileFixture(t)
 	addV2Strategy(desired, map[string]any{
@@ -169,6 +185,12 @@ func TestCompileV2SharedStrategyFixtureIsDeterministic(t *testing.T) {
 	}
 	if got := payload.Strategies["balanced"].Allowlist; len(got) != 1 || got[0] != "AD-PDF-001" {
 		t.Fatalf("client allowlist = %#v", got)
+	}
+	if _, exists := payload.Strategies["balanced"].Policies["AD-PDF-001"]; !exists {
+		t.Fatalf("effective frequency policy must use client_id as key: %#v", payload.Strategies["balanced"].Policies)
+	}
+	if _, exists := payload.Strategies["balanced"].Policies["interstitial_main"]; exists {
+		t.Fatalf("effective frequency policy leaked Conflow entity ID: %#v", payload.Strategies["balanced"].Policies)
 	}
 }
 
@@ -309,6 +331,29 @@ func TestBuildV2MapsFrequencyChangeToAggregateParameter(t *testing.T) {
 	}
 	if !mapped || !hasRisk(built.Plan, "frequency_policy_changed") {
 		t.Fatalf("v2 plan = %#v", built.Plan)
+	}
+}
+
+func TestBuildV2LayoutParameterKeyRenameShowsDeleteAddAndHighRisk(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	desired := v2CompileClone(t, baseline)
+	desired["remote_config_layouts"].([]any)[0].(map[string]any)["fields"].(map[string]any)["placements_parameter_key"] = "ad_placements_config_v2"
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes := map[string]string{}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		changes[change.ParameterKey] = change.ChangeKind
+	}
+	if len(built.Plan.RemoteParameterChanges) != 2 || len(changes) != 2 || changes["ad_placements_config"] != "deleted" || changes["ad_placements_config_v2"] != "added" {
+		t.Fatalf("layout remote changes = %#v", built.Plan.RemoteParameterChanges)
+	}
+	if !hasRisk(built.Plan, "remote_parameter_key_changed") || hasRisk(built.Plan, "managed_parameter_deleted") {
+		t.Fatalf("layout rename risks = %#v", built.Plan.RiskItems)
 	}
 }
 

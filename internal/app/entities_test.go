@@ -111,6 +111,11 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 	if err := validateReferences(definition, configuration); err == nil {
 		t.Fatal("missing array item reference must fail")
 	}
+	configuration["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["allowlist_placement_ids"] = []any{"interstitial_main"}
+	configuration["placements"].([]any)[0].(map[string]any)["fields"].(map[string]any)["enabled_switch_id"] = ""
+	if err := validateReferences(definition, configuration); err == nil {
+		t.Fatal("empty scalar reference must fail")
+	}
 }
 
 func v2ConfigurationWithLegacyCachePolicy(t *testing.T) map[string]any {

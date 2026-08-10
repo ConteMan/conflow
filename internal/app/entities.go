@@ -634,9 +634,6 @@ func validateReferences(definition packs.Definition, effective map[string]any) e
 					if reference.invalid {
 						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "field_type_mismatch")
 					}
-					if reference.id == "" {
-						continue
-					}
 					if _, exists := findRecord(records(effective, target.Collection), reference.id); !exists {
 						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "value_not_allowed")
 					}

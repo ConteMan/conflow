@@ -44,6 +44,7 @@ function StrategySettingsCard({ environment, revision, draft, settings, strategi
   const source = settings?.effective.value.fields;
   const [parameterKey, setParameterKey] = useState(String(source?.parameter_key ?? "ad_strategies_config"));
   const [defaultStrategyID, setDefaultStrategyID] = useState(String(source?.default_strategy_id ?? ""));
+  const payloadVersion = Number(source?.payload_version ?? 1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -51,7 +52,7 @@ function StrategySettingsCard({ environment, revision, draft, settings, strategi
     setDefaultStrategyID(String(source?.default_strategy_id ?? ""));
   }, [source?.default_strategy_id, source?.parameter_key]);
   const save = async () => {
-    const entity: EntityRecord = { id: "default", fields: { parameter_key: parameterKey, payload_version: 1, default_strategy_id: defaultStrategyID || null } };
+    const entity: EntityRecord = { id: "default", fields: { parameter_key: parameterKey, payload_version: payloadVersion, default_strategy_id: defaultStrategyID || null } };
     setSaving(true); setError(null);
     try {
       if (settings) await replaceDraftEntity(environment.id, "ad_strategy_settings", "default", revision, { expected_source_revision: draft?.source_revision ?? settings.source_revision, write_scope: "baseline", entity });
@@ -66,7 +67,7 @@ function StrategySettingsCard({ environment, revision, draft, settings, strategi
     <div className="strategy-settings-fields">
       <label className="form-field"><span>Remote Config 参数键</span><input value={parameterKey} onChange={(event) => setParameterKey(event.target.value)} /><small>通用值 · 必须与其他受管参数键唯一</small></label>
       <label className="form-field"><span>默认策略</span><select value={defaultStrategyID} onChange={(event) => setDefaultStrategyID(event.target.value)}><option value="">不启用默认策略</option>{strategies.map((strategy) => <option key={strategy.entity_id} value={strategy.entity_id}>{strategy.entity_id}</option>)}</select><small>默认策略被引用后不可删除</small></label>
-      <label className="form-field"><span>负载版本</span><input value="1" disabled /><small>由 schema 3 固定管理</small></label>
+      <label className="form-field"><span>负载版本</span><input value={payloadVersion} disabled /><small>由 schema 3 固定管理</small></label>
     </div>
     {error ? <p className="binding-error" role="alert">{error}</p> : null}
     <footer><Button variant="primary" icon={<Save size={16} />} disabled={saving || !parameterKey.trim()} onClick={() => void save()}>{saving ? "正在保存" : settings ? "保存设置" : "初始化广告策略"}</Button></footer>
@@ -129,9 +130,9 @@ export function AdStrategyDetail({ environment, revision, draft, strategy, strat
       setError(strategyRequestError(cause, "保存广告策略失败。"));
     } finally { setSaving(false); }
   };
-  const ownDiagnostics = diagnostics.filter((item) => !strategy || item.entity_ref === strategy.entity_ref);
+  const ownDiagnostics = strategy ? diagnostics.filter((item) => item.entity_ref === strategy.entity_ref) : [];
   return <main className="page-container placement-detail strategy-detail-page">
-    <header className="detail-heading"><div className="detail-heading-title"><button className="icon-button detail-back" aria-label="返回广告策略列表" onClick={onBack}><ArrowLeft size={19} /></button><div><h1>{creating ? "新建广告策略" : entityID}</h1><p><code>{creating ? "创建后策略 ID 不可修改" : entityID}</code> · allowlist</p></div></div><Button className="strategy-editor-only" variant="primary" icon={<Save size={16} />} disabled={saving || !entityID || fields.allowlist_placement_ids.length === 0} onClick={() => void save()}>{saving ? "正在保存" : "保存策略"}</Button></header>
+    <header className="detail-heading"><div className="detail-heading-title"><button className="icon-button detail-back" aria-label="返回广告策略列表" onClick={onBack}><ArrowLeft size={19} /></button><div><h1>{creating ? "新建广告策略" : entityID}</h1><p><code>{creating ? "创建后策略 ID 不可修改" : entityID}</code> · allowlist</p></div></div><Button className="strategy-editor-only" variant="primary" icon={<Save size={16} />} disabled={saving || !entityID} onClick={() => void save()}>{saving ? "正在保存" : "保存策略"}</Button></header>
     <div className="strategy-mobile-readonly">窄屏只读。请使用桌面端编辑广告策略。</div>
     <div className="detail-layout"><div className="detail-main">
       {ownDiagnostics.length ? <section className="strategy-diagnostics"><strong>{ownDiagnostics.length} 项校验问题</strong>{ownDiagnostics.map((item) => <p key={`${item.code}:${item.path}`}>{item.message}</p>)}</section> : null}

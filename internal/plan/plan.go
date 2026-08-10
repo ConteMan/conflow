@@ -283,7 +283,7 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 						if !v2FieldCompiled(field) {
 							skipRemoteChange = true
 						}
-						keys := affectedParameterKeys(in.PackRef, entityType, entityID, field, in.Desired)
+						keys := affectedParameterKeys(in.PackRef, entityType, entityID, field, in.Baseline, in.Desired)
 						for _, affectedKey := range keys {
 							if skipRemoteChange {
 								break
@@ -478,7 +478,7 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 		if len(remoteChange.CausedBySemanticChangeIDs) > 0 {
 			entityRef = changesByID[remoteChange.CausedBySemanticChangeIDs[0]].DirectEntityRef
 		}
-		if strings.Contains(entityRef, ":custom_parameter:") || strings.Contains(entityRef, ":ad_strategy:") || strings.Contains(entityRef, ":ad_strategy_settings:") {
+		if strings.Contains(entityRef, ":custom_parameter:") || strings.Contains(entityRef, ":ad_strategy:") || strings.Contains(entityRef, ":ad_strategy_settings:") || strings.Contains(entityRef, ":remote_config_layout:") {
 			continue
 		}
 		result = append(result, RiskItem{RiskItemID: "risk_" + id("managed_parameter_deleted", remoteChange.NodeID), Severity: "blocking", ReasonCode: "managed_parameter_deleted", Summary: "受管远端参数将被删除", EntityRef: entityRef, SemanticChangeIDs: append([]string{}, remoteChange.CausedBySemanticChangeIDs...), RemoteParameterNodeIDs: []string{remoteChange.NodeID}})
@@ -680,9 +680,15 @@ func parameterKey(typ, id, field string) string {
 	}
 	return typ + "_" + id + "_" + field
 }
-func affectedParameterKeys(packRef, entityType, entityID, field string, desired map[string]any) []string {
+func affectedParameterKeys(packRef, entityType, entityID, field string, baseline, desired map[string]any) []string {
 	if packRef != "mobile-ad-monetization/v2" {
 		return []string{parameterKey(entityType, entityID, field)}
+	}
+	if entityType == "remote_config_layout" {
+		if !strings.HasSuffix(field, "_parameter_key") {
+			return nil
+		}
+		return uniqueNonEmpty([]string{v2LayoutParameterKey(baseline, field), v2LayoutParameterKey(desired, field)})
 	}
 	layout, found := records(desired["remote_config_layouts"])["default"]
 	if !found {
@@ -723,10 +729,17 @@ func affectedParameterKeys(packRef, entityType, entityID, field string, desired 
 			return uniqueNonEmpty([]string{key("mediation_strategy_parameter_key")})
 		}
 		return uniqueNonEmpty([]string{key("active_network_parameter_key")})
-	case "remote_config_layout":
-		return nil
 	}
 	return nil
+}
+
+func v2LayoutParameterKey(configuration map[string]any, field string) string {
+	layout, found := records(configuration["remote_config_layouts"])["default"]
+	if !found {
+		return ""
+	}
+	value, _ := layout.Fields[field].(string)
+	return value
 }
 
 func strategyParameterKey(desired map[string]any) string {
