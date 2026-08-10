@@ -17,16 +17,22 @@ func mobileAdV2Definition() Definition {
 			Capabilities: []string{"entities", "environment_overrides"},
 			EntityTypes: []EntityMetadata{
 				defaultEntity("remote_config_layout", "remote_config_layouts", "远端配置布局", "定义广告聚合参数布局。", nil),
+				withReferences(defaultEntity("ad_strategy_settings", "ad_strategy_settings", "广告策略设置", "定义广告策略聚合参数与默认策略。", nil), reference("default_strategy_id", "ad_strategy", ReferenceShapeScalar)),
 				entityMetadata("feature_switch", "feature_switches", "功能开关", "定义稳定的广告功能开关。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				entityMetadata("custom_parameter", "custom_parameters", "自定义参数", "定义独立受管的 Firebase Remote Config 参数。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				defaultEntity("network_settings", "network_settings", "网络设置", "定义当前广告网络和聚合策略。", []string{"active_network", "mediation_strategy"}),
 				entityMetadata("frequency_policy", "frequency_policies", "频控策略", "定义结构化广告展示频率限制。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
-				entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
-				entityMetadata("unit_binding", "unit_bindings", "广告单元绑定", "定义环境、平台和网络对应的广告单元。", `^[a-z][a-z0-9_]{0,127}$`, DeletionPolicyRestrict, []string{"placement_id", "environment_id", "platform", "network", "unit_id_ref", "status"}),
+				withReferences(entityMetadata("ad_strategy", "ad_strategies", "广告策略", "定义广告位范围与频控覆盖。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
+					reference("allowlist_placement_ids", "placement", ReferenceShapeArrayItems),
+					reference("frequency_policy_overrides", "placement", ReferenceShapeObjectKeys)),
+				withReferences(entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
+					reference("enabled_switch_id", "feature_switch", ReferenceShapeScalar),
+					reference("frequency_policy_id", "frequency_policy", ReferenceShapeScalar)),
+				withReferences(entityMetadata("unit_binding", "unit_bindings", "广告单元绑定", "定义环境、平台和网络对应的广告单元。", `^[a-z][a-z0-9_]{0,127}$`, DeletionPolicyRestrict, []string{"placement_id", "environment_id", "platform", "network", "unit_id_ref", "status"}), reference("placement_id", "placement", ReferenceShapeScalar)),
 			},
 		},
 		Schema: Schema{
-			Version: 2,
+			Version: 3,
 			Entities: []EntitySchema{
 				{Name: "remote_config_layout", Fields: []FieldSchema{
 					field("active_network_parameter_key", FieldTypeString, true, false, `""`, "当前网络参数键", "当前网络独立参数的键。", "input", "布局", 0, FieldValidation{}),
@@ -34,6 +40,11 @@ func mobileAdV2Definition() Definition {
 					field("frequency_policies_parameter_key", FieldTypeString, true, false, `""`, "频控参数键", "频控策略聚合参数的键。", "input", "布局", 2, FieldValidation{}),
 					field("placements_parameter_key", FieldTypeString, true, false, `""`, "广告位参数键", "广告位聚合参数的键。", "input", "布局", 3, FieldValidation{}),
 					field("payload_version", FieldTypeInteger, true, false, "2", "负载版本", "聚合 JSON 的顶层版本。", "number", "布局", 4, FieldValidation{}),
+				}},
+				{Name: "ad_strategy_settings", Fields: []FieldSchema{
+					field("parameter_key", FieldTypeString, true, false, `""`, "策略参数键", "广告策略聚合参数的 Remote Config 键。", "input", "策略设置", 0, FieldValidation{}),
+					field("payload_version", FieldTypeInteger, true, false, "1", "负载版本", "广告策略聚合 JSON 的顶层版本。", "number", "策略设置", 1, FieldValidation{Minimum: &minimumOne}),
+					field("default_strategy_id", FieldTypeReference, true, true, "null", "默认策略", "客户端未显式选择时使用的策略。", "ad_strategy_ref", "策略设置", 2, FieldValidation{}),
 				}},
 				{Name: "feature_switch", Fields: []FieldSchema{
 					field("key", FieldTypeString, true, false, `""`, "开关键", "稳定且可读的配置键。", "input", "基础", 0, FieldValidation{}),
@@ -61,6 +72,12 @@ func mobileAdV2Definition() Definition {
 					field("positions", FieldTypeArray, true, true, "null", "适用位置", "固定业务位置集合。", "tags", "频控", 4, FieldValidation{}),
 					field("description", FieldTypeString, false, true, "null", "描述", "频控策略用途说明。", "input", "频控", 5, FieldValidation{}),
 				}},
+				{Name: "ad_strategy", Fields: []FieldSchema{
+					field("description", FieldTypeString, false, true, "null", "描述", "广告策略用途说明，不参与发布编译。", "input", "基础", 0, FieldValidation{}),
+					field("placement_rule_mode", FieldTypeString, true, false, `"allowlist"`, "广告位规则", "本版使用广告位白名单。", "select", "范围", 1, enum("allowlist")),
+					field("allowlist_placement_ids", FieldTypeArray, true, false, "[]", "适用广告位", "允许使用此策略的广告位。", "placement_multi_ref", "范围", 2, FieldValidation{}),
+					field("frequency_policy_overrides", FieldTypeObject, true, false, "{}", "频控覆盖", "按广告位维护稀疏频控覆盖。", "strategy_frequency_overrides", "频控", 3, FieldValidation{}),
+				}},
 				{Name: "placement", Fields: []FieldSchema{
 					field("client_id", FieldTypeString, true, false, `""`, "客户端 ID", "编译到客户端聚合 JSON 的稳定 ID。", "input", "基础", 0, FieldValidation{}),
 					field("key", FieldTypeString, true, false, `""`, "广告位键", "面向业务的稳定键。", "input", "基础", 1, FieldValidation{}),
@@ -84,7 +101,7 @@ func mobileAdV2Definition() Definition {
 					field("status", FieldTypeString, true, false, `"configured"`, "配置状态", "单元 ID 是否已经配置。", "select", "绑定", 5, enum("configured", "missing")),
 				}},
 			},
-			Migrations: []SchemaMigration{},
+			Migrations: []SchemaMigration{{FromVersion: 2, ToVersion: 3, Description: "新增可选广告策略设置与策略集合。"}},
 		},
 	}
 }

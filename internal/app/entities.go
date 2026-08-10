@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/entities"
@@ -245,7 +246,7 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 					return &EntityReferencedError{Revision: mutation.ExpectedRevision, References: refs}
 				}
 			}
-			if err := validateReferences(effective); err != nil {
+			if err := validateReferences(definition, effective); err != nil {
 				return err
 			}
 			return nil
@@ -621,17 +622,26 @@ func allowsEntityValue(value any, field packs.FieldSchema) bool {
 	return true
 }
 
-func validateReferences(effective map[string]any) error {
-	for _, placement := range records(effective, "placements") {
-		policyID, _ := placement.Fields["frequency_policy_id"].(string)
-		if _, found := findRecord(records(effective, "frequency_policies"), policyID); !found {
-			return validationError(draft.ScopeBaseline, "placements", placement.ID, "frequency_policy_id", "value_not_allowed")
-		}
-	}
-	for _, binding := range records(effective, "unit_bindings") {
-		placementID, _ := binding.Fields["placement_id"].(string)
-		if _, found := findRecord(records(effective, "placements"), placementID); !found {
-			return validationError(draft.ScopeEnvironmentOverride, "unit_bindings", binding.ID, "placement_id", "value_not_allowed")
+func validateReferences(definition packs.Definition, effective map[string]any) error {
+	for _, metadata := range definition.Metadata.EntityTypes {
+		for _, record := range records(effective, metadata.Collection) {
+			for _, rule := range metadata.ReferenceRules {
+				target, found := findEntityMetadata(definition, rule.TargetEntityType)
+				if !found {
+					return ErrEntityTypeInvalid
+				}
+				for _, reference := range recordReferences(record, rule) {
+					if reference.invalid {
+						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "field_type_mismatch")
+					}
+					if reference.id == "" {
+						continue
+					}
+					if _, exists := findRecord(records(effective, target.Collection), reference.id); !exists {
+						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "value_not_allowed")
+					}
+				}
+			}
 		}
 	}
 	return nil
@@ -639,20 +649,77 @@ func validateReferences(effective map[string]any) error {
 
 func references(definition packs.Definition, packRef string, effective map[string]any, targetType, targetID string) []EntityReference {
 	var result []EntityReference
-	if targetType == "frequency_policy" {
-		for _, placement := range records(effective, "placements") {
-			if placement.Fields["frequency_policy_id"] == targetID {
-				result = append(result, EntityReference{EntityRef: entityRef(packRef, "placement", placement.ID), EntityType: "placement", EntityID: placement.ID, Path: "/frequency_policy_id"})
+	for _, metadata := range definition.Metadata.EntityTypes {
+		for _, rule := range metadata.ReferenceRules {
+			if rule.TargetEntityType != targetType {
+				continue
 			}
-		}
-	}
-	if targetType == "placement" {
-		for _, binding := range records(effective, "unit_bindings") {
-			if binding.Fields["placement_id"] == targetID {
-				result = append(result, EntityReference{EntityRef: entityRef(packRef, "unit_binding", binding.ID), EntityType: "unit_binding", EntityID: binding.ID, Path: "/placement_id"})
+			for _, record := range records(effective, metadata.Collection) {
+				for _, reference := range recordReferences(record, rule) {
+					if !reference.invalid && reference.id == targetID {
+						result = append(result, EntityReference{EntityRef: entityRef(packRef, metadata.Name, record.ID), EntityType: metadata.Name, EntityID: record.ID, Path: reference.path})
+					}
+				}
 			}
 		}
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].EntityRef < result[j].EntityRef })
 	return result
+}
+
+type recordReference struct {
+	id      string
+	path    string
+	invalid bool
+}
+
+func recordReferences(record entities.Record, rule packs.ReferenceRule) []recordReference {
+	value, exists := record.Fields[rule.Field]
+	if !exists || value == nil {
+		return nil
+	}
+	switch rule.Shape {
+	case packs.ReferenceShapeScalar:
+		id, ok := value.(string)
+		return []recordReference{{id: id, path: "/" + rule.Field, invalid: !ok}}
+	case packs.ReferenceShapeArrayItems:
+		values, ok := value.([]any)
+		if !ok {
+			return []recordReference{{path: "/" + rule.Field, invalid: true}}
+		}
+		result := make([]recordReference, 0, len(values))
+		for index, item := range values {
+			id, valid := item.(string)
+			result = append(result, recordReference{id: id, path: fmt.Sprintf("/%s/%d", rule.Field, index), invalid: !valid})
+		}
+		return result
+	case packs.ReferenceShapeObjectKeys:
+		values, ok := value.(map[string]any)
+		if !ok {
+			return []recordReference{{path: "/" + rule.Field, invalid: true}}
+		}
+		keys := make([]string, 0, len(values))
+		for key := range values {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		result := make([]recordReference, 0, len(keys))
+		for _, key := range keys {
+			result = append(result, recordReference{id: key, path: "/" + rule.Field + "/" + escapeJSONPointer(key)})
+		}
+		return result
+	default:
+		return []recordReference{{path: "/" + rule.Field, invalid: true}}
+	}
+}
+
+func referenceScope(metadata packs.EntityMetadata) string {
+	if metadata.Name == "unit_binding" {
+		return draft.ScopeEnvironmentOverride
+	}
+	return draft.ScopeBaseline
+}
+
+func escapeJSONPointer(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(value, "~", "~0"), "/", "~1")
 }

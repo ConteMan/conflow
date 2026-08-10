@@ -17,10 +17,10 @@ func mobileAdDefinition() Definition {
 			Description:  "Versioned contract for mobile advertising configuration.",
 			Capabilities: []string{"entities", "environment_overrides"},
 			EntityTypes: []EntityMetadata{
-				entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
+				withReferences(entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil), reference("frequency_policy_id", "frequency_policy", ReferenceShapeScalar)),
 				entityMetadata("frequency_policy", "frequency_policies", "频控策略", "定义广告展示频率限制。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				entityMetadata("feature_switch", "feature_switches", "功能开关", "定义稳定的广告功能开关。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
-				entityMetadata("unit_binding", "unit_bindings", "广告单元绑定", "定义环境和平台对应的广告单元。", `^[a-z][a-z0-9_]{0,127}$`, DeletionPolicyRestrict, []string{"placement_id", "environment_id", "platform", "unit_id_ref", "status"}),
+				withReferences(entityMetadata("unit_binding", "unit_bindings", "广告单元绑定", "定义环境和平台对应的广告单元。", `^[a-z][a-z0-9_]{0,127}$`, DeletionPolicyRestrict, []string{"placement_id", "environment_id", "platform", "unit_id_ref", "status"}), reference("placement_id", "placement", ReferenceShapeScalar)),
 			},
 		},
 		Schema: Schema{
@@ -64,6 +64,15 @@ func mobileAdDefinition() Definition {
 
 func entityMetadata(name, collection, label, description, pattern string, deletion DeletionPolicy, overrides []string) EntityMetadata {
 	return EntityMetadata{Name: name, Collection: collection, Label: label, Description: description, IDRule: IDRule{Pattern: pattern, MinLength: 1, MaxLength: 128}, DeletionPolicy: deletion, EnvironmentOverrideFields: overrides}
+}
+
+func withReferences(metadata EntityMetadata, rules ...ReferenceRule) EntityMetadata {
+	metadata.ReferenceRules = rules
+	return metadata
+}
+
+func reference(field, target string, shape ReferenceShape) ReferenceRule {
+	return ReferenceRule{Field: field, TargetEntityType: target, Shape: shape}
 }
 
 func field(name string, fieldType FieldType, required, nullable bool, defaultValue, label, description, control, group string, order int, validation FieldValidation) FieldSchema {

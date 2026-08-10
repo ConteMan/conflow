@@ -9,6 +9,7 @@ import (
 
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/entities"
+	"github.com/ConteMan/conflow/internal/packs"
 	"github.com/ConteMan/conflow/internal/project"
 	"github.com/ConteMan/conflow/internal/source"
 )
@@ -77,6 +78,38 @@ func TestMutateV2PlacementDropsLegacyCachePolicy(t *testing.T) {
 	}
 	if _, ok := after.Effective.Value.Fields["cache_policy"]; ok {
 		t.Fatalf("saved placement fields still contain cache_policy: %#v", after.Effective.Value.Fields)
+	}
+}
+
+func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
+	configuration := v2ConfigurationWithLegacyCachePolicy(t)
+	configuration["ad_strategy_settings"] = []any{map[string]any{"id": "default", "fields": map[string]any{"parameter_key": "ad_strategies_config", "payload_version": float64(1), "default_strategy_id": "balanced"}}}
+	configuration["ad_strategies"] = []any{map[string]any{"id": "balanced", "fields": map[string]any{
+		"placement_rule_mode":        "allowlist",
+		"allowlist_placement_ids":    []any{"interstitial_main"},
+		"frequency_policy_overrides": map[string]any{"interstitial_main": map[string]any{"cooldown": nil}},
+	}}}
+	definition, _, err := packs.BuiltinRegistry().Resolve("mobile-ad-monetization/v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateReferences(definition, configuration); err != nil {
+		t.Fatalf("valid references: %v", err)
+	}
+	got := references(definition, "mobile-ad-monetization/v2", configuration, "placement", "interstitial_main")
+	paths := map[string]bool{}
+	for _, reference := range got {
+		if reference.EntityType == "ad_strategy" {
+			paths[reference.Path] = true
+		}
+	}
+	if !paths["/allowlist_placement_ids/0"] || !paths["/frequency_policy_overrides/interstitial_main"] {
+		t.Fatalf("strategy reference paths = %#v", got)
+	}
+
+	configuration["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["allowlist_placement_ids"] = []any{"missing"}
+	if err := validateReferences(definition, configuration); err == nil {
+		t.Fatal("missing array item reference must fail")
 	}
 }
 

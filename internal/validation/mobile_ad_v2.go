@@ -19,6 +19,8 @@ func validateV2(input Input) []Diagnostic {
 	placements := records(input.Effective, "placements")
 	bindings := records(input.Effective, "unit_bindings")
 	customParameters := records(input.Effective, "custom_parameters")
+	strategySettings := records(input.Effective, "ad_strategy_settings")
+	strategies := records(input.Effective, "ad_strategies")
 	diagnostics := []Diagnostic{}
 
 	layout, layoutOK := v2Singleton(layouts)
@@ -28,6 +30,12 @@ func validateV2(input Input) []Diagnostic {
 	network, networkOK := v2Singleton(networkSettings)
 	if !networkOK {
 		diagnostics = append(diagnostics, diagnostic("network_settings_not_singleton", "/network_settings/default/id", SeverityBlocking, entityRef(input.PackRef, "network_settings", "default"), "网络设置必须且只能有一个 default 实体", "保留一个 ID 为 default 的网络设置。"))
+	}
+	strategySettingsRecord, strategySettingsOK := v2Singleton(strategySettings)
+	if len(strategySettings) > 0 || len(strategies) > 0 {
+		if !strategySettingsOK {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_settings_not_singleton", "/ad_strategy_settings/default/id", SeverityBlocking, entityRef(input.PackRef, "ad_strategy_settings", "default"), "启用广告策略时必须且只能有一个 default 设置实体", "保留一个 ID 为 default 的广告策略设置。"))
+		}
 	}
 
 	parameterKeys := map[string]string{}
@@ -42,6 +50,14 @@ func validateV2(input Input) []Diagnostic {
 		}
 		if value, ok := layout.Fields["mediation_strategy_parameter_key"].(string); ok && strings.TrimSpace(value) != "" {
 			diagnostics = v2AddParameterKeyDiagnostic(input, diagnostics, parameterKeys, value, "remote_config_layout", "remote_config_layouts", layout.ID, "mediation_strategy_parameter_key")
+		}
+	}
+	if strategySettingsOK {
+		key, ok := strategySettingsRecord.Fields["parameter_key"].(string)
+		if !ok || !v2RemoteConfigKeyPattern.MatchString(key) {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "ad_strategy_parameter_key_empty", "ad_strategy_settings", "ad_strategy_settings", "default", "parameter_key", SeverityBlocking, "广告策略参数键不能为空", "填写一个合法且唯一的 Remote Config 参数键。"))
+		} else {
+			diagnostics = v2AddParameterKeyDiagnostic(input, diagnostics, parameterKeys, key, "ad_strategy_settings", "ad_strategy_settings", "default", "parameter_key")
 		}
 	}
 
@@ -149,6 +165,49 @@ func validateV2(input Input) []Diagnostic {
 		}
 	}
 
+	strategyIDs := ids(strategies)
+	if strategySettingsOK {
+		if defaultID, ok := strategySettingsRecord.Fields["default_strategy_id"].(string); ok && defaultID != "" && !strategyIDs[defaultID] {
+			diagnostics = append(diagnostics, v2Diagnostic(input, "reference_not_found", "ad_strategy_settings", "ad_strategy_settings", "default", "default_strategy_id", SeverityBlocking, "默认广告策略不存在", "选择一个存在的广告策略，或清空默认策略。"))
+		}
+	}
+	for _, strategy := range strategies {
+		ref := entityRef(input.PackRef, "ad_strategy", strategy.ID)
+		path := "/ad_strategies/" + strategy.ID
+		if strategy.Fields["placement_rule_mode"] != "allowlist" {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_rule_mode_invalid", path+"/placement_rule_mode", SeverityBlocking, ref, "广告策略规则模式必须为 allowlist", "选择 allowlist 规则模式。"))
+		}
+		allowlist := v2StringSlice(strategy.Fields["allowlist_placement_ids"])
+		allowlistSet := map[string]bool{}
+		for _, placementID := range allowlist {
+			if allowlistSet[placementID] {
+				diagnostics = append(diagnostics, diagnostic("ad_strategy_allowlist_duplicate", path+"/allowlist_placement_ids", SeverityBlocking, ref, "广告策略适用广告位不能重复", "移除重复的广告位。"))
+				continue
+			}
+			allowlistSet[placementID] = true
+			if !placementIDs[placementID] {
+				diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/allowlist_placement_ids", SeverityBlocking, ref, "广告策略引用的广告位不存在", "选择一个存在的广告位。"))
+			}
+		}
+		overrides, ok := strategy.Fields["frequency_policy_overrides"].(map[string]any)
+		if !ok {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_overrides_invalid", path+"/frequency_policy_overrides", SeverityBlocking, ref, "频控覆盖必须是对象", "按广告位填写频控覆盖对象。"))
+			continue
+		}
+		for placementID, rawOverride := range overrides {
+			if !placementIDs[placementID] {
+				diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "频控覆盖引用的广告位不存在", "选择一个存在的广告位。"))
+			}
+			if !allowlistSet[placementID] {
+				diagnostics = append(diagnostics, diagnostic("ad_strategy_override_outside_allowlist", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "频控覆盖的广告位不在策略 allowlist 中", "先将广告位加入适用范围，或删除该覆盖。"))
+			}
+			override, valid := rawOverride.(map[string]any)
+			if !valid || !v2StrategyFrequencyOverrideValid(override) {
+				diagnostics = append(diagnostics, diagnostic("ad_strategy_frequency_override_invalid", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "广告策略频控覆盖不合法", "只填写允许的频控字段，并使用合法值、null 或省略字段。"))
+			}
+		}
+	}
+
 	bindingByKey := map[string]record{}
 	for _, binding := range bindings {
 		ref := entityRef(input.PackRef, "unit_binding", binding.ID)
@@ -247,6 +306,48 @@ func v2CustomParameterValueValid(valueType, value any) bool {
 	default:
 		return false
 	}
+}
+
+func v2StrategyFrequencyOverrideValid(value map[string]any) bool {
+	for field, item := range value {
+		if item == nil {
+			if field == "cooldown" || field == "interval" || field == "max_count" || field == "shift_count" || field == "positions" {
+				continue
+			}
+			return false
+		}
+		switch field {
+		case "cooldown":
+			if !validDuration(item) {
+				return false
+			}
+		case "interval":
+			if !validInterval(item) {
+				return false
+			}
+		case "max_count":
+			if !validCountLimit(item) {
+				return false
+			}
+		case "shift_count":
+			if !validShiftLimit(item) {
+				return false
+			}
+		case "positions":
+			items, ok := item.([]any)
+			if !ok {
+				return false
+			}
+			for _, position := range items {
+				if _, ok := position.(string); !ok {
+					return false
+				}
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func validDuration(value any) bool {

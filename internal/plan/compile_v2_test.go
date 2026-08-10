@@ -37,6 +37,45 @@ func TestCompileV2ParametersFeatureSwitch(t *testing.T) {
 	}
 }
 
+func TestCompileV2ParametersKeepsStrategyFeatureOptional(t *testing.T) {
+	values := compileV2Parameters(v2CompileFixture(t), "development")
+	if _, exists := values["ad_strategies_config"]; exists {
+		t.Fatalf("strategy parameter must stay absent for schema 2 compatible input: %#v", values)
+	}
+}
+
+func TestCompileV2AdStrategiesAppliesSparseOverrides(t *testing.T) {
+	desired := v2CompileFixture(t)
+	addV2Strategy(desired, map[string]any{
+		"cooldown":  nil,
+		"max_count": map[string]any{"unit": "day", "value": float64(8)},
+	})
+	values := compileV2Parameters(desired, "development")
+	raw, ok := values["ad_strategies_config"].(string)
+	if !ok {
+		t.Fatalf("strategy parameter = %#v", values["ad_strategies_config"])
+	}
+	var payload struct {
+		Version           int    `json:"version"`
+		DefaultStrategyID string `json:"default_strategy_id"`
+		Strategies        map[string]struct {
+			Allowlist []string                  `json:"allowlist_client_ids"`
+			Policies  map[string]map[string]any `json:"frequency_policies"`
+		} `json:"strategies"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatal(err)
+	}
+	strategy := payload.Strategies["balanced"]
+	policy := strategy.Policies["interstitial_main"]
+	if payload.Version != 1 || payload.DefaultStrategyID != "balanced" || len(strategy.Allowlist) != 1 || strategy.Allowlist[0] != "interstitial_main" {
+		t.Fatalf("strategy payload = %#v", payload)
+	}
+	if policy["cooldown"] != nil || policy["interval"] != nil || policy["max_count"].(map[string]any)["value"] != float64(8) {
+		t.Fatalf("effective strategy policy = %#v", policy)
+	}
+}
+
 func TestCompileV2ParametersCustomParameters(t *testing.T) {
 	desired := v2CompileFixture(t)
 	desired["custom_parameters"] = []any{
@@ -101,6 +140,35 @@ func TestCompileV2ParametersFrequencyPolicies(t *testing.T) {
 	}
 	if got := payload.Policies["alpha_cap"].(map[string]any)["positions"].([]any); len(got) != 2 || got[0] != "a" || got[1] != "z" {
 		t.Fatalf("normalized positions = %#v", got)
+	}
+}
+
+func TestCompileV2SharedStrategyFixtureIsDeterministic(t *testing.T) {
+	configuration := v2CompileFixtureFile(t, "strategy-valid.json")
+	first := compileV2Parameters(configuration, "development")["ad_strategies_config"]
+	reordered := v2CompileClone(t, configuration)
+	strategies := reordered["ad_strategies"].([]any)
+	strategies[0], strategies[1] = strategies[1], strategies[0]
+	second := compileV2Parameters(reordered, "development")["ad_strategies_config"]
+	if first != second {
+		t.Fatalf("strategy payload changed after record reordering:\nfirst:  %s\nsecond: %s", first, second)
+	}
+	var payload struct {
+		Version           int    `json:"version"`
+		DefaultStrategyID string `json:"default_strategy_id"`
+		Strategies        map[string]struct {
+			Allowlist []string                  `json:"allowlist_client_ids"`
+			Policies  map[string]map[string]any `json:"frequency_policies"`
+		} `json:"strategies"`
+	}
+	if err := json.Unmarshal([]byte(first.(string)), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Version != 1 || payload.DefaultStrategyID != "balanced" || len(payload.Strategies) != 2 {
+		t.Fatalf("strategy payload = %#v", payload)
+	}
+	if got := payload.Strategies["balanced"].Allowlist; len(got) != 1 || got[0] != "AD-PDF-001" {
+		t.Fatalf("client allowlist = %#v", got)
 	}
 }
 
@@ -244,6 +312,94 @@ func TestBuildV2MapsFrequencyChangeToAggregateParameter(t *testing.T) {
 	}
 }
 
+func TestBuildV2MapsFrequencyChangeToPolicyAndStrategyParameters(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	addV2Strategy(baseline, map[string]any{"cooldown": map[string]any{"unit": "seconds", "value": float64(45)}})
+	desired := v2CompileClone(t, baseline)
+	desired["frequency_policies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["max_count"] = map[string]any{"unit": "day", "value": float64(8)}
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		seen[change.ParameterKey] = true
+	}
+	if !seen["ad_frequency_policies_config"] || !seen["ad_strategies_config"] {
+		t.Fatalf("remote parameter mapping = %#v", built.Plan.RemoteParameterChanges)
+	}
+}
+
+func TestBuildV2StrategyRiskUsesEffectiveFrequency(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	addV2Strategy(baseline, map[string]any{"cooldown": map[string]any{"unit": "minutes", "value": float64(5)}})
+	t.Run("tightening is medium", func(t *testing.T) {
+		desired := v2CompileClone(t, baseline)
+		strategyOverride(desired)["cooldown"] = map[string]any{"unit": "minutes", "value": float64(10)}
+		built, err := Build(Input{EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true, RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !hasRisk(built.Plan, "ad_strategy_changed") || hasRisk(built.Plan, "ad_strategy_relaxed") {
+			t.Fatalf("tightening risks = %#v", built.Plan.RiskItems)
+		}
+	})
+	t.Run("disabling constraint is high", func(t *testing.T) {
+		desired := v2CompileClone(t, baseline)
+		strategyOverride(desired)["cooldown"] = nil
+		built, err := Build(Input{EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true, RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !hasRisk(built.Plan, "ad_strategy_relaxed") {
+			t.Fatalf("relaxing risks = %#v", built.Plan.RiskItems)
+		}
+	})
+}
+
+func TestBuildV2PlacementClientIDChangeAffectsStrategyAndIsHighRisk(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	addV2Strategy(baseline, map[string]any{})
+	desired := v2CompileClone(t, baseline)
+	desired["placements"].([]any)[0].(map[string]any)["fields"].(map[string]any)["client_id"] = "AD-PDF-001"
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, change := range built.Plan.RemoteParameterChanges {
+		seen[change.ParameterKey] = true
+	}
+	if !seen["ad_placements_config"] || !seen["ad_strategies_config"] {
+		t.Fatalf("client ID remote parameter mapping = %#v", built.Plan.RemoteParameterChanges)
+	}
+	if !hasRisk(built.Plan, "ad_strategy_placement_identity_changed") {
+		t.Fatalf("client ID risk = %#v", built.Plan.RiskItems)
+	}
+}
+
+func TestBuildV2NonDefaultStrategyDeletionIsHighRisk(t *testing.T) {
+	baseline := v2CompileFixtureFile(t, "strategy-valid.json")
+	desired := v2CompileClone(t, baseline)
+	desired["ad_strategies"] = desired["ad_strategies"].([]any)[:1]
+	built, err := Build(Input{
+		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
+		RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRisk(built.Plan, "ad_strategy_deleted") || hasRisk(built.Plan, "managed_parameter_deleted") {
+		t.Fatalf("strategy deletion risks = %#v", built.Plan.RiskItems)
+	}
+}
+
 func TestBuildV2SkipsRemoteChangesForDescriptionOnlyEdit(t *testing.T) {
 	baseline := v2CompileFixture(t)
 	desired := v2CompileClone(t, baseline)
@@ -382,8 +538,12 @@ func TestBuildV2CustomParameterDeletionIsHighRiskAndRemovesFirebaseParameter(t *
 }
 
 func v2CompileFixture(t *testing.T) map[string]any {
+	return v2CompileFixtureFile(t, "minimal-valid.json")
+}
+
+func v2CompileFixtureFile(t *testing.T, name string) map[string]any {
 	t.Helper()
-	content, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "mobile-ad-monetization", "v2", "minimal-valid.json"))
+	content, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "mobile-ad-monetization", "v2", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,4 +567,21 @@ func v2CompileClone(t *testing.T, configuration map[string]any) map[string]any {
 		t.Fatal(err)
 	}
 	return cloned
+}
+
+func addV2Strategy(configuration map[string]any, override map[string]any) {
+	configuration["ad_strategy_settings"] = []any{map[string]any{"id": "default", "fields": map[string]any{"parameter_key": "ad_strategies_config", "payload_version": float64(1), "default_strategy_id": "balanced"}}}
+	configuration["ad_strategies"] = []any{map[string]any{"id": "balanced", "fields": map[string]any{
+		"description":                "Balanced strategy",
+		"placement_rule_mode":        "allowlist",
+		"allowlist_placement_ids":    []any{"interstitial_main"},
+		"frequency_policy_overrides": map[string]any{"interstitial_main": override},
+	}}}
+}
+
+func strategyOverride(configuration map[string]any) map[string]any {
+	strategy := configuration["ad_strategies"].([]any)[0].(map[string]any)
+	fields := strategy["fields"].(map[string]any)
+	overrides := fields["frequency_policy_overrides"].(map[string]any)
+	return overrides["interstitial_main"].(map[string]any)
 }

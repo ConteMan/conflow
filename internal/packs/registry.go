@@ -258,6 +258,25 @@ func validatedCopy(definition Definition) (Definition, error) {
 				return Definition{}, fmt.Errorf("%w: environment override field %q", ErrInvalidDefinition, field)
 			}
 		}
+		seenReferenceRules := map[string]bool{}
+		for _, rule := range entity.ReferenceRules {
+			_, exists := availableFields[rule.Field]
+			if !exists || !identifierPattern.MatchString(rule.TargetEntityType) {
+				return Definition{}, fmt.Errorf("%w: reference rule %q", ErrInvalidDefinition, rule.Field)
+			}
+			sourceField := schemaField(schema, rule.Field)
+			if rule.Shape == ReferenceShapeScalar && sourceField.Type != FieldTypeReference || rule.Shape == ReferenceShapeArrayItems && sourceField.Type != FieldTypeArray || rule.Shape == ReferenceShapeObjectKeys && sourceField.Type != FieldTypeObject {
+				return Definition{}, fmt.Errorf("%w: reference rule shape %q", ErrInvalidDefinition, rule.Field)
+			}
+			if rule.Shape != ReferenceShapeScalar && rule.Shape != ReferenceShapeArrayItems && rule.Shape != ReferenceShapeObjectKeys {
+				return Definition{}, fmt.Errorf("%w: reference rule shape %q", ErrInvalidDefinition, rule.Field)
+			}
+			key := rule.Field + ":" + string(rule.Shape)
+			if seenReferenceRules[key] {
+				return Definition{}, fmt.Errorf("%w: duplicated reference rule %q", ErrInvalidDefinition, rule.Field)
+			}
+			seenReferenceRules[key] = true
+		}
 		if _, exists := entities[entity.Name]; exists {
 			return Definition{}, fmt.Errorf("%w: duplicated entity metadata %q", ErrInvalidDefinition, entity.Name)
 		}
@@ -265,6 +284,13 @@ func validatedCopy(definition Definition) (Definition, error) {
 	}
 	if len(entities) != len(schemas) {
 		return Definition{}, fmt.Errorf("%w: metadata and schema entities differ", ErrInvalidDefinition)
+	}
+	for _, entity := range definition.Metadata.EntityTypes {
+		for _, rule := range entity.ReferenceRules {
+			if _, exists := entities[rule.TargetEntityType]; !exists {
+				return Definition{}, fmt.Errorf("%w: reference target %q", ErrInvalidDefinition, rule.TargetEntityType)
+			}
+		}
 	}
 
 	for _, migration := range definition.Schema.Migrations {
@@ -322,9 +348,19 @@ func cloneDefinition(definition Definition) Definition {
 	copy(clone.Metadata.EntityTypes, definition.Metadata.EntityTypes)
 	for index := range clone.Metadata.EntityTypes {
 		clone.Metadata.EntityTypes[index].EnvironmentOverrideFields = append([]string{}, definition.Metadata.EntityTypes[index].EnvironmentOverrideFields...)
+		clone.Metadata.EntityTypes[index].ReferenceRules = append([]ReferenceRule{}, definition.Metadata.EntityTypes[index].ReferenceRules...)
 	}
 	clone.Schema = cloneSchema(definition.Schema)
 	return clone
+}
+
+func schemaField(schema EntitySchema, name string) FieldSchema {
+	for _, field := range schema.Fields {
+		if field.Name == name {
+			return field
+		}
+	}
+	return FieldSchema{}
 }
 
 func cloneSchema(schema Schema) Schema {

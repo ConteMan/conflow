@@ -247,7 +247,7 @@ Plan 返回服务端计算的 `confirmation_requirements`；服务端发布前�
 |---|---|---|
 | `/health`、`/bootstrap` | 运行状态、GUI 启动上下文、能力发现 | 001、002 |
 | `/project`、`/environments` | 项目和环境 CRUD | 002 |
-| `/packs` | Pack 列表、版本 metadata 与声明式表单 schema；schema 查询可带客户端支持的 `schema_version` | 003 |
+| `/packs` | Pack 列表、版本 metadata 与声明式表单 schema；schema 同时返回标量、数组元素和对象键三种声明式实体引用规则，查询可带客户端支持的 `schema_version` | 003、028 |
 | `/drafts/{environment_id}`、`/drafts/{environment_id}/entities` | 草稿、分层实体 CRUD、引用查询、环境覆盖 | 004、005、006 |
 | `/drafts/{environment_id}:validate` | 完整校验 | 007 |
 | `/drafts/{environment_id}:plan` | 构建、语义 diff、风险和影响范围 | 008 |

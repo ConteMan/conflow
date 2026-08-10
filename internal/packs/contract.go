@@ -26,12 +26,27 @@ type EntityMetadata struct {
 	// Collection is the configuration field that stores the entity records. It
 	// is intentionally internal until the public Pack metadata contract gains a
 	// collection member.
-	Collection                string         `json:"-"`
-	Label                     string         `json:"label"`
-	Description               string         `json:"description"`
-	IDRule                    IDRule         `json:"id_rule"`
-	DeletionPolicy            DeletionPolicy `json:"deletion_policy"`
-	EnvironmentOverrideFields []string       `json:"environment_override_fields"`
+	Collection                string          `json:"-"`
+	Label                     string          `json:"label"`
+	Description               string          `json:"description"`
+	IDRule                    IDRule          `json:"id_rule"`
+	DeletionPolicy            DeletionPolicy  `json:"deletion_policy"`
+	EnvironmentOverrideFields []string        `json:"environment_override_fields"`
+	ReferenceRules            []ReferenceRule `json:"reference_rules,omitempty"`
+}
+
+type ReferenceShape string
+
+const (
+	ReferenceShapeScalar     ReferenceShape = "scalar"
+	ReferenceShapeArrayItems ReferenceShape = "array_items"
+	ReferenceShapeObjectKeys ReferenceShape = "object_keys"
+)
+
+type ReferenceRule struct {
+	Field            string         `json:"field"`
+	TargetEntityType string         `json:"target_entity_type"`
+	Shape            ReferenceShape `json:"shape"`
 }
 
 type IDRule struct {

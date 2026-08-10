@@ -2466,6 +2466,24 @@ components:
           type: array
           items:
             type: string
+        reference_rules:
+          type: array
+          description: Declarative entity references consumed by structural validation, referenced-by queries, restricted deletion, and schema-driven selectors.
+          items:
+            $ref: "#/components/schemas/EntityReferenceRule"
+    EntityReferenceRule:
+      type: object
+      additionalProperties: false
+      required: [field, target_entity_type, shape]
+      properties:
+        field:
+          type: string
+        target_entity_type:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{0,62}$"
+        shape:
+          type: string
+          enum: [scalar, array_items, object_keys]
     IDRule:
       type: object
       additionalProperties: false
@@ -2498,7 +2516,7 @@ components:
     EntityType:
       type: string
       pattern: "^[a-z][a-z0-9_]{0,62}$"
-      enum: [remote_config_layout, network_settings, feature_switch, custom_parameter, frequency_policy, placement, unit_binding]
+      enum: [remote_config_layout, ad_strategy_settings, network_settings, feature_switch, custom_parameter, frequency_policy, ad_strategy, placement, unit_binding]
       description: Pack-declared entity type. Clients treat it as opaque outside schema-driven display.
     EntityRef:
       type: string
@@ -3547,7 +3565,7 @@ components:
           $ref: "#/components/schemas/RiskSeverity"
         reason_code:
           type: string
-          enum: [shared_frequency_policy_relaxed, global_feature_switch_changed, production_network_mode_changed, unit_binding_changed, managed_parameter_deleted, custom_parameter_changed, custom_parameter_deleted, custom_parameter_adopted, unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
+          enum: [shared_frequency_policy_relaxed, frequency_policy_changed, global_feature_switch_changed, production_network_mode_changed, production_network_settings_changed, unit_binding_changed, remote_parameter_key_changed, managed_parameter_deleted, custom_parameter_changed, custom_parameter_deleted, custom_parameter_adopted, ad_strategy_changed, ad_strategy_relaxed, ad_strategy_deleted, ad_strategy_settings_changed, ad_strategy_placement_identity_changed, unmodeled_remote_condition, remote_baseline_missing, validation_not_ready, remote_snapshot_unavailable]
         summary:
           type: string
         entity_ref:

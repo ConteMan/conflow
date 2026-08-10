@@ -90,9 +90,72 @@ test("v2 网络设置可加载并保存基线草稿", async ({ page }) => {
   await expect(page.getByText("已修改")).toBeVisible();
 });
 
-async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>, writeScope?: string) => void, events: string[] = []) {
+test("v2 广告策略支持列表、独立详情和稀疏覆盖保存", async ({ page }) => {
+  const savedStrategies: Array<{ id: string; fields: Record<string, unknown> }> = [];
+  await mockV2ConfigurationAPI(page, () => undefined, [], savedStrategies);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+
+  await expect(page.getByRole("heading", { name: "策略发布设置" })).toBeVisible();
+  await expect(page.getByText("balanced默认", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "编辑策略 balanced" }).click();
+  await expect(page.getByRole("heading", { name: "balanced" })).toBeVisible();
+
+  const placementCard = page.locator(".strategy-placement").filter({ hasText: "main_interstitial" });
+  const cooldown = placementCard.locator(".strategy-override-field").filter({ hasText: "冷却时间" });
+  await cooldown.locator("select").selectOption("disabled");
+  await expect(cooldown.getByText("客户端不应用此约束")).toBeVisible();
+  await page.getByRole("button", { name: "保存策略" }).click();
+
+  await expect.poll(() => savedStrategies.length).toBe(1);
+  expect(savedStrategies[0]).toMatchObject({
+    id: "balanced",
+    fields: { frequency_policy_overrides: { interstitial_main: { cooldown: null } } },
+  });
+  await expect(page.getByRole("table", { name: "广告策略列表" })).toBeVisible();
+});
+
+test("v2 广告策略在 390px 窄屏保持只读", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+
+  await expect(page.getByText("窄屏仅提供策略摘要。请使用桌面端创建、编辑或删除策略。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "新建策略" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "策略发布设置" })).toBeHidden();
+});
+
+test("v2 广告策略列表保持 1440px 视觉基线", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+  await expect(page).toHaveScreenshot("ad-strategy-list-1440.png", { fullPage: true, animations: "disabled" });
+});
+
+test("v2 广告策略详情保持 1280px 视觉基线", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+  await page.getByRole("button", { name: "编辑策略 balanced" }).click();
+  await expect(page).toHaveScreenshot("ad-strategy-detail-1280.png", { fullPage: true, animations: "disabled" });
+});
+
+test("v2 广告策略摘要保持 390px 视觉基线", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+  await expect(page).toHaveScreenshot("ad-strategy-summary-390.png", { fullPage: true, animations: "disabled" });
+});
+
+async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string, unknown>, writeScope?: string) => void, events: string[] = [], savedStrategies: Array<{ id: string; fields: Record<string, unknown> }> = []) {
   let revision = 1;
   const customParameters: Array<{ id: string; fields: Record<string, unknown> }> = [];
+  const strategySettings = { id: "default", fields: { parameter_key: "ad_strategies_config", payload_version: 1, default_strategy_id: "balanced" } };
+  const strategies = [{ id: "balanced", fields: { description: "默认均衡策略", placement_rule_mode: "allowlist", allowlist_placement_ids: ["interstitial_main"], frequency_policy_overrides: {} as Record<string, Record<string, unknown>> } }];
   let networkSettingsChanged = false;
   const environment = { id: "development", name: "Development", kind: "development", provider: { type: "firebase-remote-config", project_id: "photo-editor-dev" }, publish: { requires_confirmation: false } };
   await page.route("**/api/v1/**", async (route) => {
@@ -111,6 +174,8 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
       if (entityType === "unit_binding") return json(route, { data: [], meta: meta(revision) });
       if (entityType === "custom_parameter") return json(route, { data: customParameters.map((parameter) => view("custom_parameter", parameter, "modified")), meta: meta(revision) });
       if (entityType === "network_settings") return json(route, { data: [view("network_settings", networkSettings, networkSettingsChanged ? "modified" : "unchanged")], meta: meta(revision) });
+      if (entityType === "ad_strategy_settings") return json(route, { data: [view("ad_strategy_settings", strategySettings)], meta: meta(revision) });
+      if (entityType === "ad_strategy") return json(route, { data: strategies.map((strategy) => view("ad_strategy", strategy)), meta: meta(revision) });
     }
     if (path === "/api/v1/drafts/development/entities" && method === "POST") {
       const input = request.postDataJSON() as { entity_type: string; entity: { id: string; fields: Record<string, unknown> } };
@@ -137,6 +202,12 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
       networkSettings.fields = input.entity.fields as typeof networkSettings.fields;
       networkSettingsChanged = true; revision += 1;
       return json(route, { data: view("network_settings", networkSettings, "modified"), meta: meta(revision) });
+    }
+    if (path === "/api/v1/drafts/development/entities/ad_strategy/balanced" && method === "PUT") {
+      const input = request.postDataJSON() as { entity: { id: string; fields: Record<string, unknown> } };
+      strategies[0] = input.entity as typeof strategies[number];
+      savedStrategies.push(input.entity); revision += 1;
+      return json(route, { data: view("ad_strategy", input.entity, "modified"), meta: meta(revision) });
     }
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "GET") return json(route, { data: view("placement", placement), meta: meta(revision) });
     if (path === "/api/v1/drafts/development/entities/placement/interstitial_main" && method === "PUT") {

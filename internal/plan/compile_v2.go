@@ -57,7 +57,92 @@ func compileV2Parameters(desired map[string]any, environmentID string) map[strin
 	if key, ok := layout.Fields["placements_parameter_key"].(string); ok && key != "" {
 		values[key] = marshalV2JSON(map[string]any{"version": 2, "placements": v2Placements(desired, environmentID)})
 	}
+	settings, settingsFound := records(desired["ad_strategy_settings"])["default"]
+	strategies := sortedRecords(desired, "ad_strategies")
+	if settingsFound && len(strategies) > 0 {
+		if key, ok := settings.Fields["parameter_key"].(string); ok && key != "" {
+			version, _ := settings.Fields["payload_version"].(float64)
+			values[key] = marshalV2JSON(map[string]any{
+				"version":             version,
+				"default_strategy_id": settings.Fields["default_strategy_id"],
+				"strategies":          v2AdStrategies(desired),
+			})
+		}
+	}
 	return values
+}
+
+func v2AdStrategies(desired map[string]any) map[string]any {
+	placements := records(desired["placements"])
+	policies := records(desired["frequency_policies"])
+	result := map[string]any{}
+	for _, strategy := range sortedRecords(desired, "ad_strategies") {
+		allowlist := stringSlice(strategy.Fields["allowlist_placement_ids"])
+		sort.Strings(allowlist)
+		overrides, _ := strategy.Fields["frequency_policy_overrides"].(map[string]any)
+		clientIDs := make([]string, 0, len(allowlist))
+		effectivePolicies := map[string]any{}
+		for _, placementID := range allowlist {
+			placement, found := placements[placementID]
+			if !found {
+				continue
+			}
+			clientID, _ := placement.Fields["client_id"].(string)
+			if clientID == "" {
+				continue
+			}
+			clientIDs = append(clientIDs, clientID)
+			base := v2PlacementFrequencyPolicy(placement, policies)
+			override, _ := overrides[placementID].(map[string]any)
+			effectivePolicies[clientID] = v2EffectiveFrequencyPolicy(base, override)
+		}
+		sort.Strings(clientIDs)
+		result[strategy.ID] = map[string]any{
+			"placement_rule_mode":  strategy.Fields["placement_rule_mode"],
+			"allowlist_client_ids": clientIDs,
+			"frequency_policies":   effectivePolicies,
+		}
+	}
+	return result
+}
+
+func v2PlacementFrequencyPolicy(placement entities.Record, policies map[string]entities.Record) map[string]any {
+	if placement.Fields["frequency_policy_type"] == "custom" {
+		value, _ := placement.Fields["custom_frequency_policy"].(map[string]any)
+		return value
+	}
+	policyID, _ := placement.Fields["frequency_policy_id"].(string)
+	return policies[policyID].Fields
+}
+
+func v2EffectiveFrequencyPolicy(base, override map[string]any) map[string]any {
+	result := map[string]any{}
+	for _, field := range []string{"cooldown", "interval", "max_count", "shift_count", "positions"} {
+		value := base[field]
+		if overrideValue, exists := override[field]; exists {
+			value = overrideValue
+		}
+		if field == "positions" {
+			result[field] = normalizedPositions(value)
+		} else {
+			result[field] = normalizedV2FrequencyValue(value)
+		}
+	}
+	return result
+}
+
+func stringSlice(value any) []string {
+	items, _ := value.([]any)
+	result := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		text, ok := item.(string)
+		if ok && !seen[text] {
+			seen[text] = true
+			result = append(result, text)
+		}
+	}
+	return result
 }
 
 func v2Policies(desired map[string]any) map[string]any {
