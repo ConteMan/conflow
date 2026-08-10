@@ -637,6 +637,10 @@ function PlacementDetail({ packRef, environment, environments, revision, schema,
 
   const save = async () => {
     if (!draft || !placementSchema) return;
+    if (packRef === "mobile-ad-monetization/v2" && !String(fields.enabled_switch_id ?? "").trim()) {
+      setFieldErrors({ enabled_switch_id: switches.length === 0 ? "还没有功能开关——先创建一个" : "请选择功能开关" });
+      return;
+    }
     if (packRef !== "mobile-ad-monetization/v2" && !String(fields.frequency_policy_id ?? "").trim()) {
       setFieldErrors({ frequency_policy_id: policies.length === 0 ? "还没有频控策略——先创建一个" : "请选择频控策略" });
       return;

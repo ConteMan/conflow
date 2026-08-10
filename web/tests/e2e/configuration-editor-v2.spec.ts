@@ -45,6 +45,19 @@ test("v2 编辑保存会剔除遗留 cache_policy", async ({ page }) => {
   expect(submittedFields).toMatchObject({ cache_ttl: null, fallback_behavior: "continue" });
 });
 
+test("v2 新建广告位未选择功能开关时在客户端阻止保存", async ({ page }) => {
+  const events: string[] = [];
+  await mockV2ConfigurationAPI(page, () => undefined, events);
+  await page.goto("/#configuration");
+  await page.getByRole("button", { name: "新建广告位" }).click();
+  await page.getByLabel("客户端 ID").fill("AD-NEW-001");
+  await page.getByLabel("广告位键").fill("new_interstitial");
+  await page.getByRole("button", { name: "保存修改" }).click();
+
+  await expect(page.getByRole("alert")).toHaveText("请选择功能开关");
+  expect(events.filter((event) => event.startsWith("create-placement:"))).toEqual([]);
+});
+
 test("v2 自定义参数可创建、编辑和删除", async ({ page }) => {
   const events: string[] = [];
   await mockV2ConfigurationAPI(page, () => undefined, events);
@@ -208,6 +221,10 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
     }
     if (path === "/api/v1/drafts/development/entities" && method === "POST") {
       const input = request.postDataJSON() as { entity_type: string; entity: { id: string; fields: Record<string, unknown> } };
+      if (input.entity_type === "placement") {
+        events.push(`create-placement:${input.entity.id}`); revision += 1;
+        return json(route, { data: view("placement", input.entity, "created"), meta: meta(revision) }, 201);
+      }
       if (input.entity_type === "ad_strategy") {
         strategies.push(input.entity as typeof strategies[number]); savedStrategies.push(input.entity); revision += 1;
         return json(route, { data: view("ad_strategy", input.entity, "created"), meta: meta(revision) }, 201);

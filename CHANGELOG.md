@@ -12,6 +12,7 @@ All notable changes are documented here. This project follows Keep a Changelog a
 
 - **Remote Config plan accuracy**: renaming a v2 layout parameter key now reports the old key as deleted and the new key as added, with a high `remote_parameter_key_changed` risk; mediation strategy changes map to `mediation_strategy_parameter_key` instead of the active-network key.
 - **Strategy editing integrity**: saving settings preserves the imported payload version, new-strategy pages ignore diagnostics from unrelated entities, empty allowlists remain saveable, and invalid payload versions are blocked instead of compiling as version `0`.
+- **Recoverable v2 reference editing**: required placement switch and unit-binding placement references now reject empty strings at the field path, the placement editor catches a missing switch before sending, and focused entity writes no longer let unrelated legacy dangling references block incremental repairs.
 - **API and Pack contract coverage**: the OpenAPI risk-code enum now includes the existing `frequency_policy_changed`, `production_network_settings_changed`, and `remote_parameter_key_changed` codes; the v2 schema golden test now checks the golden entity list and therefore covers the previously omitted `custom_parameter` entity.
 
 ## [0.5.3] - 2026-07-20

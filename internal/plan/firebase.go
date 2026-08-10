@@ -28,19 +28,8 @@ func MergeFirebaseTemplate(remoteTemplate, desiredJSON []byte, changes []RemoteP
 	}
 	values := desiredParameterValues(desired, packRef, environmentID)
 	keys := make([]string, 0, len(changes))
-	allV2Parameters := false
 	for _, change := range changes {
-		if packRef == "mobile-ad-monetization/v2" && change.ParameterKey == "remote_config_layout_changed" {
-			allV2Parameters = true
-			continue
-		}
 		keys = append(keys, change.ParameterKey)
-	}
-	if allV2Parameters {
-		keys = keys[:0]
-		for key := range values {
-			keys = append(keys, key)
-		}
 	}
 	for _, key := range keys {
 		value, exists := values[key]

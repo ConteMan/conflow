@@ -83,7 +83,7 @@ func mobileAdV2Definition() Definition {
 					field("key", FieldTypeString, true, false, `""`, "广告位键", "面向业务的稳定键。", "input", "基础", 1, FieldValidation{}),
 					field("ad_type", FieldTypeString, true, false, `"interstitial"`, "广告类型", "支持开屏、插屏和原生广告。", "select", "基础", 2, enum("app_open", "interstitial", "native")),
 					field("description", FieldTypeString, false, true, "null", "描述", "广告位用途说明。", "input", "基础", 3, FieldValidation{}),
-					field("enabled_switch_id", FieldTypeReference, true, false, `""`, "启用开关", "引用 feature_switch 实体 ID。", "feature_switch_ref", "投放", 3, FieldValidation{}),
+					field("enabled_switch_id", FieldTypeReference, true, false, `""`, "启用开关", "引用 feature_switch 实体 ID。", "feature_switch_ref", "投放", 3, FieldValidation{MinLength: intPointer(1)}),
 					field("frequency_policy_type", FieldTypeString, true, false, `"preset"`, "频控类型", "使用预设或自定义频控策略。", "select", "投放", 4, enum("preset", "custom")),
 					field("network_mode", FieldTypeString, false, true, `"admob"`, "广告链路", "覆盖全局 ad_network_mode；空表示继承全局配置。", "select", "投放", 5, enum("admob", "max")),
 					field("frequency_policy_id", FieldTypeReference, true, true, "null", "频控策略", "引用 frequency_policy 实体 ID。", "select", "投放", 5, FieldValidation{}),
@@ -93,7 +93,7 @@ func mobileAdV2Definition() Definition {
 					field("fallback_behavior", FieldTypeString, true, false, `"continue"`, "兜底行为", "广告不可用时的业务动作。", "select", "投放", 10, enum("continue", "skip_slot", "show_empty_safe")),
 				}},
 				{Name: "unit_binding", Fields: []FieldSchema{
-					field("placement_id", FieldTypeReference, true, false, `""`, "广告位", "引用 placement 实体 ID。", "select", "绑定", 0, FieldValidation{}),
+					field("placement_id", FieldTypeReference, true, false, `""`, "广告位", "引用 placement 实体 ID。", "select", "绑定", 0, FieldValidation{MinLength: intPointer(1)}),
 					field("environment_id", FieldTypeString, true, false, `""`, "环境", "绑定所属的项目环境。", "input", "绑定", 1, FieldValidation{}),
 					field("platform", FieldTypeString, true, false, `""`, "平台", "客户端平台稳定 ID。", "input", "绑定", 2, FieldValidation{}),
 					field("network", FieldTypeString, true, false, `""`, "网络", "广告网络或聚合平台稳定 ID。", "input", "绑定", 3, FieldValidation{}),

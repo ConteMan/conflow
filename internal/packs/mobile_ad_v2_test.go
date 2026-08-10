@@ -50,8 +50,13 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 		}
 	}
 	enabledSwitch := findField(t, placement, "enabled_switch_id")
-	if enabledSwitch.Type != FieldTypeReference {
-		t.Fatalf("enabled_switch_id type = %q", enabledSwitch.Type)
+	if enabledSwitch.Type != FieldTypeReference || enabledSwitch.Validation.MinLength == nil || *enabledSwitch.Validation.MinLength != 1 {
+		t.Fatalf("enabled_switch_id = %#v", enabledSwitch)
+	}
+	unitBindingSchema, _ := findSchema(definition, "unit_binding")
+	placementReference := findField(t, unitBindingSchema, "placement_id")
+	if placementReference.Type != FieldTypeReference || placementReference.Validation.MinLength == nil || *placementReference.Validation.MinLength != 1 {
+		t.Fatalf("unit_binding.placement_id = %#v", placementReference)
 	}
 	frequencyPolicy, _ := findSchema(definition, "frequency_policy")
 	cooldown := findField(t, frequencyPolicy, "cooldown")

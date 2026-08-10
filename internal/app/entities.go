@@ -235,8 +235,10 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 			return json.Marshal(base)
 		},
 		Validate: func(replacement map[string]any) error {
-			if err := validateRecords(definition, metadata, replacement, mutation.Scope); err != nil {
-				return err
+			if mutation.Action != "delete" {
+				if err := validateRecord(definition, metadata, replacement, mutation.Scope, mutation.EntityID); err != nil {
+					return err
+				}
 			}
 			effective := cloneConfiguration(currentEffective)
 			effective[metadata.Collection] = replacement[metadata.Collection]
@@ -246,8 +248,10 @@ func (s *Service) MutateEntity(_ context.Context, environmentID string, mutation
 					return &EntityReferencedError{Revision: mutation.ExpectedRevision, References: refs}
 				}
 			}
-			if err := validateReferences(definition, effective); err != nil {
-				return err
+			if mutation.Action != "delete" {
+				if err := validateRecordReferences(definition, metadata, effective, mutation.EntityID); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -514,35 +518,41 @@ func validateEntityID(metadata packs.EntityMetadata, id string) error {
 	return nil
 }
 
-func validateRecords(definition packs.Definition, metadata packs.EntityMetadata, replacement map[string]any, scope string) error {
+func validateRecord(definition packs.Definition, metadata packs.EntityMetadata, replacement map[string]any, scope, entityID string) error {
 	schema, ok := findEntitySchema(definition, metadata.Name)
 	if !ok {
 		return ErrEntityTypeInvalid
 	}
-	for _, record := range records(replacement, metadata.Collection) {
-		if err := validateEntityID(metadata, record.ID); err != nil {
-			return err
+	record, ok := findRecord(records(replacement, metadata.Collection), entityID)
+	if !ok {
+		return ErrEntityNotFound
+	}
+	if err := validateEntityID(metadata, record.ID); err != nil {
+		return err
+	}
+	for _, field := range schema.Fields {
+		value, exists := record.Fields[field.Name]
+		if field.Required && !exists {
+			code := "required_field_missing"
+			if field.Type == packs.FieldTypeReference && field.Validation.MinLength != nil {
+				code = "value_not_allowed"
+			}
+			return validationError(scope, metadata.Collection, record.ID, field.Name, code)
 		}
-		for _, field := range schema.Fields {
-			value, exists := record.Fields[field.Name]
-			if field.Required && !exists {
-				return validationError(scope, metadata.Collection, record.ID, field.Name, "required_field_missing")
+		if !exists {
+			continue
+		}
+		if value == nil {
+			if !field.Nullable {
+				return validationError(scope, metadata.Collection, record.ID, field.Name, "explicit_null_forbidden")
 			}
-			if !exists {
-				continue
-			}
-			if value == nil {
-				if !field.Nullable {
-					return validationError(scope, metadata.Collection, record.ID, field.Name, "explicit_null_forbidden")
-				}
-				continue
-			}
-			if !matchesEntityType(value, field.Type) {
-				return validationError(scope, metadata.Collection, record.ID, field.Name, "field_type_mismatch")
-			}
-			if !allowsEntityValue(value, field) {
-				return validationError(scope, metadata.Collection, record.ID, field.Name, "value_not_allowed")
-			}
+			continue
+		}
+		if !matchesEntityType(value, field.Type) {
+			return validationError(scope, metadata.Collection, record.ID, field.Name, "field_type_mismatch")
+		}
+		if !allowsEntityValue(value, field) {
+			return validationError(scope, metadata.Collection, record.ID, field.Name, "value_not_allowed")
 		}
 	}
 	return nil
@@ -625,19 +635,30 @@ func allowsEntityValue(value any, field packs.FieldSchema) bool {
 func validateReferences(definition packs.Definition, effective map[string]any) error {
 	for _, metadata := range definition.Metadata.EntityTypes {
 		for _, record := range records(effective, metadata.Collection) {
-			for _, rule := range metadata.ReferenceRules {
-				target, found := findEntityMetadata(definition, rule.TargetEntityType)
-				if !found {
-					return ErrEntityTypeInvalid
-				}
-				for _, reference := range recordReferences(record, rule) {
-					if reference.invalid {
-						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "field_type_mismatch")
-					}
-					if _, exists := findRecord(records(effective, target.Collection), reference.id); !exists {
-						return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "value_not_allowed")
-					}
-				}
+			if err := validateRecordReferences(definition, metadata, effective, record.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateRecordReferences(definition packs.Definition, metadata packs.EntityMetadata, effective map[string]any, entityID string) error {
+	record, found := findRecord(records(effective, metadata.Collection), entityID)
+	if !found {
+		return ErrEntityNotFound
+	}
+	for _, rule := range metadata.ReferenceRules {
+		target, found := findEntityMetadata(definition, rule.TargetEntityType)
+		if !found {
+			return ErrEntityTypeInvalid
+		}
+		for _, reference := range recordReferences(record, rule) {
+			if reference.invalid {
+				return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "field_type_mismatch")
+			}
+			if _, exists := findRecord(records(effective, target.Collection), reference.id); !exists {
+				return validationError(referenceScope(metadata), metadata.Collection, record.ID, strings.TrimPrefix(reference.path, "/"), "value_not_allowed")
 			}
 		}
 	}

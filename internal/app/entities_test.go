@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,6 +117,103 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 	if err := validateReferences(definition, configuration); err == nil {
 		t.Fatal("empty scalar reference must fail")
 	}
+}
+
+func TestMutateV2PlacementRejectsMissingOrEmptyEnabledSwitch(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "missing", mutate: func(fields map[string]any) { delete(fields, "enabled_switch_id") }},
+		{name: "empty", mutate: func(fields map[string]any) { fields["enabled_switch_id"] = "" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := openV2EntityService(t, v2ConfigurationWithLegacyCachePolicy(t))
+			current, revision, err := service.GetEntity(context.Background(), "development", "placement", "interstitial_main")
+			if err != nil {
+				t.Fatal(err)
+			}
+			created := cloneRecord(*current.Effective.Value)
+			created.ID = "interstitial_secondary"
+			created.Fields["client_id"] = "AD-SECONDARY-001"
+			created.Fields["key"] = "secondary_interstitial"
+			test.mutate(created.Fields)
+
+			_, _, err = service.MutateEntity(context.Background(), "development", EntityMutation{
+				ExpectedRevision: revision, ExpectedSourceRevision: current.SourceRevision, Scope: draft.ScopeBaseline,
+				EntityType: "placement", EntityID: created.ID, Entity: &created, Action: "create",
+			})
+			var validation *draft.ValidationError
+			if !errors.As(err, &validation) || len(validation.Details) != 1 {
+				t.Fatalf("create placement error = %#v", err)
+			}
+			detail := validation.Details[0]
+			if detail.Code != "value_not_allowed" || detail.Path != "/placements/interstitial_secondary/fields/enabled_switch_id" {
+				t.Fatalf("validation detail = %#v", detail)
+			}
+		})
+	}
+}
+
+func TestMutateV2PlacementIgnoresHistoricalInvalidSibling(t *testing.T) {
+	configuration := v2ConfigurationWithLegacyCachePolicy(t)
+	placements := records(configuration, "placements")
+	placements[0].Fields["enabled_switch_id"] = ""
+	valid := cloneRecord(placements[0])
+	valid.ID = "interstitial_secondary"
+	valid.Fields["client_id"] = "AD-SECONDARY-001"
+	valid.Fields["key"] = "secondary_interstitial"
+	valid.Fields["enabled_switch_id"] = "ads_enabled"
+	configuration["placements"] = recordsValue(append(placements, valid))
+	service := openV2EntityService(t, configuration)
+
+	current, revision, err := service.GetEntity(context.Background(), "development", "placement", valid.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement := cloneRecord(*current.Effective.Value)
+	replacement.Fields["description"] = "updated while repairing legacy data"
+	if _, _, err := service.MutateEntity(context.Background(), "development", EntityMutation{
+		ExpectedRevision: revision, ExpectedSourceRevision: current.SourceRevision, Scope: draft.ScopeBaseline,
+		EntityType: "placement", EntityID: valid.ID, Entity: &replacement, Action: "replace",
+	}); err != nil {
+		t.Fatalf("replace valid sibling with historical invalid reference: %v", err)
+	}
+}
+
+func openV2EntityService(t *testing.T, configuration map[string]any) *Service {
+	t.Helper()
+	workspace := t.TempDir()
+	if _, err := project.CreateExample(workspace); err != nil {
+		t.Fatal(err)
+	}
+	store, err := project.Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Update(snapshot.Revision, func(manifest *project.Manifest) error {
+		manifest.Pack.ID = "mobile-ad-monetization/v2"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	adapter := source.OpenManagedFile(workspace)
+	initial, err := adapter.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Save(source.SaveInput{ExpectedRevision: initial.Revision, EnvironmentID: "development", Baseline: configuration}); err != nil {
+		t.Fatal(err)
+	}
+	service, err := Open(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return service
 }
 
 func v2ConfigurationWithLegacyCachePolicy(t *testing.T) map[string]any {
