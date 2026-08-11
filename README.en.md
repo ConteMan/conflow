@@ -4,7 +4,7 @@
 
 > A local-first ConfigOps workbench: manage Firebase Remote Config through business forms, validation, semantic diffs, and controlled publishing.
 
-Conflow is a single Go binary with both a CLI and a local web GUI. It represents remote configuration as business entities — ad placements, frequency policies, feature switches, custom parameters — instead of asking teams to edit long JSON values in the Firebase console. The single source of truth lives in your local workspace (optionally under Git); Firebase is the publish target and audit object.
+Conflow is a single Go binary with both a CLI and a local web GUI. It represents remote configuration as business entities — ad placements, ad strategies, frequency policies, feature switches, custom parameters — instead of asking teams to edit long JSON values in the Firebase console. The single source of truth lives in your local workspace (optionally under Git); Firebase is the publish target and audit object.
 
 **Highlights**
 

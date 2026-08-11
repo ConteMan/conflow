@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows Keep a Changelog a
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-11
+
 ### Added
 
 - **Reusable ad strategy collection** (Spec 028, #69): `mobile-ad-monetization/v2` schema 3 adds optional strategy settings and arbitrary strategy entities, typed placement references, sparse frequency overrides, deterministic client-ID compilation, Plan risks, import round-trips, desktop editing, narrow-screen summaries, and Pen/Playwright visual baselines.
