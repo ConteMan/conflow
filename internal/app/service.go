@@ -400,6 +400,10 @@ func (s *Service) ValidateDraft(_ context.Context, environmentID string) (valida
 	if err != nil {
 		return validation.Result{}, 0, err
 	}
+	definition, _, err := s.packRegistry.Resolve(view.PackRef)
+	if err != nil {
+		return validation.Result{}, 0, err
+	}
 	result := validation.Result{
 		EnvironmentID:          environmentID,
 		ValidatedDraftRevision: revision,
@@ -407,6 +411,7 @@ func (s *Service) ValidateDraft(_ context.Context, environmentID string) (valida
 		Status:                 validation.StatusFresh,
 		Diagnostics: validation.Validate(validation.Input{
 			PackRef:         view.PackRef,
+			Definition:      definition,
 			EnvironmentID:   environmentID,
 			EnvironmentKind: environment.Kind,
 			Effective:       view.Effective,

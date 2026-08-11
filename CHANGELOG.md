@@ -2,6 +2,22 @@
 
 All notable changes are documented here. This project follows Keep a Changelog and Semantic Versioning.
 
+## [Unreleased]
+
+## [0.6.0] - 2026-08-11
+
+### Added
+
+- **Reusable ad strategy collection** (Spec 028, #69): `mobile-ad-monetization/v2` schema 3 adds optional strategy settings and arbitrary strategy entities, typed placement references, sparse frequency overrides, deterministic client-ID compilation, Plan risks, import round-trips, desktop editing, narrow-screen summaries, and Pen/Playwright visual baselines.
+
+### Fixed
+
+- **Remote Config plan accuracy**: renaming a v2 layout parameter key now reports the old key as deleted and the new key as added, with a high `remote_parameter_key_changed` risk; mediation strategy changes map to `mediation_strategy_parameter_key` instead of the active-network key.
+- **Strategy editing integrity**: saving settings preserves the imported payload version, new-strategy pages ignore diagnostics from unrelated entities, empty allowlists remain saveable, invalid payload versions are blocked instead of compiling as version `0`, and deletion dialogs fully cover pinned table actions while keeping destructive hover labels readable.
+- **Recoverable v2 reference editing**: required placement switch and unit-binding placement references now reject empty strings at the field path, the placement editor catches a missing switch before sending, and focused entity writes no longer let unrelated legacy dangling references block incremental repairs.
+- **Complete Pack contract validation**: full draft validation now rejects entity IDs that violate Pack ID rules and field values outside schema enums across both v1 and v2, preventing invalid strategy IDs and other source/import defects from reaching release plans.
+- **API and Pack contract coverage**: the OpenAPI risk-code enum now includes the existing `frequency_policy_changed`, `production_network_settings_changed`, and `remote_parameter_key_changed` codes; the v2 schema golden test now checks the golden entity list and therefore covers the previously omitted `custom_parameter` entity.
+
 ## [0.5.3] - 2026-07-20
 
 ### Fixed

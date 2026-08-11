@@ -1044,6 +1044,14 @@ export interface components {
             /** @enum {string} */
             deletion_policy: "restrict" | "cascade" | "allow";
             environment_override_fields: string[];
+            /** @description Declarative entity references consumed by structural validation, referenced-by queries, restricted deletion, and schema-driven selectors. */
+            reference_rules?: components["schemas"]["EntityReferenceRule"][];
+        };
+        EntityReferenceRule: {
+            field: string;
+            target_entity_type: string;
+            /** @enum {string} */
+            shape: "scalar" | "array_items" | "object_keys";
         };
         IDRule: {
             pattern: string;
@@ -1059,7 +1067,7 @@ export interface components {
          * @description Pack-declared entity type. Clients treat it as opaque outside schema-driven display.
          * @enum {string}
          */
-        EntityType: "remote_config_layout" | "network_settings" | "feature_switch" | "custom_parameter" | "frequency_policy" | "placement" | "unit_binding";
+        EntityType: "remote_config_layout" | "ad_strategy_settings" | "network_settings" | "feature_switch" | "custom_parameter" | "frequency_policy" | "ad_strategy" | "placement" | "unit_binding";
         /** @description Stable opaque entity reference in entity:{pack_ref}:{entity_type}:{entity_id} format. */
         EntityRef: string;
         EntityRecord: {
@@ -1577,7 +1585,7 @@ export interface components {
             risk_item_id: string;
             severity: components["schemas"]["RiskSeverity"];
             /** @enum {string} */
-            reason_code: "shared_frequency_policy_relaxed" | "global_feature_switch_changed" | "production_network_mode_changed" | "unit_binding_changed" | "managed_parameter_deleted" | "custom_parameter_changed" | "custom_parameter_deleted" | "custom_parameter_adopted" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            reason_code: "shared_frequency_policy_relaxed" | "frequency_policy_changed" | "global_feature_switch_changed" | "production_network_mode_changed" | "production_network_settings_changed" | "unit_binding_changed" | "remote_parameter_key_changed" | "managed_parameter_deleted" | "custom_parameter_changed" | "custom_parameter_deleted" | "custom_parameter_adopted" | "ad_strategy_changed" | "ad_strategy_relaxed" | "ad_strategy_deleted" | "ad_strategy_settings_changed" | "ad_strategy_placement_identity_changed" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
             summary: string;
             entity_ref?: components["schemas"]["EntityRef"];
             semantic_change_ids: components["schemas"]["PlanNodeID"][];

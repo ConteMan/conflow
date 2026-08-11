@@ -202,6 +202,8 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 	collections := map[string]string{"frequency_policies": "frequency_policy", "feature_switches": "feature_switch", "placements": "placement", "unit_bindings": "unit_binding"}
 	if in.PackRef == "mobile-ad-monetization/v2" {
 		collections = map[string]string{
+			"ad_strategy_settings":  "ad_strategy_settings",
+			"ad_strategies":         "ad_strategy",
 			"custom_parameters":     "custom_parameter",
 			"remote_config_layouts": "remote_config_layout",
 			"network_settings":      "network_settings",
@@ -269,7 +271,6 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 					}
 				}
 				if in.RemoteSnapshot.Status == "available" {
-					remoteNode := "node_" + id("remote", scope, entityType, entityID, field)
 					key := parameterKey(entityType, entityID, field)
 					remoteBefore, remoteExists := in.RemoteSnapshot.Parameters[key]
 					remoteAfter := av
@@ -282,25 +283,35 @@ func semanticChanges(in Input, p *Plan) []SemanticChange {
 						if !v2FieldCompiled(field) {
 							skipRemoteChange = true
 						}
-						key = affectedParameterKey(in.PackRef, entityType, entityID, in.Desired)
-						remoteBefore, remoteExists = in.RemoteSnapshot.Parameters[key]
-						if value, exists := compiledV2[key]; exists {
-							remoteAfter = value
-							if remoteValuesEqual(remoteBefore, remoteAfter) {
-								skipRemoteChange = true
+						keys := affectedParameterKeys(in.PackRef, entityType, entityID, field, in.Baseline, in.Desired)
+						for _, affectedKey := range keys {
+							if skipRemoteChange {
+								break
 							}
-							if !skipRemoteChange && remoteChangeKind == "deleted" {
-								remoteChangeKind = "updated"
-							} else if !skipRemoteChange && remoteExists {
-								remoteChangeKind = "updated"
-							} else if !skipRemoteChange {
-								remoteChangeKind = "added"
+							before, exists := in.RemoteSnapshot.Parameters[affectedKey]
+							after, desiredExists := compiledV2[affectedKey]
+							if desiredExists && remoteValuesEqual(before, after) {
+								continue
 							}
+							if !desiredExists && !exists {
+								continue
+							}
+							kind := "deleted"
+							if desiredExists && exists {
+								kind = "updated"
+							} else if desiredExists {
+								kind = "added"
+							}
+							remoteNode := "node_" + id("remote", scope, entityType, entityID, field, affectedKey)
+							p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, affectedKey), ParameterKey: affectedKey, ChangeKind: kind, BeforeSummary: summary(before), AfterSummary: summary(after), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
+							c.RemoteParameterNodeIDs = append(c.RemoteParameterNodeIDs, remoteNode)
 						}
+						skipRemoteChange = true
 					} else if !remoteExists {
 						remoteBefore = bv
 					}
 					if !skipRemoteChange {
+						remoteNode := "node_" + id("remote", scope, entityType, entityID, field)
 						p.RemoteParameterChanges = append(p.RemoteParameterChanges, RemoteParameterChange{NodeID: remoteNode, ProjectionID: "rvp_" + id(in.EnvironmentID, key), ParameterKey: key, ChangeKind: remoteChangeKind, BeforeSummary: summary(remoteBefore), AfterSummary: summary(remoteAfter), Managed: true, CausedBySemanticChangeIDs: []string{node}, AffectedEntityNodeIDs: append([]string{}, c.AffectedEntityNodeIDs...)})
 						c.RemoteParameterNodeIDs = []string{remoteNode}
 					}
@@ -412,6 +423,18 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 		}
 		if in.PackRef == "mobile-ad-monetization/v2" {
 			switch {
+			case strings.Contains(c.DirectEntityRef, ":placement:") && c.FieldPath == "/client_id" && strategyUsesPlacement(in.Desired, entityIDFromRef(c.DirectEntityRef)):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("ad_strategy_placement_identity_changed", c.NodeID), Severity: "high", ReasonCode: "ad_strategy_placement_identity_changed", Summary: "广告策略引用的客户端广告位标识已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case strings.Contains(c.DirectEntityRef, ":ad_strategy:"):
+				severity, code, summaryText := "medium", "ad_strategy_changed", "广告策略已变更"
+				if c.ChangeKind == "deleted" {
+					severity, code, summaryText = "high", "ad_strategy_deleted", "广告策略将被删除"
+				} else if strategyEffectivePolicyRelaxed(in.Baseline, in.Desired, entityIDFromRef(c.DirectEntityRef)) {
+					severity, code, summaryText = "high", "ad_strategy_relaxed", "广告策略生效范围或频控已放宽"
+				}
+				result = append(result, RiskItem{RiskItemID: "risk_" + id(code, c.NodeID), Severity: severity, ReasonCode: code, Summary: summaryText, EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
+			case strings.Contains(c.DirectEntityRef, ":ad_strategy_settings:"):
+				result = append(result, RiskItem{RiskItemID: "risk_" + id("ad_strategy_settings_changed", c.NodeID), Severity: "high", ReasonCode: "ad_strategy_settings_changed", Summary: "广告策略默认值或远端布局已变更", EntityRef: c.DirectEntityRef, SemanticChangeIDs: []string{c.NodeID}, RemoteParameterNodeIDs: c.RemoteParameterNodeIDs, AcknowledgementRequired: true})
 			case strings.Contains(c.DirectEntityRef, ":custom_parameter:") && len(c.RemoteParameterNodeIDs) > 0:
 				severity, code, summary := "medium", "custom_parameter_changed", "自定义参数已变更"
 				if c.ChangeKind == "deleted" {
@@ -455,7 +478,7 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 		if len(remoteChange.CausedBySemanticChangeIDs) > 0 {
 			entityRef = changesByID[remoteChange.CausedBySemanticChangeIDs[0]].DirectEntityRef
 		}
-		if strings.Contains(entityRef, ":custom_parameter:") {
+		if strings.Contains(entityRef, ":custom_parameter:") || strings.Contains(entityRef, ":ad_strategy:") || strings.Contains(entityRef, ":ad_strategy_settings:") || strings.Contains(entityRef, ":remote_config_layout:") {
 			continue
 		}
 		result = append(result, RiskItem{RiskItemID: "risk_" + id("managed_parameter_deleted", remoteChange.NodeID), Severity: "blocking", ReasonCode: "managed_parameter_deleted", Summary: "受管远端参数将被删除", EntityRef: entityRef, SemanticChangeIDs: append([]string{}, remoteChange.CausedBySemanticChangeIDs...), RemoteParameterNodeIDs: []string{remoteChange.NodeID}})
@@ -474,6 +497,110 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].RiskItemID < result[j].RiskItemID })
 	return result
+}
+
+func strategyEffectivePolicyRelaxed(before, after map[string]any, strategyID string) bool {
+	beforeStrategy, beforeOK := v2AdStrategies(before)[strategyID].(map[string]any)
+	afterStrategy, afterOK := v2AdStrategies(after)[strategyID].(map[string]any)
+	if !afterOK {
+		return false
+	}
+	if !beforeOK {
+		return true
+	}
+	beforePolicies, _ := beforeStrategy["frequency_policies"].(map[string]any)
+	afterPolicies, _ := afterStrategy["frequency_policies"].(map[string]any)
+	for clientID, afterRaw := range afterPolicies {
+		beforeRaw, exists := beforePolicies[clientID]
+		if !exists {
+			return true
+		}
+		beforePolicy, _ := beforeRaw.(map[string]any)
+		afterPolicy, _ := afterRaw.(map[string]any)
+		if frequencyPolicyRelaxed(beforePolicy, afterPolicy) {
+			return true
+		}
+	}
+	return false
+}
+
+func frequencyPolicyRelaxed(before, after map[string]any) bool {
+	for _, field := range []string{"cooldown", "interval", "max_count", "shift_count", "positions"} {
+		beforeValue, afterValue := before[field], after[field]
+		if equal(beforeValue, afterValue) {
+			continue
+		}
+		if afterValue == nil && beforeValue != nil {
+			return true
+		}
+		switch field {
+		case "cooldown", "interval":
+			beforeAmount, beforeDimension, beforeOK := comparableIntervalAmount(beforeValue)
+			afterAmount, afterDimension, afterOK := comparableIntervalAmount(afterValue)
+			if !beforeOK || !afterOK || beforeDimension != afterDimension || afterAmount < beforeAmount {
+				return true
+			}
+		case "max_count":
+			beforeAmount, beforeUnit, beforeOK := frequencyAmount(beforeValue)
+			afterAmount, afterUnit, afterOK := frequencyAmount(afterValue)
+			if !beforeOK || !afterOK || beforeUnit != afterUnit || afterAmount > beforeAmount {
+				return true
+			}
+		case "shift_count":
+			beforeShift, beforeOK := beforeValue.(map[string]any)
+			afterShift, afterOK := afterValue.(map[string]any)
+			if !beforeOK || !afterOK || numeric(afterShift["am"]) > numeric(beforeShift["am"]) || numeric(afterShift["pm"]) > numeric(beforeShift["pm"]) {
+				return true
+			}
+		case "positions":
+			return true
+		}
+	}
+	return false
+}
+
+func comparableIntervalAmount(value any) (float64, string, bool) {
+	amount, unit, ok := frequencyAmount(value)
+	if !ok {
+		return 0, "", false
+	}
+	switch unit {
+	case "seconds":
+		return amount, "time", true
+	case "minutes":
+		return amount * 60, "time", true
+	case "hours":
+		return amount * 3600, "time", true
+	case "days":
+		return amount * 86400, "time", true
+	case "items":
+		return amount, "items", true
+	default:
+		return 0, "", false
+	}
+}
+
+func frequencyAmount(value any) (float64, string, bool) {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return 0, "", false
+	}
+	unit, unitOK := object["unit"].(string)
+	amount, amountOK := object["value"].(float64)
+	return amount, unit, unitOK && amountOK
+}
+
+func numeric(value any) float64 {
+	number, _ := value.(float64)
+	return number
+}
+
+func entityIDFromRef(ref string) string {
+	parts := strings.Split(ref, ":")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 func blockingReasons(items []RiskItem) []BlockingReason {
 	result := []BlockingReason{}
@@ -553,13 +680,19 @@ func parameterKey(typ, id, field string) string {
 	}
 	return typ + "_" + id + "_" + field
 }
-func affectedParameterKey(packRef, entityType, entityID string, desired map[string]any) string {
+func affectedParameterKeys(packRef, entityType, entityID, field string, baseline, desired map[string]any) []string {
 	if packRef != "mobile-ad-monetization/v2" {
-		return parameterKey(entityType, entityID, "")
+		return []string{parameterKey(entityType, entityID, field)}
+	}
+	if entityType == "remote_config_layout" {
+		if !strings.HasSuffix(field, "_parameter_key") {
+			return nil
+		}
+		return uniqueNonEmpty([]string{v2LayoutParameterKey(baseline, field), v2LayoutParameterKey(desired, field)})
 	}
 	layout, found := records(desired["remote_config_layouts"])["default"]
 	if !found {
-		return "remote_config_layout_changed"
+		return nil
 	}
 	key := func(field string) string {
 		value, _ := layout.Fields[field].(string)
@@ -569,19 +702,77 @@ func affectedParameterKey(packRef, entityType, entityID string, desired map[stri
 	case "feature_switch":
 		if featureSwitch, found := records(desired["feature_switches"])[entityID]; found {
 			if value, ok := featureSwitch.Fields["key"].(string); ok && value != "" {
-				return value
+				return []string{value}
 			}
 		}
 	case "frequency_policy":
-		return key("frequency_policies_parameter_key")
-	case "placement", "unit_binding":
-		return key("placements_parameter_key")
+		result := []string{key("frequency_policies_parameter_key")}
+		for _, placementID := range placementsUsing(desired, entityID) {
+			if strategyUsesPlacement(desired, placementID) {
+				result = append(result, strategyParameterKey(desired))
+				break
+			}
+		}
+		return uniqueNonEmpty(result)
+	case "placement":
+		result := []string{key("placements_parameter_key")}
+		if strategyUsesPlacement(desired, entityID) {
+			result = append(result, strategyParameterKey(desired))
+		}
+		return uniqueNonEmpty(result)
+	case "unit_binding":
+		return uniqueNonEmpty([]string{key("placements_parameter_key")})
+	case "ad_strategy", "ad_strategy_settings":
+		return uniqueNonEmpty([]string{strategyParameterKey(desired)})
 	case "network_settings":
-		return key("active_network_parameter_key")
-	case "remote_config_layout":
-		return "remote_config_layout_changed"
+		if field == "mediation_strategy" {
+			return uniqueNonEmpty([]string{key("mediation_strategy_parameter_key")})
+		}
+		return uniqueNonEmpty([]string{key("active_network_parameter_key")})
 	}
-	return entityType + "_" + entityID
+	return nil
+}
+
+func v2LayoutParameterKey(configuration map[string]any, field string) string {
+	layout, found := records(configuration["remote_config_layouts"])["default"]
+	if !found {
+		return ""
+	}
+	value, _ := layout.Fields[field].(string)
+	return value
+}
+
+func strategyParameterKey(desired map[string]any) string {
+	settings, found := records(desired["ad_strategy_settings"])["default"]
+	if !found {
+		return ""
+	}
+	key, _ := settings.Fields["parameter_key"].(string)
+	return key
+}
+
+func strategyUsesPlacement(desired map[string]any, placementID string) bool {
+	for _, strategy := range records(desired["ad_strategies"]) {
+		for _, candidate := range stringSlice(strategy.Fields["allowlist_placement_ids"]) {
+			if candidate == placementID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func uniqueNonEmpty(values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "" && !seen[value] {
+			seen[value] = true
+			result = append(result, value)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 func summary(v any) string {
 	if f, ok := v.(float64); ok && strings.Contains(fmt.Sprint(f), "000") {

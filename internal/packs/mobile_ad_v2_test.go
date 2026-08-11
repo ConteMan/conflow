@@ -14,7 +14,7 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wantEntities := []string{"remote_config_layout", "feature_switch", "custom_parameter", "network_settings", "frequency_policy", "placement", "unit_binding"}
+	wantEntities := []string{"remote_config_layout", "ad_strategy_settings", "feature_switch", "custom_parameter", "network_settings", "frequency_policy", "ad_strategy", "placement", "unit_binding"}
 	if len(definition.Metadata.EntityTypes) != len(wantEntities) || len(definition.Schema.Entities) != len(wantEntities) {
 		t.Fatalf("v2 entity count = metadata %d, schema %d", len(definition.Metadata.EntityTypes), len(definition.Schema.Entities))
 	}
@@ -27,7 +27,7 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"remote_config_layout", "network_settings"} {
+	for _, name := range []string{"remote_config_layout", "ad_strategy_settings", "network_settings"} {
 		metadata, _ := findMetadata(definition, name)
 		if metadata.IDRule.Pattern != "^default$" {
 			t.Fatalf("%s ID pattern = %q", name, metadata.IDRule.Pattern)
@@ -50,8 +50,13 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 		}
 	}
 	enabledSwitch := findField(t, placement, "enabled_switch_id")
-	if enabledSwitch.Type != FieldTypeReference {
-		t.Fatalf("enabled_switch_id type = %q", enabledSwitch.Type)
+	if enabledSwitch.Type != FieldTypeReference || enabledSwitch.Validation.MinLength == nil || *enabledSwitch.Validation.MinLength != 1 {
+		t.Fatalf("enabled_switch_id = %#v", enabledSwitch)
+	}
+	unitBindingSchema, _ := findSchema(definition, "unit_binding")
+	placementReference := findField(t, unitBindingSchema, "placement_id")
+	if placementReference.Type != FieldTypeReference || placementReference.Validation.MinLength == nil || *placementReference.Validation.MinLength != 1 {
+		t.Fatalf("unit_binding.placement_id = %#v", placementReference)
 	}
 	frequencyPolicy, _ := findSchema(definition, "frequency_policy")
 	cooldown := findField(t, frequencyPolicy, "cooldown")
@@ -63,13 +68,20 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 	if value.Type != FieldTypeAny || value.UI.Control != "custom_parameter_value" {
 		t.Fatalf("custom parameter value = %#v", value)
 	}
+	strategy, _ := findMetadata(definition, "ad_strategy")
+	if !reflect.DeepEqual(strategy.ReferenceRules, []ReferenceRule{
+		{Field: "allowlist_placement_ids", TargetEntityType: "placement", Shape: ReferenceShapeArrayItems},
+		{Field: "frequency_policy_overrides", TargetEntityType: "placement", Shape: ReferenceShapeObjectKeys},
+	}) {
+		t.Fatalf("ad_strategy reference rules = %#v", strategy.ReferenceRules)
+	}
 
 	if _, err := json.Marshal(definition); err != nil {
 		t.Fatalf("marshal definition: %v", err)
 	}
 
 	golden := loadMobileAdV2SchemaGolden(t)
-	if golden.PackRef != "mobile-ad-monetization/v2" || golden.SchemaVersion != 2 || !containsString(wantEntities, "custom_parameter") {
+	if golden.PackRef != "mobile-ad-monetization/v2" || golden.SchemaVersion != 3 || !containsString(golden.EntityTypes, "ad_strategy") {
 		t.Fatalf("schema golden = %#v", golden)
 	}
 }

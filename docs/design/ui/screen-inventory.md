@@ -62,6 +62,13 @@
 2. `Narrow / Placement Quick Edit`：只展示经 Spec 004 明确允许的轻量字段；未冻结字段以只读呈现。
 3. `Narrow / Navigation Menu`：项目 / 环境、主导航和 Production 文本状态。
 
+### Spec 028：广告策略
+
+1. `028 / Strategy Table`：策略设置卡、搜索筛选、默认标记、适用广告位与覆盖计数。
+2. `028 / Strategy Detail`：基础信息、广告位 allowlist、频控继承/显式关闭/自定义覆盖与影响摘要。
+3. `028 / Strategy Delete Blocked`：默认或被引用策略的删除阻断与引用清单。
+4. `Narrow / Strategy Readonly`：策略摘要只读展示与桌面端编辑提示。
+
 ## 组件清单
 
 基础组件：`Button`、`IconButton`、`Input`、`Select`、`Tabs`、`Badge`、`Alert`、`Tooltip`、`Table`、`Dialog`、`Drawer`、`Stepper`、`Skeleton`、`EmptyState`、`ErrorState`。

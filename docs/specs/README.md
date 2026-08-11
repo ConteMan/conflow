@@ -33,6 +33,7 @@
 | [025](025-plan-invalidation-tiers.md) | 发布计划失效分层与自动重建 | 008 | 已实现 |
 | [026](026-config-tables-tanstack.md) | 配置列表迁移 TanStack Table | 014 | 已实现 |
 | [027](027-custom-parameters.md) | 通用自定义 Remote Config 参数 | 020、024 | 已实现 |
+| [028](028-ad-strategy-collection.md) | 通用广告策略集合 | 020、024、026 | 已实现 |
 
 新建规格使用 [template.md](template.md)。
 

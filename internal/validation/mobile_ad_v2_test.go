@@ -96,9 +96,106 @@ func TestValidateV2RejectsCustomParameterValueTypeMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateV2KeepsAdStrategiesOptional(t *testing.T) {
+	configuration := v2ValidationFixture(t)
+	configuration["ad_strategy_settings"] = []any{}
+	configuration["ad_strategies"] = []any{}
+	if hasV2Diagnostic(Validate(v2ValidationInput(t, configuration)), "ad_strategy_settings_not_singleton", SeverityBlocking) {
+		t.Fatal("empty strategy feature must remain compatible")
+	}
+}
+
+func TestValidateV2AdStrategyRules(t *testing.T) {
+	configuration := v2ValidationFixture(t)
+	addV2ValidationStrategy(configuration)
+	if diagnostics := Validate(v2ValidationInput(t, configuration)); hasV2Diagnostic(diagnostics, "ad_strategy_frequency_override_invalid", SeverityBlocking) {
+		t.Fatalf("valid strategy diagnostics = %#v", diagnostics)
+	}
+
+	t.Run("override outside allowlist", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
+		fields["allowlist_placement_ids"] = []any{}
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_override_outside_allowlist", SeverityBlocking) {
+			t.Fatal("missing override outside allowlist diagnostic")
+		}
+	})
+
+	t.Run("unknown override field", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
+		overrides := fields["frequency_policy_overrides"].(map[string]any)
+		overrides["interstitial_main"].(map[string]any)["unknown"] = true
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_frequency_override_invalid", SeverityBlocking) {
+			t.Fatal("missing unknown override field diagnostic")
+		}
+	})
+
+	t.Run("parameter key conflict", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		v2RecordFields(t, invalid, "ad_strategy_settings", "default")["parameter_key"] = "ads_enabled"
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "parameter_key_conflict", SeverityBlocking) {
+			t.Fatal("missing strategy parameter key conflict diagnostic")
+		}
+	})
+
+	t.Run("empty allowlist", func(t *testing.T) {
+		valid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, valid, "ad_strategies", "balanced")
+		fields["allowlist_placement_ids"] = []any{}
+		fields["frequency_policy_overrides"] = map[string]any{}
+		if diagnostics := Validate(v2ValidationInput(t, valid)); hasV2Diagnostic(diagnostics, "ad_strategy_override_outside_allowlist", SeverityBlocking) || hasV2Diagnostic(diagnostics, "ad_strategy_frequency_override_invalid", SeverityBlocking) {
+			t.Fatalf("empty allowlist diagnostics = %#v", diagnostics)
+		}
+	})
+
+	t.Run("payload version two", func(t *testing.T) {
+		valid := v2Clone(t, configuration).(map[string]any)
+		v2RecordFields(t, valid, "ad_strategy_settings", "default")["payload_version"] = float64(2)
+		if hasV2Diagnostic(Validate(v2ValidationInput(t, valid)), "ad_strategy_payload_version_invalid", SeverityBlocking) {
+			t.Fatal("payload version 2 must remain valid")
+		}
+	})
+
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{name: "missing", value: nil},
+		{name: "zero", value: float64(0)},
+		{name: "fractional", value: 1.5},
+		{name: "wrong type", value: "2"},
+	} {
+		t.Run("invalid payload version "+test.name, func(t *testing.T) {
+			invalid := v2Clone(t, configuration).(map[string]any)
+			v2RecordFields(t, invalid, "ad_strategy_settings", "default")["payload_version"] = test.value
+			if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_payload_version_invalid", SeverityBlocking) {
+				t.Fatal("missing invalid strategy payload version diagnostic")
+			}
+		})
+	}
+}
+
+func TestValidateV2SharedStrategyFixture(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "mobile-ad-monetization", "v2", "strategy-valid.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Entities map[string]any `json:"entities"`
+	}
+	if err := json.Unmarshal(content, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	configuration := entities.AdaptFlatFixture(fixture.Entities)
+	if diagnostics := Validate(v2ValidationInput(t, configuration)); len(diagnostics) != 0 {
+		t.Fatalf("strategy fixture diagnostics = %#v", diagnostics)
+	}
+}
+
 func v2ValidationInput(t *testing.T, configuration map[string]any) Input {
 	t.Helper()
-	return Input{PackRef: "mobile-ad-monetization/v2", EnvironmentID: "development", EnvironmentKind: "development", Effective: configuration}
+	return Input{PackRef: "mobile-ad-monetization/v2", Definition: testPackDefinition(t, "mobile-ad-monetization/v2"), EnvironmentID: "development", EnvironmentKind: "development", Effective: configuration}
 }
 
 func v2ValidationFixture(t *testing.T) map[string]any {
@@ -148,4 +245,16 @@ func hasV2Diagnostic(diagnostics []Diagnostic, code, severity string) bool {
 		}
 	}
 	return false
+}
+
+func addV2ValidationStrategy(configuration map[string]any) {
+	configuration["ad_strategy_settings"] = []any{map[string]any{"id": "default", "fields": map[string]any{"parameter_key": "ad_strategies_config", "payload_version": float64(1), "default_strategy_id": "balanced"}}}
+	configuration["ad_strategies"] = []any{map[string]any{"id": "balanced", "fields": map[string]any{
+		"placement_rule_mode":     "allowlist",
+		"allowlist_placement_ids": []any{"interstitial_main"},
+		"frequency_policy_overrides": map[string]any{"interstitial_main": map[string]any{
+			"cooldown":  nil,
+			"max_count": map[string]any{"unit": "day", "value": float64(8)},
+		}},
+	}}}
 }

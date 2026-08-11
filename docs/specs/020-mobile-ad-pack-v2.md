@@ -198,7 +198,7 @@ Pack compiler 输出稳定排序的 managed parameter 集合，每项至少包�
 ## 校验与引用规则
 
 - 所有实体 ID、`client_id`、参数 key 和复合 binding 键必须唯一。
-- `enabled_switch_id`、`frequency_policy_id`、`placement_id` 必须命中有效实体。
+- 非空的 `enabled_switch_id`、`frequency_policy_id`、`placement_id` 必须命中有效实体；其中 `enabled_switch_id` 和 `placement_id` 是长度至少为 1 的必填标量引用，`frequency_policy_id` 允许以 `null` 表示 custom 模式。
 - 当前环境下，每个 placement、`network_settings.platforms[]` 与 `active_network` 的组合都必须有唯一 unit binding；生产环境缺失为 blocking，非生产环境按 Pack 风险规则报告。
 - `preset/custom` 联合字段、nullable 字段、Duration/Interval 单位和数值范围执行 structural validation。
 - 删除被引用实体继续使用 `deletion_policy=restrict` 和 typed `references[]`。

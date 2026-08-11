@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/ConteMan/conflow/internal/entities"
+	"github.com/ConteMan/conflow/internal/packs"
 )
 
 // Input is the captured DraftView data needed for a complete validation run.
@@ -12,6 +13,7 @@ import (
 // deletion; ordinary full validation leaves it empty.
 type Input struct {
 	PackRef           string
+	Definition        packs.Definition
 	EnvironmentID     string
 	EnvironmentKind   string
 	Effective         map[string]any
@@ -26,14 +28,17 @@ type RestrictedDelete struct {
 // Validate dispatches to the validator for the selected mobile advertising
 // Pack version. Other Pack versions have no domain rules yet.
 func Validate(input Input) []Diagnostic {
+	packDiagnostics := validatePackRules(input)
+	var domainDiagnostics []Diagnostic
 	switch input.PackRef {
 	case "mobile-ad-monetization/v1":
-		return validateV1(input)
+		domainDiagnostics = validateV1(input)
 	case "mobile-ad-monetization/v2":
-		return validateV2(input)
-	default:
-		return []Diagnostic{}
+		domainDiagnostics = validateV2(input)
 	}
+	diagnostics := mergePackAndDomainDiagnostics(packDiagnostics, domainDiagnostics)
+	SortDiagnostics(diagnostics)
+	return diagnostics
 }
 
 func validateV1(input Input) []Diagnostic {
@@ -124,7 +129,6 @@ func validateV1(input Input) []Diagnostic {
 		}
 	}
 
-	SortDiagnostics(diagnostics)
 	return diagnostics
 }
 
