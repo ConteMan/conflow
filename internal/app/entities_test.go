@@ -88,7 +88,7 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 	configuration["ad_strategies"] = []any{map[string]any{"id": "balanced", "fields": map[string]any{
 		"placement_rule_mode":        "allowlist",
 		"allowlist_placement_ids":    []any{"interstitial_main"},
-		"frequency_policy_overrides": map[string]any{"interstitial_main": map[string]any{"cooldown": nil}},
+		"frequency_policy_overrides": map[string]any{"global_cap": map[string]any{"cooldown": nil}},
 	}}}
 	definition, _, err := packs.BuiltinRegistry().Resolve("mobile-ad-monetization/v2")
 	if err != nil {
@@ -108,8 +108,18 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 			paths[reference.Path] = true
 		}
 	}
-	if !paths["/allowlist_placement_ids/0"] || !paths["/frequency_policy_overrides/interstitial_main"] {
+	if !paths["/allowlist_placement_ids/0"] {
 		t.Fatalf("strategy reference paths = %#v", got)
+	}
+	policyReferences := references(definition, "mobile-ad-monetization/v2", configuration, "frequency_policy", "global_cap")
+	policyPaths := map[string]bool{}
+	for _, reference := range policyReferences {
+		if reference.EntityType == "ad_strategy" {
+			policyPaths[reference.Path] = true
+		}
+	}
+	if !policyPaths["/frequency_policy_overrides/global_cap"] {
+		t.Fatalf("strategy policy reference paths = %#v", policyReferences)
 	}
 
 	configuration["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["allowlist_placement_ids"] = []any{"missing"}

@@ -177,8 +177,9 @@ func validateV2(input Input) []Diagnostic {
 	for _, strategy := range strategies {
 		ref := entityRef(input.PackRef, "ad_strategy", strategy.ID)
 		path := "/ad_strategies/" + strategy.ID
-		if strategy.Fields["placement_rule_mode"] != "allowlist" {
-			diagnostics = append(diagnostics, diagnostic("ad_strategy_rule_mode_invalid", path+"/placement_rule_mode", SeverityBlocking, ref, "广告策略规则模式必须为 allowlist", "选择 allowlist 规则模式。"))
+		mode, modeOK := strategy.Fields["placement_rule_mode"].(string)
+		if !modeOK || (mode != "inherit" && mode != "allowlist") {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_rule_mode_invalid", path+"/placement_rule_mode", SeverityBlocking, ref, "广告策略规则模式必须为 inherit 或 allowlist", "选择继承全部广告位或广告位白名单。"))
 		}
 		allowlist := v2StringSlice(strategy.Fields["allowlist_placement_ids"])
 		allowlistSet := map[string]bool{}
@@ -192,21 +193,26 @@ func validateV2(input Input) []Diagnostic {
 				diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/allowlist_placement_ids", SeverityBlocking, ref, "广告策略引用的广告位不存在", "选择一个存在的广告位。"))
 			}
 		}
+		if mode == "inherit" && len(allowlist) > 0 {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_inherit_allowlist_not_empty", path+"/allowlist_placement_ids", SeverityBlocking, ref, "继承模式的广告位白名单必须为空", "清空广告位白名单，或切换为 allowlist 模式。"))
+		}
+		if mode == "allowlist" && len(allowlist) == 0 {
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_allowlist_empty", path+"/allowlist_placement_ids", SeverityBlocking, ref, "白名单模式至少需要一个广告位", "选择至少一个广告位，或切换为继承模式。"))
+		}
 		overrides, ok := strategy.Fields["frequency_policy_overrides"].(map[string]any)
 		if !ok {
-			diagnostics = append(diagnostics, diagnostic("ad_strategy_overrides_invalid", path+"/frequency_policy_overrides", SeverityBlocking, ref, "频控覆盖必须是对象", "按广告位填写频控覆盖对象。"))
+			diagnostics = append(diagnostics, diagnostic("ad_strategy_overrides_invalid", path+"/frequency_policy_overrides", SeverityBlocking, ref, "频控覆盖必须是对象", "按频控策略填写稀疏覆盖对象。"))
 			continue
 		}
-		for placementID, rawOverride := range overrides {
-			if !placementIDs[placementID] {
-				diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "频控覆盖引用的广告位不存在", "选择一个存在的广告位。"))
-			}
-			if !allowlistSet[placementID] {
-				diagnostics = append(diagnostics, diagnostic("ad_strategy_override_outside_allowlist", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "频控覆盖的广告位不在策略 allowlist 中", "先将广告位加入适用范围，或删除该覆盖。"))
+		for policyID, rawOverride := range overrides {
+			if !policyIDs[policyID] {
+				diagnostics = append(diagnostics, diagnostic("reference_not_found", path+"/frequency_policy_overrides/"+policyID, SeverityBlocking, ref, "频控覆盖引用的基础策略不存在", "选择一个存在的频控策略。"))
 			}
 			override, valid := rawOverride.(map[string]any)
 			if !valid || !v2StrategyFrequencyOverrideValid(override) {
-				diagnostics = append(diagnostics, diagnostic("ad_strategy_frequency_override_invalid", path+"/frequency_policy_overrides/"+placementID, SeverityBlocking, ref, "广告策略频控覆盖不合法", "只填写允许的频控字段，并使用合法值、null 或省略字段。"))
+				diagnostics = append(diagnostics, diagnostic("ad_strategy_frequency_override_invalid", path+"/frequency_policy_overrides/"+policyID, SeverityBlocking, ref, "广告策略频控覆盖不合法", "只填写允许的频控字段，并使用合法值、null 或省略字段。"))
+			} else if policyIDs[policyID] && len(override) > 0 && (mode == "inherit" || mode == "allowlist") && v2StrategyPolicyPlacementCount(mode, allowlistSet, placements, policyID) == 0 {
+				diagnostics = append(diagnostics, diagnostic("ad_strategy_override_unused_in_scope", path+"/frequency_policy_overrides/"+policyID, SeverityWarning, ref, "频控覆盖当前未命中任何适用广告位", "确认适用范围和广告位的基础频控策略，或删除暂不需要的覆盖。"))
 			}
 		}
 	}
@@ -265,6 +271,19 @@ func validateV2(input Input) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+func v2StrategyPolicyPlacementCount(mode string, allowlist map[string]bool, placements []record, policyID string) int {
+	count := 0
+	for _, placement := range placements {
+		if mode == "allowlist" && !allowlist[placement.ID] {
+			continue
+		}
+		if placement.Fields["frequency_policy_type"] == "preset" && placement.Fields["frequency_policy_id"] == policyID {
+			count++
+		}
+	}
+	return count
 }
 
 func v2Singleton(values []record) (record, bool) {

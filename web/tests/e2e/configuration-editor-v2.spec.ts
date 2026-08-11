@@ -114,8 +114,8 @@ test("v2 广告策略支持列表、独立详情和稀疏覆盖保存", async ({
   await page.getByRole("button", { name: "编辑策略 balanced" }).click();
   await expect(page.getByRole("heading", { name: "balanced" })).toBeVisible();
 
-  const placementCard = page.locator(".strategy-placement").filter({ hasText: "main_interstitial" });
-  const cooldown = placementCard.locator(".strategy-override-field").filter({ hasText: "冷却时间" });
+  const policyCard = page.locator(".strategy-placement").filter({ hasText: "global_cap" });
+  const cooldown = policyCard.locator(".strategy-override-field").filter({ hasText: "冷却时间" });
   await cooldown.locator("select").selectOption("disabled");
   await expect(cooldown.getByText("客户端不应用此约束")).toBeVisible();
   await page.getByRole("button", { name: "保存策略" }).click();
@@ -123,9 +123,25 @@ test("v2 广告策略支持列表、独立详情和稀疏覆盖保存", async ({
   await expect.poll(() => savedStrategies.length).toBe(1);
   expect(savedStrategies[0]).toMatchObject({
     id: "balanced",
-    fields: { frequency_policy_overrides: { interstitial_main: { cooldown: null } } },
+    fields: { frequency_policy_overrides: { global_cap: { cooldown: null } } },
   });
   await expect(page.getByRole("table", { name: "广告策略列表" })).toBeVisible();
+});
+
+test("v2 广告策略显示频控覆盖的范围命中状态", async ({ page }) => {
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+  await page.getByRole("button", { name: "编辑策略 balanced" }).click();
+
+  const matchedPolicy = page.locator(".strategy-placement").filter({ hasText: "global_cap" });
+  await expect(matchedPolicy.getByText("当前命中 1 个广告位")).toBeVisible();
+
+  const unusedPolicy = page.locator(".strategy-placement").filter({ hasText: "unused_cap" });
+  await expect(unusedPolicy.getByText("当前命中 0 个广告位")).toBeVisible();
+  const cooldown = unusedPolicy.locator(".strategy-override-field").filter({ hasText: "冷却时间" });
+  await cooldown.locator("select").selectOption("custom");
+  await expect(unusedPolicy.getByRole("status")).toContainText("当前未命中任何适用广告位");
 });
 
 test("v2 广告策略删除弹窗覆盖固定列且危险按钮 hover 可读", async ({ page }) => {
@@ -166,7 +182,7 @@ test("v2 广告策略设置保存时保留导入的负载版本", async ({ page 
   await expect.poll(() => submittedFields).toMatchObject({ payload_version: 2 });
 });
 
-test("v2 新建广告策略忽略其他实体诊断并允许空 allowlist", async ({ page }) => {
+test("v2 新建继承策略忽略其他实体诊断并保存空 allowlist", async ({ page }) => {
   const savedStrategies: Array<{ id: string; fields: Record<string, unknown> }> = [];
   await mockV2ConfigurationAPI(page, () => undefined, [], savedStrategies, [{ code: "placement_invalid", path: "/placements/interstitial_main/client_id", severity: "error", message: "无关广告位错误", entity_ref: "entity:mobile-ad-monetization/v2:placement:interstitial_main" }]);
   await page.goto("/#configuration");
@@ -175,9 +191,12 @@ test("v2 新建广告策略忽略其他实体诊断并允许空 allowlist", asyn
 
   await expect(page.locator(".strategy-diagnostics")).toHaveCount(0);
   await page.getByLabel("策略 ID").fill("empty_scope");
+  await expect(page.getByRole("button", { name: "保存策略" })).toBeDisabled();
+  await page.getByLabel("广告位规则").selectOption("inherit");
   await expect(page.getByRole("button", { name: "保存策略" })).toBeEnabled();
   await page.getByRole("button", { name: "保存策略" }).click();
   await expect.poll(() => savedStrategies.length).toBe(1);
+  expect(savedStrategies[0]).toMatchObject({ fields: { placement_rule_mode: "inherit", allowlist_placement_ids: [], frequency_policy_overrides: {} } });
   expect(savedStrategies[0]).toMatchObject({ id: "empty_scope", fields: { allowlist_placement_ids: [] } });
 });
 
@@ -221,7 +240,10 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
   let revision = 1;
   const customParameters: Array<{ id: string; fields: Record<string, unknown> }> = [];
   const strategySettings = { id: "default", fields: { parameter_key: "ad_strategies_config", payload_version: 2, default_strategy_id: "balanced" } };
-  const strategies = [{ id: "balanced", fields: { description: "默认均衡策略", placement_rule_mode: "allowlist", allowlist_placement_ids: ["interstitial_main"], frequency_policy_overrides: {} as Record<string, Record<string, unknown>> } }];
+  const strategies = [
+    { id: "balanced", fields: { description: "默认均衡策略", placement_rule_mode: "allowlist", allowlist_placement_ids: ["interstitial_main"], frequency_policy_overrides: {} as Record<string, Record<string, unknown>> } },
+    { id: "paid", fields: { description: "投放获客用户策略", placement_rule_mode: "inherit", allowlist_placement_ids: [] as string[], frequency_policy_overrides: {} as Record<string, Record<string, unknown>> } },
+  ];
   let networkSettingsChanged = false;
   const environment = { id: "development", name: "Development", kind: "development", provider: { type: "firebase-remote-config", project_id: "photo-editor-dev" }, publish: { requires_confirmation: false } };
   await page.route("**/api/v1/**", async (route) => {
@@ -238,7 +260,10 @@ async function mockV2ConfigurationAPI(page: Page, onSave: (fields: Record<string
     if (path === "/api/v1/drafts/development/entities" && method === "GET") {
       const entityType = new URL(request.url()).searchParams.get("entity_type");
       if (entityType === "placement") return json(route, { data: [view("placement", placement)], meta: meta(revision) });
-      if (entityType === "frequency_policy") return json(route, { data: [view("frequency_policy", { id: "global_cap", fields: {} })], meta: meta(revision) });
+      if (entityType === "frequency_policy") return json(route, { data: [
+        view("frequency_policy", { id: "global_cap", fields: { cooldown: { unit: "seconds", value: 30 }, interval: null, max_count: { unit: "day", value: 4 }, shift_count: null, positions: null, description: "全局基础频控" } }),
+        view("frequency_policy", { id: "unused_cap", fields: { cooldown: { unit: "minutes", value: 5 }, interval: null, max_count: null, shift_count: null, positions: null, description: "当前范围未使用" } }),
+      ], meta: meta(revision) });
       if (entityType === "feature_switch") return json(route, { data: [view("feature_switch", { id: "ads_enabled", fields: {} })], meta: meta(revision) });
       if (entityType === "unit_binding") return json(route, { data: [], meta: meta(revision) });
       if (entityType === "custom_parameter") return json(route, { data: customParameters.map((parameter) => view("custom_parameter", parameter, "modified")), meta: meta(revision) });

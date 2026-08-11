@@ -171,6 +171,6 @@ Pack 实体之间的引用必须由 `EntityMetadata.reference_rules[]` 声明，
 
 实体写入 API 只对本次新增或修改的记录执行字段约束和出向引用校验，避免源文件或导入数据中的既存悬空引用阻断逐条修复；删除操作仍对整份 effective 配置执行反向引用保护。校验中心按照 Spec 007 检查整份 effective 配置，包括实体 ID 规则、schema 枚举与引用完整性，并将错误纳入发布就绪度。标量引用的空字符串不是“未设置”；可空引用必须使用 JSON `null` 或缺失字段。
 
-`mobile-ad-monetization/v2` schema 3 在保持 Pack ref 不变的前提下增加可选广告策略集合。schema 2 配置没有 `ad_strategy_settings` / `ad_strategies` 时仍合法且编译产物不变；启用后由设置实体声明独立参数 key，并把策略、广告位客户端 ID 和覆盖后的最终频控确定性编译为版本化 JSON。字段缺失表示继承，显式 `null` 表示关闭约束。
+`mobile-ad-monetization/v2` schema 3 在保持 Pack ref 不变的前提下增加可选广告策略集合。schema 2 配置没有 `ad_strategy_settings` / `ad_strategies` 时仍合法且编译产物不变；启用后由设置实体声明独立参数 key，并把广告位规则、广告位客户端 ID 和按基础频控策略 ID 组织的稀疏覆盖确定性编译为版本化 JSON。`inherit` 广告位规则表示全部基础广告位；覆盖对象或字段缺失表示由客户端继承基础频控，显式 `null` 表示关闭约束。基础频控字段变化不物化到策略参数。
 
 同一规范化输入必须产生相同的参数 key、值、来源引用和 content digest。对象键顺序、源文件排版或无业务语义的记录顺序不得改变编译结果。远端受管聚合参数含未知版本、无法映射字段或未建模条件值时默认阻止发布，不能重建后静默覆盖。

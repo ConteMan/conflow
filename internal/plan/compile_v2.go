@@ -77,14 +77,11 @@ func compileV2Parameters(desired map[string]any, environmentID string) map[strin
 
 func v2AdStrategies(desired map[string]any) map[string]any {
 	placements := records(desired["placements"])
-	policies := records(desired["frequency_policies"])
 	result := map[string]any{}
 	for _, strategy := range sortedRecords(desired, "ad_strategies") {
 		allowlist := stringSlice(strategy.Fields["allowlist_placement_ids"])
 		sort.Strings(allowlist)
-		overrides, _ := strategy.Fields["frequency_policy_overrides"].(map[string]any)
 		clientIDs := make([]string, 0, len(allowlist))
-		effectivePolicies := map[string]any{}
 		for _, placementID := range allowlist {
 			placement, found := placements[placementID]
 			if !found {
@@ -95,41 +92,40 @@ func v2AdStrategies(desired map[string]any) map[string]any {
 				continue
 			}
 			clientIDs = append(clientIDs, clientID)
-			base := v2PlacementFrequencyPolicy(placement, policies)
-			override, _ := overrides[placementID].(map[string]any)
-			effectivePolicies[clientID] = v2EffectiveFrequencyPolicy(base, override)
 		}
 		sort.Strings(clientIDs)
 		result[strategy.ID] = map[string]any{
-			"placement_rule_mode":  strategy.Fields["placement_rule_mode"],
-			"allowlist_client_ids": clientIDs,
-			"frequency_policies":   effectivePolicies,
+			"placement_rule": map[string]any{
+				"mode":      strategy.Fields["placement_rule_mode"],
+				"allowlist": clientIDs,
+			},
+			"frequency_policy_overrides": v2SparseFrequencyPolicyOverrides(strategy.Fields["frequency_policy_overrides"]),
 		}
 	}
 	return result
 }
 
-func v2PlacementFrequencyPolicy(placement entities.Record, policies map[string]entities.Record) map[string]any {
-	if placement.Fields["frequency_policy_type"] == "custom" {
-		value, _ := placement.Fields["custom_frequency_policy"].(map[string]any)
-		return value
-	}
-	policyID, _ := placement.Fields["frequency_policy_id"].(string)
-	return policies[policyID].Fields
-}
-
-func v2EffectiveFrequencyPolicy(base, override map[string]any) map[string]any {
+func v2SparseFrequencyPolicyOverrides(value any) map[string]any {
+	raw, _ := value.(map[string]any)
 	result := map[string]any{}
-	for _, field := range []string{"cooldown", "interval", "max_count", "shift_count", "positions"} {
-		value := base[field]
-		if overrideValue, exists := override[field]; exists {
-			value = overrideValue
+	for policyID, rawOverride := range raw {
+		override, ok := rawOverride.(map[string]any)
+		if !ok {
+			continue
 		}
-		if field == "positions" {
-			result[field] = normalizedPositions(value)
-		} else {
-			result[field] = normalizedV2FrequencyValue(value)
+		normalized := map[string]any{}
+		for _, field := range []string{"cooldown", "interval", "max_count", "shift_count", "positions"} {
+			item, exists := override[field]
+			if !exists {
+				continue
+			}
+			if field == "positions" {
+				normalized[field] = normalizedPositions(item)
+			} else {
+				normalized[field] = normalizedV2FrequencyValue(item)
+			}
 		}
+		result[policyID] = normalized
 	}
 	return result
 }
