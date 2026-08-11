@@ -24,7 +24,7 @@ func mobileAdV2Definition() Definition {
 				entityMetadata("frequency_policy", "frequency_policies", "频控策略", "定义结构化广告展示频率限制。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 				withReferences(entityMetadata("ad_strategy", "ad_strategies", "广告策略", "定义广告位范围与频控覆盖。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 					reference("allowlist_placement_ids", "placement", ReferenceShapeArrayItems),
-					reference("frequency_policy_overrides", "placement", ReferenceShapeObjectKeys)),
+					reference("frequency_policy_overrides", "frequency_policy", ReferenceShapeObjectKeys)),
 				withReferences(entityMetadata("placement", "placements", "广告位", "定义稳定广告展示位置。", `^[a-z][a-z0-9_]{0,62}$`, DeletionPolicyRestrict, nil),
 					reference("enabled_switch_id", "feature_switch", ReferenceShapeScalar),
 					reference("frequency_policy_id", "frequency_policy", ReferenceShapeScalar)),
@@ -74,9 +74,9 @@ func mobileAdV2Definition() Definition {
 				}},
 				{Name: "ad_strategy", Fields: []FieldSchema{
 					field("description", FieldTypeString, false, true, "null", "描述", "广告策略用途说明，不参与发布编译。", "input", "基础", 0, FieldValidation{}),
-					field("placement_rule_mode", FieldTypeString, true, false, `"allowlist"`, "广告位规则", "本版使用广告位白名单。", "select", "范围", 1, enum("allowlist")),
-					field("allowlist_placement_ids", FieldTypeArray, true, false, "[]", "适用广告位", "允许使用此策略的广告位。", "placement_multi_ref", "范围", 2, FieldValidation{}),
-					field("frequency_policy_overrides", FieldTypeObject, true, false, "{}", "频控覆盖", "按广告位维护稀疏频控覆盖。", "strategy_frequency_overrides", "频控", 3, FieldValidation{}),
+					field("placement_rule_mode", FieldTypeString, true, false, `"allowlist"`, "广告位规则", "继承全部广告位，或只允许白名单中的广告位。", "select", "范围", 1, enum("inherit", "allowlist")),
+					field("allowlist_placement_ids", FieldTypeArray, true, false, "[]", "适用广告位", "allowlist 模式允许使用此策略的广告位；inherit 模式必须为空。", "placement_multi_ref", "范围", 2, FieldValidation{}),
+					field("frequency_policy_overrides", FieldTypeObject, true, false, "{}", "频控覆盖", "按频控策略 ID 维护稀疏字段覆盖。", "strategy_frequency_overrides", "频控", 3, FieldValidation{}),
 				}},
 				{Name: "placement", Fields: []FieldSchema{
 					field("client_id", FieldTypeString, true, false, `""`, "客户端 ID", "编译到客户端聚合 JSON 的稳定 ID。", "input", "基础", 0, FieldValidation{}),

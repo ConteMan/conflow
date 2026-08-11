@@ -312,6 +312,11 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .strategy-placement > header input { width: 16px; height: 16px; accent-color: var(--accent); }
 .strategy-placement > header label span { display: grid; gap: 2px; }
 .strategy-placement > header code, .strategy-placement > header > span { color: var(--text-muted); font-size: 12px; }
+.strategy-policy-heading { display: grid; min-width: 0; gap: 2px; }
+.strategy-policy-heading strong { color: var(--text); font-size: 13px; }
+.strategy-policy-status { display: grid; justify-items: end; gap: 2px; }
+.strategy-override-scope-warning { border-top: 1px solid #ecd89f; color: var(--warning); background: var(--warning-soft); padding: 10px 14px; font-size: 12px; line-height: 1.45; }
+.strategy-inherit-summary { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); background: var(--surface-muted); font-size: 13px; }
 .strategy-override-grid { display: grid; gap: 0; border-top: 1px solid var(--border); }
 .strategy-override-field { display: grid; grid-template-columns: minmax(120px, .8fr) 110px minmax(160px, 1fr); gap: 10px; align-items: center; padding: 11px 14px; border-top: 1px solid var(--border); }
 .strategy-override-field:first-child { border-top: 0; }

@@ -500,28 +500,78 @@ func risks(in Input, changes []SemanticChange, remoteChanges []RemoteParameterCh
 }
 
 func strategyEffectivePolicyRelaxed(before, after map[string]any, strategyID string) bool {
-	beforeStrategy, beforeOK := v2AdStrategies(before)[strategyID].(map[string]any)
-	afterStrategy, afterOK := v2AdStrategies(after)[strategyID].(map[string]any)
+	beforeStrategy, beforeOK := records(before["ad_strategies"])[strategyID]
+	afterStrategy, afterOK := records(after["ad_strategies"])[strategyID]
 	if !afterOK {
 		return false
 	}
 	if !beforeOK {
 		return true
 	}
-	beforePolicies, _ := beforeStrategy["frequency_policies"].(map[string]any)
-	afterPolicies, _ := afterStrategy["frequency_policies"].(map[string]any)
-	for clientID, afterRaw := range afterPolicies {
-		beforeRaw, exists := beforePolicies[clientID]
-		if !exists {
-			return true
-		}
-		beforePolicy, _ := beforeRaw.(map[string]any)
-		afterPolicy, _ := afterRaw.(map[string]any)
+	if strategyPlacementScopeExpanded(beforeStrategy, afterStrategy) {
+		return true
+	}
+	beforeOverrides, _ := beforeStrategy.Fields["frequency_policy_overrides"].(map[string]any)
+	afterOverrides, _ := afterStrategy.Fields["frequency_policy_overrides"].(map[string]any)
+	policyIDs := map[string]bool{}
+	for policyID := range beforeOverrides {
+		policyIDs[policyID] = true
+	}
+	for policyID := range afterOverrides {
+		policyIDs[policyID] = true
+	}
+	beforePolicies := records(before["frequency_policies"])
+	afterPolicies := records(after["frequency_policies"])
+	for policyID := range policyIDs {
+		beforeOverride, _ := beforeOverrides[policyID].(map[string]any)
+		afterOverride, _ := afterOverrides[policyID].(map[string]any)
+		beforePolicy := effectiveFrequencyPolicy(beforePolicies[policyID].Fields, beforeOverride)
+		afterPolicy := effectiveFrequencyPolicy(afterPolicies[policyID].Fields, afterOverride)
 		if frequencyPolicyRelaxed(beforePolicy, afterPolicy) {
 			return true
 		}
 	}
 	return false
+}
+
+func strategyPlacementScopeExpanded(before, after entities.Record) bool {
+	beforeMode, _ := before.Fields["placement_rule_mode"].(string)
+	afterMode, _ := after.Fields["placement_rule_mode"].(string)
+	if beforeMode == "allowlist" && afterMode == "inherit" {
+		return true
+	}
+	if afterMode != "allowlist" {
+		return false
+	}
+	if beforeMode != "allowlist" {
+		return false
+	}
+	beforeAllowlist := map[string]bool{}
+	for _, placementID := range stringSlice(before.Fields["allowlist_placement_ids"]) {
+		beforeAllowlist[placementID] = true
+	}
+	for _, placementID := range stringSlice(after.Fields["allowlist_placement_ids"]) {
+		if !beforeAllowlist[placementID] {
+			return true
+		}
+	}
+	return false
+}
+
+func effectiveFrequencyPolicy(base, override map[string]any) map[string]any {
+	result := map[string]any{}
+	for _, field := range []string{"cooldown", "interval", "max_count", "shift_count", "positions"} {
+		value := base[field]
+		if overrideValue, exists := override[field]; exists {
+			value = overrideValue
+		}
+		if field == "positions" {
+			result[field] = normalizedPositions(value)
+		} else {
+			result[field] = normalizedV2FrequencyValue(value)
+		}
+	}
+	return result
 }
 
 func frequencyPolicyRelaxed(before, after map[string]any) bool {
@@ -706,17 +756,10 @@ func affectedParameterKeys(packRef, entityType, entityID, field string, baseline
 			}
 		}
 	case "frequency_policy":
-		result := []string{key("frequency_policies_parameter_key")}
-		for _, placementID := range placementsUsing(desired, entityID) {
-			if strategyUsesPlacement(desired, placementID) {
-				result = append(result, strategyParameterKey(desired))
-				break
-			}
-		}
-		return uniqueNonEmpty(result)
+		return uniqueNonEmpty([]string{key("frequency_policies_parameter_key")})
 	case "placement":
 		result := []string{key("placements_parameter_key")}
-		if strategyUsesPlacement(desired, entityID) {
+		if field == "client_id" && strategyUsesPlacement(desired, entityID) {
 			result = append(result, strategyParameterKey(desired))
 		}
 		return uniqueNonEmpty(result)

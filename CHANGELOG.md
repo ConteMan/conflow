@@ -4,6 +4,12 @@ All notable changes are documented here. This project follows Keep a Changelog a
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-11
+
+### Fixed
+
+- **Sparse ad strategy contract** (#72): restore `inherit`/`allowlist` placement rules and policy-keyed sparse frequency overrides, avoiding per-placement copies of inherited base frequency policies in the Remote Config payload; clarify that placement scope and frequency overrides are independent and warn when an override currently matches no placement.
+
 ## [0.6.0] - 2026-08-11
 
 ### Added

@@ -71,7 +71,7 @@ func TestMobileAdV2DefinitionContract(t *testing.T) {
 	strategy, _ := findMetadata(definition, "ad_strategy")
 	if !reflect.DeepEqual(strategy.ReferenceRules, []ReferenceRule{
 		{Field: "allowlist_placement_ids", TargetEntityType: "placement", Shape: ReferenceShapeArrayItems},
-		{Field: "frequency_policy_overrides", TargetEntityType: "placement", Shape: ReferenceShapeObjectKeys},
+		{Field: "frequency_policy_overrides", TargetEntityType: "frequency_policy", Shape: ReferenceShapeObjectKeys},
 	}) {
 		t.Fatalf("ad_strategy reference rules = %#v", strategy.ReferenceRules)
 	}

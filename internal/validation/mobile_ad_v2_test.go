@@ -112,12 +112,21 @@ func TestValidateV2AdStrategyRules(t *testing.T) {
 		t.Fatalf("valid strategy diagnostics = %#v", diagnostics)
 	}
 
-	t.Run("override outside allowlist", func(t *testing.T) {
+	t.Run("allowlist mode requires placement", func(t *testing.T) {
 		invalid := v2Clone(t, configuration).(map[string]any)
 		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
 		fields["allowlist_placement_ids"] = []any{}
-		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_override_outside_allowlist", SeverityBlocking) {
-			t.Fatal("missing override outside allowlist diagnostic")
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_allowlist_empty", SeverityBlocking) {
+			t.Fatal("missing empty allowlist diagnostic")
+		}
+	})
+
+	t.Run("inherit mode requires empty allowlist", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
+		fields["placement_rule_mode"] = "inherit"
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_inherit_allowlist_not_empty", SeverityBlocking) {
+			t.Fatal("missing inherit allowlist diagnostic")
 		}
 	})
 
@@ -125,9 +134,18 @@ func TestValidateV2AdStrategyRules(t *testing.T) {
 		invalid := v2Clone(t, configuration).(map[string]any)
 		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
 		overrides := fields["frequency_policy_overrides"].(map[string]any)
-		overrides["interstitial_main"].(map[string]any)["unknown"] = true
+		overrides["global_cap"].(map[string]any)["unknown"] = true
 		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "ad_strategy_frequency_override_invalid", SeverityBlocking) {
 			t.Fatal("missing unknown override field diagnostic")
+		}
+	})
+
+	t.Run("unknown override policy", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
+		fields["frequency_policy_overrides"] = map[string]any{"missing_policy": map[string]any{"cooldown": nil}}
+		if !hasV2Diagnostic(Validate(v2ValidationInput(t, invalid)), "reference_not_found", SeverityBlocking) {
+			t.Fatal("missing override policy reference diagnostic")
 		}
 	})
 
@@ -139,13 +157,29 @@ func TestValidateV2AdStrategyRules(t *testing.T) {
 		}
 	})
 
-	t.Run("empty allowlist", func(t *testing.T) {
+	t.Run("inherit mode with sparse overrides", func(t *testing.T) {
 		valid := v2Clone(t, configuration).(map[string]any)
 		fields := v2RecordFields(t, valid, "ad_strategies", "balanced")
+		fields["placement_rule_mode"] = "inherit"
 		fields["allowlist_placement_ids"] = []any{}
-		fields["frequency_policy_overrides"] = map[string]any{}
-		if diagnostics := Validate(v2ValidationInput(t, valid)); hasV2Diagnostic(diagnostics, "ad_strategy_override_outside_allowlist", SeverityBlocking) || hasV2Diagnostic(diagnostics, "ad_strategy_frequency_override_invalid", SeverityBlocking) {
-			t.Fatalf("empty allowlist diagnostics = %#v", diagnostics)
+		if diagnostics := Validate(v2ValidationInput(t, valid)); hasV2Diagnostic(diagnostics, "ad_strategy_inherit_allowlist_not_empty", SeverityBlocking) || hasV2Diagnostic(diagnostics, "ad_strategy_frequency_override_invalid", SeverityBlocking) {
+			t.Fatalf("inherit strategy diagnostics = %#v", diagnostics)
+		}
+	})
+
+	t.Run("unused override in current scope is warning", func(t *testing.T) {
+		invalid := v2Clone(t, configuration).(map[string]any)
+		policy := v2Clone(t, invalid["frequency_policies"].([]any)[0]).(map[string]any)
+		policy["id"] = "unused_cap"
+		invalid["frequency_policies"] = append(invalid["frequency_policies"].([]any), policy)
+		fields := v2RecordFields(t, invalid, "ad_strategies", "balanced")
+		fields["frequency_policy_overrides"].(map[string]any)["unused_cap"] = map[string]any{"cooldown": nil}
+		diagnostics := Validate(v2ValidationInput(t, invalid))
+		if !hasV2Diagnostic(diagnostics, "ad_strategy_override_unused_in_scope", SeverityWarning) {
+			t.Fatalf("missing unused override warning: %#v", diagnostics)
+		}
+		if hasV2Diagnostic(diagnostics, "ad_strategy_override_unused_in_scope", SeverityBlocking) {
+			t.Fatal("unused override must not block publishing")
 		}
 	})
 
@@ -252,7 +286,7 @@ func addV2ValidationStrategy(configuration map[string]any) {
 	configuration["ad_strategies"] = []any{map[string]any{"id": "balanced", "fields": map[string]any{
 		"placement_rule_mode":     "allowlist",
 		"allowlist_placement_ids": []any{"interstitial_main"},
-		"frequency_policy_overrides": map[string]any{"interstitial_main": map[string]any{
+		"frequency_policy_overrides": map[string]any{"global_cap": map[string]any{
 			"cooldown":  nil,
 			"max_count": map[string]any{"unit": "day", "value": float64(8)},
 		}},

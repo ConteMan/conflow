@@ -19,8 +19,8 @@
       {"id": "global_cap", "cooldown": {"unit": "seconds", "value": 30}, "interval": null, "max_count": {"unit": "day", "value": 4}, "shift_count": null, "positions": null}
     ],
     "ad_strategies": [
-      {"id": "balanced", "description": "Default balanced strategy", "placement_rule_mode": "allowlist", "allowlist_placement_ids": ["interstitial_main"], "frequency_policy_overrides": {"interstitial_main": {"cooldown": {"unit": "minutes", "value": 5}}}},
-      {"id": "growth", "description": "Growth-oriented strategy", "placement_rule_mode": "allowlist", "allowlist_placement_ids": ["interstitial_main"], "frequency_policy_overrides": {"interstitial_main": {"max_count": {"unit": "day", "value": 8}}}}
+      {"id": "balanced", "description": "Default balanced strategy", "placement_rule_mode": "allowlist", "allowlist_placement_ids": ["interstitial_main"], "frequency_policy_overrides": {"global_cap": {"cooldown": {"unit": "minutes", "value": 5}}}},
+      {"id": "growth", "description": "Growth-oriented strategy", "placement_rule_mode": "inherit", "allowlist_placement_ids": [], "frequency_policy_overrides": {"global_cap": {"max_count": {"unit": "day", "value": 8}}}}
     ],
     "placements": [
       {"id": "interstitial_main", "client_id": "AD-PDF-001", "key": "main_interstitial", "ad_type": "interstitial", "enabled_switch_id": "ads_enabled", "frequency_policy_type": "preset", "frequency_policy_id": "global_cap", "custom_frequency_policy": null, "load_timeout_ms": 4000, "cache_policy": "memory", "cache_ttl": null, "fallback_behavior": "continue"}

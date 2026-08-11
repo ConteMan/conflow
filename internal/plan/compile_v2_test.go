@@ -75,20 +75,37 @@ func TestCompileV2AdStrategiesAppliesSparseOverrides(t *testing.T) {
 		Version           int    `json:"version"`
 		DefaultStrategyID string `json:"default_strategy_id"`
 		Strategies        map[string]struct {
-			Allowlist []string                  `json:"allowlist_client_ids"`
-			Policies  map[string]map[string]any `json:"frequency_policies"`
+			PlacementRule struct {
+				Mode      string   `json:"mode"`
+				Allowlist []string `json:"allowlist"`
+			} `json:"placement_rule"`
+			Overrides map[string]map[string]any `json:"frequency_policy_overrides"`
 		} `json:"strategies"`
 	}
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 		t.Fatal(err)
 	}
 	strategy := payload.Strategies["balanced"]
-	policy := strategy.Policies["interstitial_main"]
-	if payload.Version != 1 || payload.DefaultStrategyID != "balanced" || len(strategy.Allowlist) != 1 || strategy.Allowlist[0] != "interstitial_main" {
+	policy := strategy.Overrides["global_cap"]
+	if payload.Version != 1 || payload.DefaultStrategyID != "balanced" || strategy.PlacementRule.Mode != "allowlist" || len(strategy.PlacementRule.Allowlist) != 1 || strategy.PlacementRule.Allowlist[0] != "interstitial_main" {
 		t.Fatalf("strategy payload = %#v", payload)
 	}
-	if policy["cooldown"] != nil || policy["interval"] != nil || policy["max_count"].(map[string]any)["value"] != float64(8) {
-		t.Fatalf("effective strategy policy = %#v", policy)
+	if len(policy) != 2 || policy["cooldown"] != nil || policy["max_count"].(map[string]any)["value"] != float64(8) {
+		t.Fatalf("sparse strategy override = %#v", policy)
+	}
+	if _, exists := policy["interval"]; exists {
+		t.Fatalf("inherited field leaked into sparse strategy override: %#v", policy)
+	}
+	var rawPayload map[string]any
+	if err := json.Unmarshal([]byte(raw), &rawPayload); err != nil {
+		t.Fatal(err)
+	}
+	rawStrategy := rawPayload["strategies"].(map[string]any)["balanced"].(map[string]any)
+	if _, exists := rawStrategy["frequency_policies"]; exists {
+		t.Fatalf("materialized frequency policies leaked into sparse payload: %#v", rawStrategy)
+	}
+	if _, exists := rawStrategy["allowlist_client_ids"]; exists {
+		t.Fatalf("legacy flat allowlist leaked into sparse payload: %#v", rawStrategy)
 	}
 }
 
@@ -173,8 +190,11 @@ func TestCompileV2SharedStrategyFixtureIsDeterministic(t *testing.T) {
 		Version           int    `json:"version"`
 		DefaultStrategyID string `json:"default_strategy_id"`
 		Strategies        map[string]struct {
-			Allowlist []string                  `json:"allowlist_client_ids"`
-			Policies  map[string]map[string]any `json:"frequency_policies"`
+			PlacementRule struct {
+				Mode      string   `json:"mode"`
+				Allowlist []string `json:"allowlist"`
+			} `json:"placement_rule"`
+			Overrides map[string]map[string]any `json:"frequency_policy_overrides"`
 		} `json:"strategies"`
 	}
 	if err := json.Unmarshal([]byte(first.(string)), &payload); err != nil {
@@ -183,14 +203,17 @@ func TestCompileV2SharedStrategyFixtureIsDeterministic(t *testing.T) {
 	if payload.Version != 1 || payload.DefaultStrategyID != "balanced" || len(payload.Strategies) != 2 {
 		t.Fatalf("strategy payload = %#v", payload)
 	}
-	if got := payload.Strategies["balanced"].Allowlist; len(got) != 1 || got[0] != "AD-PDF-001" {
+	if got := payload.Strategies["balanced"].PlacementRule.Allowlist; len(got) != 1 || got[0] != "AD-PDF-001" {
 		t.Fatalf("client allowlist = %#v", got)
 	}
-	if _, exists := payload.Strategies["balanced"].Policies["AD-PDF-001"]; !exists {
-		t.Fatalf("effective frequency policy must use client_id as key: %#v", payload.Strategies["balanced"].Policies)
+	if _, exists := payload.Strategies["balanced"].Overrides["global_cap"]; !exists {
+		t.Fatalf("frequency override must use policy ID as key: %#v", payload.Strategies["balanced"].Overrides)
 	}
-	if _, exists := payload.Strategies["balanced"].Policies["interstitial_main"]; exists {
-		t.Fatalf("effective frequency policy leaked Conflow entity ID: %#v", payload.Strategies["balanced"].Policies)
+	if _, exists := payload.Strategies["balanced"].Overrides["AD-PDF-001"]; exists {
+		t.Fatalf("frequency override leaked placement client ID: %#v", payload.Strategies["balanced"].Overrides)
+	}
+	if got := payload.Strategies["growth"].PlacementRule; got.Mode != "inherit" || len(got.Allowlist) != 0 {
+		t.Fatalf("inherit placement rule = %#v", got)
 	}
 }
 
@@ -357,11 +380,14 @@ func TestBuildV2LayoutParameterKeyRenameShowsDeleteAddAndHighRisk(t *testing.T) 
 	}
 }
 
-func TestBuildV2MapsFrequencyChangeToPolicyAndStrategyParameters(t *testing.T) {
+func TestBuildV2BaseFrequencyChangeDoesNotRewriteSparseStrategyParameter(t *testing.T) {
 	baseline := v2CompileFixture(t)
 	addV2Strategy(baseline, map[string]any{"cooldown": map[string]any{"unit": "seconds", "value": float64(45)}})
 	desired := v2CompileClone(t, baseline)
 	desired["frequency_policies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["max_count"] = map[string]any{"unit": "day", "value": float64(8)}
+	if before, after := compileV2Parameters(baseline, "development")["ad_strategies_config"], compileV2Parameters(desired, "development")["ad_strategies_config"]; before != after {
+		t.Fatalf("base frequency change rewrote sparse strategy payload:\nbefore: %s\nafter:  %s", before, after)
+	}
 	built, err := Build(Input{
 		EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true,
 		RemoteSnapshot: remote.Snapshot{Status: "available", RemoteETag: "etag-v2", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}},
@@ -373,7 +399,7 @@ func TestBuildV2MapsFrequencyChangeToPolicyAndStrategyParameters(t *testing.T) {
 	for _, change := range built.Plan.RemoteParameterChanges {
 		seen[change.ParameterKey] = true
 	}
-	if !seen["ad_frequency_policies_config"] || !seen["ad_strategies_config"] {
+	if !seen["ad_frequency_policies_config"] || seen["ad_strategies_config"] {
 		t.Fatalf("remote parameter mapping = %#v", built.Plan.RemoteParameterChanges)
 	}
 }
@@ -403,6 +429,22 @@ func TestBuildV2StrategyRiskUsesEffectiveFrequency(t *testing.T) {
 			t.Fatalf("relaxing risks = %#v", built.Plan.RiskItems)
 		}
 	})
+}
+
+func TestBuildV2StrategyInheritScopeExpansionIsHighRisk(t *testing.T) {
+	baseline := v2CompileFixture(t)
+	addV2Strategy(baseline, map[string]any{})
+	desired := v2CompileClone(t, baseline)
+	fields := desired["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)
+	fields["placement_rule_mode"] = "inherit"
+	fields["allowlist_placement_ids"] = []any{}
+	built, err := Build(Input{EnvironmentID: "development", PackRef: "mobile-ad-monetization/v2", Baseline: baseline, Desired: desired, ValidationReady: true, RemoteSnapshot: remote.Snapshot{Status: "available", Parameters: compileV2Parameters(baseline, "development"), Summary: &remote.Summary{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRisk(built.Plan, "ad_strategy_relaxed") {
+		t.Fatalf("inherit scope risk = %#v", built.Plan.RiskItems)
+	}
 }
 
 func TestBuildV2PlacementClientIDChangeAffectsStrategyAndIsHighRisk(t *testing.T) {
@@ -620,7 +662,7 @@ func addV2Strategy(configuration map[string]any, override map[string]any) {
 		"description":                "Balanced strategy",
 		"placement_rule_mode":        "allowlist",
 		"allowlist_placement_ids":    []any{"interstitial_main"},
-		"frequency_policy_overrides": map[string]any{"interstitial_main": override},
+		"frequency_policy_overrides": map[string]any{"global_cap": override},
 	}}}
 }
 
@@ -628,5 +670,5 @@ func strategyOverride(configuration map[string]any) map[string]any {
 	strategy := configuration["ad_strategies"].([]any)[0].(map[string]any)
 	fields := strategy["fields"].(map[string]any)
 	overrides := fields["frequency_policy_overrides"].(map[string]any)
-	return overrides["interstitial_main"].(map[string]any)
+	return overrides["global_cap"].(map[string]any)
 }
