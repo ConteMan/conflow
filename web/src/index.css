@@ -83,6 +83,7 @@ code { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monos
 .button--primary { border-color: var(--accent); color: white; background: var(--accent); }
 .button--primary:hover:not(:disabled) { border-color: #1d45b9; background: #1d45b9; }
 .button--danger { border-color: var(--danger); color: white; background: var(--danger); }
+.button--danger:hover:not(:disabled) { border-color: #922118; color: white; background: #922118; }
 .button--ghost { border-color: transparent; color: var(--danger); background: transparent; }
 .icon-button, .link-button { display: inline-flex; align-items: center; justify-content: center; border: 0; color: inherit; background: transparent; }
 .icon-button { width: 36px; height: 36px; border-radius: var(--radius-sm); }
@@ -171,8 +172,8 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .spin { animation: spin 1s linear infinite; color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.dialog-backdrop { position: fixed; inset: 0; background: rgb(20 24 20 / 38%); }
-.dialog-viewport { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; }
+.dialog-backdrop { position: fixed; z-index: 60; inset: 0; background: rgb(20 24 20 / 38%); }
+.dialog-viewport { position: fixed; z-index: 61; inset: 0; display: grid; place-items: center; padding: 20px; }
 .dialog-popup { position: relative; width: min(100%, 660px); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-overlay); }
 .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px; border-bottom: 1px solid var(--border); }
 .dialog-title { font-size: 19px; font-weight: 750; }

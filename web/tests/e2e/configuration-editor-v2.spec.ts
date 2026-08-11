@@ -128,6 +128,33 @@ test("v2 广告策略支持列表、独立详情和稀疏覆盖保存", async ({
   await expect(page.getByRole("table", { name: "广告策略列表" })).toBeVisible();
 });
 
+test("v2 广告策略删除弹窗覆盖固定列且危险按钮 hover 可读", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockV2ConfigurationAPI(page, () => undefined);
+  await page.goto("/#configuration");
+  await page.getByRole("tab", { name: "广告策略" }).click();
+  const pinnedCell = page.locator(".data-table-cell--pinned-right").last();
+  const pinnedBox = await pinnedCell.boundingBox();
+  await page.getByRole("button", { name: "删除策略 balanced" }).click();
+
+  await expect(page.getByRole("dialog", { name: "删除广告策略" })).toBeVisible();
+  const backdrop = page.locator(".dialog-backdrop");
+  await expect(backdrop).toBeVisible();
+  const backdropBox = await backdrop.boundingBox();
+  expect(backdropBox).toMatchObject({ x: 0, y: 0, width: 1280, height: 900 });
+  expect(await backdrop.evaluate((element) => Number.parseInt(getComputedStyle(element).zIndex, 10))).toBeGreaterThan(2);
+  expect(pinnedBox).not.toBeNull();
+  expect(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest(".data-table-cell")), {
+    x: pinnedBox!.x + pinnedBox!.width / 2,
+    y: pinnedBox!.y + pinnedBox!.height / 2,
+  })).toBe(false);
+
+  const confirm = page.getByRole("button", { name: "确认删除" });
+  await confirm.hover();
+  const hoverStyle = await confirm.evaluate((element) => ({ color: getComputedStyle(element).color, background: getComputedStyle(element).backgroundColor }));
+  expect(hoverStyle).toEqual({ color: "rgb(255, 255, 255)", background: "rgb(146, 33, 24)" });
+});
+
 test("v2 广告策略设置保存时保留导入的负载版本", async ({ page }) => {
   let submittedFields: Record<string, unknown> | undefined;
   await mockV2ConfigurationAPI(page, (fields) => { submittedFields = fields; });
