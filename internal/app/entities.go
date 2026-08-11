@@ -533,11 +533,7 @@ func validateRecord(definition packs.Definition, metadata packs.EntityMetadata, 
 	for _, field := range schema.Fields {
 		value, exists := record.Fields[field.Name]
 		if field.Required && !exists {
-			code := "required_field_missing"
-			if field.Type == packs.FieldTypeReference && field.Validation.MinLength != nil {
-				code = "value_not_allowed"
-			}
-			return validationError(scope, metadata.Collection, record.ID, field.Name, code)
+			return validationError(scope, metadata.Collection, record.ID, field.Name, "required_field_missing")
 		}
 		if !exists {
 			continue
@@ -630,17 +626,6 @@ func allowsEntityValue(value any, field packs.FieldSchema) bool {
 		}
 	}
 	return true
-}
-
-func validateReferences(definition packs.Definition, effective map[string]any) error {
-	for _, metadata := range definition.Metadata.EntityTypes {
-		for _, record := range records(effective, metadata.Collection) {
-			if err := validateRecordReferences(definition, metadata, effective, record.ID); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func validateRecordReferences(definition packs.Definition, metadata packs.EntityMetadata, effective map[string]any, entityID string) error {

@@ -195,7 +195,7 @@ func TestValidateV2SharedStrategyFixture(t *testing.T) {
 
 func v2ValidationInput(t *testing.T, configuration map[string]any) Input {
 	t.Helper()
-	return Input{PackRef: "mobile-ad-monetization/v2", EnvironmentID: "development", EnvironmentKind: "development", Effective: configuration}
+	return Input{PackRef: "mobile-ad-monetization/v2", Definition: testPackDefinition(t, "mobile-ad-monetization/v2"), EnvironmentID: "development", EnvironmentKind: "development", Effective: configuration}
 }
 
 func v2ValidationFixture(t *testing.T) map[string]any {

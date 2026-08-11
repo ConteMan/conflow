@@ -101,7 +101,7 @@ func TestValidationOverlaysGolden(t *testing.T) {
 		}
 		deletes = append(deletes, RestrictedDelete{EntityType: parts[2], EntityID: parts[3]})
 	}
-	diagnostics := Validate(Input{PackRef: "mobile-ad-monetization/v1", EnvironmentID: scenario.EnvironmentID, EnvironmentKind: "production", Effective: effective, RestrictedDeletes: deletes})
+	diagnostics := Validate(Input{PackRef: "mobile-ad-monetization/v1", Definition: testPackDefinition(t, "mobile-ad-monetization/v1"), EnvironmentID: scenario.EnvironmentID, EnvironmentKind: "production", Effective: effective, RestrictedDeletes: deletes})
 	if got := ReadinessFor(diagnostics); got != scenario.Expected.Readiness {
 		t.Fatalf("readiness = %q, want %q", got, scenario.Expected.Readiness)
 	}

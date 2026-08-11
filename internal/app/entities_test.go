@@ -94,8 +94,12 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := validateReferences(definition, configuration); err != nil {
-		t.Fatalf("valid references: %v", err)
+	for _, metadata := range definition.Metadata.EntityTypes {
+		for _, record := range records(configuration, metadata.Collection) {
+			if err := validateRecordReferences(definition, metadata, configuration, record.ID); err != nil {
+				t.Fatalf("valid reference %s/%s: %v", metadata.Name, record.ID, err)
+			}
+		}
 	}
 	got := references(definition, "mobile-ad-monetization/v2", configuration, "placement", "interstitial_main")
 	paths := map[string]bool{}
@@ -109,23 +113,26 @@ func TestV2ReferenceRulesCoverStrategyArraysAndObjectKeys(t *testing.T) {
 	}
 
 	configuration["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["allowlist_placement_ids"] = []any{"missing"}
-	if err := validateReferences(definition, configuration); err == nil {
+	strategyMetadata, _ := findEntityMetadata(definition, "ad_strategy")
+	if err := validateRecordReferences(definition, strategyMetadata, configuration, "balanced"); err == nil {
 		t.Fatal("missing array item reference must fail")
 	}
 	configuration["ad_strategies"].([]any)[0].(map[string]any)["fields"].(map[string]any)["allowlist_placement_ids"] = []any{"interstitial_main"}
 	configuration["placements"].([]any)[0].(map[string]any)["fields"].(map[string]any)["enabled_switch_id"] = ""
-	if err := validateReferences(definition, configuration); err == nil {
+	placementMetadata, _ := findEntityMetadata(definition, "placement")
+	if err := validateRecordReferences(definition, placementMetadata, configuration, "interstitial_main"); err == nil {
 		t.Fatal("empty scalar reference must fail")
 	}
 }
 
 func TestMutateV2PlacementRejectsMissingOrEmptyEnabledSwitch(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		mutate func(map[string]any)
+		name     string
+		wantCode string
+		mutate   func(map[string]any)
 	}{
-		{name: "missing", mutate: func(fields map[string]any) { delete(fields, "enabled_switch_id") }},
-		{name: "empty", mutate: func(fields map[string]any) { fields["enabled_switch_id"] = "" }},
+		{name: "missing", wantCode: "required_field_missing", mutate: func(fields map[string]any) { delete(fields, "enabled_switch_id") }},
+		{name: "empty", wantCode: "value_not_allowed", mutate: func(fields map[string]any) { fields["enabled_switch_id"] = "" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			service := openV2EntityService(t, v2ConfigurationWithLegacyCachePolicy(t))
@@ -148,7 +155,7 @@ func TestMutateV2PlacementRejectsMissingOrEmptyEnabledSwitch(t *testing.T) {
 				t.Fatalf("create placement error = %#v", err)
 			}
 			detail := validation.Details[0]
-			if detail.Code != "value_not_allowed" || detail.Path != "/placements/interstitial_secondary/fields/enabled_switch_id" {
+			if detail.Code != test.wantCode || detail.Path != "/placements/interstitial_secondary/fields/enabled_switch_id" {
 				t.Fatalf("validation detail = %#v", detail)
 			}
 		})

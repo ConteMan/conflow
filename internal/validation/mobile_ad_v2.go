@@ -264,7 +264,6 @@ func validateV2(input Input) []Diagnostic {
 		}
 	}
 
-	SortDiagnostics(diagnostics)
 	return diagnostics
 }
 
