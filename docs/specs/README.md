@@ -34,6 +34,7 @@
 | [026](026-config-tables-tanstack.md) | 配置列表迁移 TanStack Table | 014 | 已实现 |
 | [027](027-custom-parameters.md) | 通用自定义 Remote Config 参数 | 020、024 | 已实现 |
 | [028](028-ad-strategy-collection.md) | 通用广告策略集合 | 020、024、026 | 已实现 |
+| [029](029-managed-remote-reconcile.md) | 受管 Remote Config 参数全量对账 | 008、009、010、020、024 | 已实现 |
 
 新建规格使用 [template.md](template.md)。
 
@@ -70,6 +71,11 @@ flowchart LR
   S006 --> S020["020 广告 Pack v2"]
   S008 --> S020
   S011 --> S020
+  S008 --> S029["029 受管参数全量对账"]
+  S009 --> S029
+  S010 --> S029
+  S020 --> S029
+  S024["024 发布基线"] --> S029
 ```
 
 图中突出主路径，完整直接依赖以规格清单表为准。依赖表示实现前置，不要求里程碑完全串行。Spec 012 在广告领域合同稳定后即可开始，与 Firebase Provider 实现并行。

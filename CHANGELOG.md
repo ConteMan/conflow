@@ -4,6 +4,13 @@ All notable changes are documented here. This project follows Keep a Changelog a
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-03
+
+### Fixed
+
+- **Managed Remote Config reconciliation** (Spec 029, #74): release plans now reconcile the complete compiled managed parameter set against the live Firebase snapshot even when local entities have not changed, restoring missing parameters through explicit `managed_remote_drift` additions, deduplicating aggregated parameter keys, preserving unmanaged remote parameters, and continuing to block conditional-value overwrites.
+- **First-release baseline** (#75): workspaces without a successful Conflow release state now compare the complete desired configuration against an empty historical baseline, so the first plan reports genuine additions instead of paired deletion/addition noise.
+
 ## [0.6.1] - 2026-08-11
 
 ### Fixed

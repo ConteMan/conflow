@@ -106,18 +106,20 @@ function PlanInvalidationBanner({ plan, automaticRetryExhausted, onRebuild }: { 
 function PlanReview({ plan, environment, onOpenConfiguration, onOpenRelease }: { plan: Plan; environment: Environment; onOpenConfiguration: () => void; onOpenRelease: (planID: string) => void }) {
   const invalid = isPlanInvalid(plan);
   const [treeClosed, setTreeClosed] = useState(false);
-  const directChanges = plan.semantic_changes.length;
-  const isEmptyPlan = !invalid && directChanges === 0 && plan.affected_entities.length === 0 && plan.remote_parameter_changes.length === 0;
+  const managedDrift = plan.semantic_changes.filter((change) => change.change_kind === "managed_remote_drift").length;
+  const directChanges = plan.semantic_changes.length - managedDrift;
+  const remoteChanges = new Set(plan.remote_parameter_changes.map((change) => change.parameter_key)).size;
+  const isEmptyPlan = !invalid && plan.semantic_changes.length === 0 && plan.affected_entities.length === 0 && remoteChanges === 0;
   if (isEmptyPlan) return <section className="plan-empty"><CheckCircle2 size={32} /><h2>当前环境没有待发布的修改</h2><p>修改配置后可重新构建发布计划。</p><Button onClick={onOpenConfiguration}>返回配置</Button></section>;
   return <>
     {!invalid ? <section className={`plan-status ${plan.status === "preview_only" ? "plan-status--preview" : "plan-status--ready"}`}>{plan.status === "preview_only" ? <><CircleAlert size={18} /><strong>不可发布</strong><span>{plan.blocking_reasons.map((item) => item.summary).join("；") || "服务端仅允许预览此计划。"}</span></> : <><CheckCircle2 size={18} /><strong>计划可审阅</strong><span>风险与发布条件均以服务端结果为准。</span></>}</section> : null}
     <section className={invalid ? "plan-review plan-review--stale" : "plan-review"}>
-      <div className="metric-grid plan-metrics"><Metric label="直接修改" value={`${directChanges} 项`} copy="用户明确修改" /><Metric label="受影响实体" value={`${plan.affected_entities.length} 个`} copy="由业务影响展开" /><Metric label="远端参数" value={`${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 项`} copy="最终写入目标" /><Metric label="最高风险" value={riskLabel(plan.severity)} copy={`${plan.risk_items.filter((item) => item.acknowledgement_required).length} 项需要确认`} risk={plan.severity} /></div>
+      <div className="metric-grid plan-metrics"><Metric label="直接修改" value={`${directChanges} 项`} copy="用户明确修改" /><Metric label="远端漂移" value={`${managedDrift} 项`} copy="本地目标与远端不一致" /><Metric label="受影响实体" value={`${plan.affected_entities.length} 个`} copy="由业务影响展开" /><Metric label="远端参数" value={`${remoteChanges} 项`} copy="最终写入目标" /><Metric label="最高风险" value={riskLabel(plan.severity)} copy={`${plan.risk_items.filter((item) => item.acknowledgement_required).length} 项需要确认`} risk={plan.severity} /></div>
       <div className="plan-layout">
         <div className="plan-main">
           <section className="semantic-tree panel">
             <button className="panel-section-toggle tree-heading" onClick={() => setTreeClosed((c) => !c)} aria-expanded={!treeClosed}>
-              <div><h2>业务变更与影响</h2><p>{`${directChanges} 项直接修改 · ${plan.affected_entities.length} 个受影响实体 · ${new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 个远端参数`}</p></div>
+              <div><h2>业务变更与影响</h2><p>{`${directChanges} 项直接修改 · ${managedDrift} 项远端漂移 · ${plan.affected_entities.length} 个受影响实体 · ${remoteChanges} 个远端参数`}</p></div>
               <ChevronDown size={16} className={treeClosed ? "section-chevron section-chevron--closed" : "section-chevron"} />
             </button>
             {!treeClosed ? <SemanticTree plan={plan} /> : null}
@@ -182,7 +184,7 @@ function fieldLabel(path: string) {
   return ({ description: "描述", cache_policy: "缓存策略", key: "键", ad_type: "广告类型", enabled_switch_id: "启用开关", frequency_policy_type: "频控类型", frequency_policy_id: "频控策略", custom_frequency_policy: "自定义频控", load_timeout_ms: "加载超时", cache_ttl: "缓存有效期", fallback_behavior: "兜底行为", network_mode: "广告链路", client_id: "客户端 ID", cooldown: "冷却时间", interval: "展示间隔", max_count: "次数上限", shift_count: "分时上限", positions: "适用位置", default_value: "默认值", risk_level: "风险等级", rollback_method: "回滚方式", active_network: "当前网络", mediation_strategy: "聚合策略", platforms: "平台", value: "参数值", value_type: "值类型", unit_id_ref: "广告单元引用", status: "配置状态" } as Record<string, string>)[field] ?? field;
 }
 export function riskLabel(value: string) { return ({ low: "低", medium: "中", high: "高", blocking: "阻断" } as Record<string, string>)[value] ?? value; }
-function changeKind(value: string) { return ({ created: "新增", updated: "修改", deleted: "删除", overridden: "环境专属修改" } as Record<string, string>)[value] ?? value; }
-function entityType(value: string) { return ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定" } as Record<string, string>)[value] ?? value; }
+function changeKind(value: string) { return ({ created: "新增", added: "新增", updated: "修改", deleted: "删除", overridden: "环境专属修改", managed_remote_drift: "受管远端漂移" } as Record<string, string>)[value] ?? value; }
+function entityType(value: string) { return ({ placement: "广告位", frequency_policy: "频控策略", feature_switch: "功能开关", unit_binding: "广告单元绑定", custom_parameter: "自定义参数", ad_strategy: "广告策略", ad_strategy_settings: "广告策略设置", network_settings: "广告网络设置", remote_config_layout: "远端参数布局" } as Record<string, string>)[value] ?? value; }
 function impactKind(value: string) { return ({ direct: "直接修改", inherited: "继承影响", referenced: "引用影响", compiled: "编译结果" } as Record<string, string>)[value] ?? value; }
 function toRequestError(cause: unknown) { if (cause instanceof ConflowAPIError) return { code: cause.code, requestId: cause.requestId }; if (cause instanceof ConflowNetworkError) return { code: "network_unavailable" }; return { code: "internal_error" }; }

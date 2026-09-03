@@ -182,7 +182,9 @@ export function RollbackFlow({ environment, releaseID, onOpenHistory, onOpenReco
 }
 
 function ReviewStep({ plan, environment, onNext }: { plan: Plan; environment: Environment; onNext: () => void }) {
-  return <div className="release-flow-layout"><section className="panel semantic-tree"><header className="tree-heading"><div><h2>审阅发布计划</h2><p>{plan.semantic_changes.length} 项直接修改 · {plan.affected_entities.length} 个受影响实体 · {new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 个远端参数</p></div><span className={`risk-tag risk-tag--${plan.severity === "blocking" ? "high" : plan.severity}`}>{riskLabel(plan.severity)}风险</span></header><SemanticTree plan={plan} /></section><aside className="release-flow-sidebar"><Button variant="primary" onClick={onNext}>继续确认风险</Button><TargetCard environment={environment} planID={plan.plan_id} remoteVersion={plan.remote_snapshot.version} /><RiskPanel plan={plan} /></aside></div>;
+  const managedDrift = plan.semantic_changes.filter((change) => change.change_kind === "managed_remote_drift").length;
+  const directChanges = plan.semantic_changes.length - managedDrift;
+  return <div className="release-flow-layout"><section className="panel semantic-tree"><header className="tree-heading"><div><h2>审阅发布计划</h2><p>{directChanges} 项直接修改 · {managedDrift} 项远端漂移 · {plan.affected_entities.length} 个受影响实体 · {new Set(plan.remote_parameter_changes.map((c) => c.parameter_key)).size} 个远端参数</p></div><span className={`risk-tag risk-tag--${plan.severity === "blocking" ? "high" : plan.severity}`}>{riskLabel(plan.severity)}风险</span></header><SemanticTree plan={plan} /></section><aside className="release-flow-sidebar"><Button variant="primary" onClick={onNext}>继续确认风险</Button><TargetCard environment={environment} planID={plan.plan_id} remoteVersion={plan.remote_snapshot.version} /><RiskPanel plan={plan} /></aside></div>;
 }
 
 function RollbackReview({ preview, environment, onNext, onBack }: { preview: RollbackPreview; environment: Environment; onNext: () => void; onBack: () => void }) {

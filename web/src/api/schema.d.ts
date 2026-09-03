@@ -1536,7 +1536,7 @@ export interface components {
             message: string;
         };
         /** @enum {string} */
-        PlanChangeKind: "created" | "updated" | "deleted" | "overridden";
+        PlanChangeKind: "created" | "added" | "updated" | "deleted" | "overridden" | "managed_remote_drift";
         PlanNodeID: string;
         SemanticChange: {
             node_id: components["schemas"]["PlanNodeID"];
@@ -1585,7 +1585,7 @@ export interface components {
             risk_item_id: string;
             severity: components["schemas"]["RiskSeverity"];
             /** @enum {string} */
-            reason_code: "shared_frequency_policy_relaxed" | "frequency_policy_changed" | "global_feature_switch_changed" | "production_network_mode_changed" | "production_network_settings_changed" | "unit_binding_changed" | "remote_parameter_key_changed" | "managed_parameter_deleted" | "custom_parameter_changed" | "custom_parameter_deleted" | "custom_parameter_adopted" | "ad_strategy_changed" | "ad_strategy_relaxed" | "ad_strategy_deleted" | "ad_strategy_settings_changed" | "ad_strategy_placement_identity_changed" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            reason_code: "shared_frequency_policy_relaxed" | "frequency_policy_changed" | "global_feature_switch_changed" | "production_network_mode_changed" | "production_network_settings_changed" | "unit_binding_changed" | "remote_parameter_key_changed" | "managed_parameter_deleted" | "managed_remote_drift" | "unmanaged_remote_parameter_preserved" | "custom_parameter_changed" | "custom_parameter_deleted" | "custom_parameter_adopted" | "ad_strategy_changed" | "ad_strategy_relaxed" | "ad_strategy_deleted" | "ad_strategy_settings_changed" | "ad_strategy_placement_identity_changed" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
             summary: string;
             entity_ref?: components["schemas"]["EntityRef"];
             semantic_change_ids: components["schemas"]["PlanNodeID"][];
@@ -1594,7 +1594,7 @@ export interface components {
         };
         BlockingReason: {
             /** @enum {string} */
-            reason_code: "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
+            reason_code: "managed_parameter_deleted" | "unmodeled_remote_condition" | "remote_baseline_missing" | "validation_not_ready" | "remote_snapshot_unavailable";
             summary: string;
             risk_item_id?: string;
             node_id?: components["schemas"]["PlanNodeID"];

@@ -126,7 +126,7 @@ test("bootstrap renders project overview from API data", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Photo Editor" })).toBeVisible();
   await expect(page.getByText("mobile-ad-monetization/v1")).toBeVisible();
   await expect(page.getByText("配置实体").locator("../..")).toContainText("9");
-  await expect(page.getByText("未发布修改").locator("../..")).toContainText("已同步");
+  await expect(page.getByText("未发布修改").locator("../..")).toContainText("本地无修改");
   await expect(page.getByText("校验状态").locator("../..")).toContainText("未校验");
   await expect(page.getByText("远端连接").locator("../..")).toContainText("未配置");
 });
