@@ -702,17 +702,7 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 		fail("compiling", err)
 		return
 	}
-	schema, environments, err := s.draftSchema(manifest.Manifest)
-	if err != nil {
-		fail("compiling", err)
-		return
-	}
-	sourceSnapshot, err := s.source.Load()
-	if err != nil {
-		fail("compiling", err)
-		return
-	}
-	baseline, baseLayer := s.resolveBaseline(environmentID, schema, environments, sourceSnapshot, view)
+	baseline, baseLayer := s.resolveBaseline(environmentID)
 	if baseline == nil {
 		fail("compiling", errors.New("failed to resolve plan baseline"))
 		return
@@ -744,16 +734,10 @@ func (s *Service) buildPlan(operationID, environmentID string) {
 // When a prior successful release exists for the environment and its Conflow
 // effective state has been stored, that state becomes the baseline so the plan
 // diff reflects only changes since the last publish. In all other cases
-// (first publish, migration gap from older releases) the function falls back to
-// the clean empty-override view so that the full configuration is shown as
-// additions, matching the pre-baseline behavior.
-func (s *Service) resolveBaseline(
-	environmentID string,
-	schema draft.Schema,
-	environments []draft.Environment,
-	sourceSnapshot source.Snapshot,
-	view draft.View,
-) (baseline map[string]any, baseLayer map[string]any) {
+// (first publish, migration gap from older releases) there is no historical
+// Conflow state, so the full effective configuration is compared with an empty
+// baseline and shown as additions.
+func (s *Service) resolveBaseline(environmentID string) (baseline map[string]any, baseLayer map[string]any) {
 	latest, found, err := s.releases.LatestSucceeded(environmentID)
 	if err == nil && found {
 		raw, err := s.releases.ConflowState(latest.ReleaseID)
@@ -764,11 +748,7 @@ func (s *Service) resolveBaseline(
 			}
 		}
 	}
-	clean, err := draft.BuildView(schema, environments, draftSourceSnapshot(sourceSnapshot), draft.State{Revision: 1, EnvironmentOverrides: map[string]map[string]any{}}, environmentID)
-	if err != nil {
-		return nil, nil
-	}
-	return clean.Effective, view.Baseline.Resolved.Value
+	return map[string]any{}, nil
 }
 
 // planRemoteSnapshot owns the Plan read boundary. A configured provider is

@@ -567,7 +567,7 @@ label small { color: var(--text-muted); font-size: 11px; font-weight: 400; line-
 .remote-param-table td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; }
 .remote-param-table td:first-child code { font-size: 12px; }
 .change-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.change-tag--created { background: var(--success-soft, #d1fae5); color: #065f46; }
+.change-tag--created, .change-tag--added { background: var(--success-soft, #d1fae5); color: #065f46; }
 .change-tag--updated { background: var(--warning-soft); color: var(--warning); }
 .change-tag--deleted { background: var(--danger-soft); color: var(--danger); }
 .change-tag--overridden { background: var(--accent-soft, #ede9fe); color: var(--accent); }

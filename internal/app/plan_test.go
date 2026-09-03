@@ -6,13 +6,44 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/ConteMan/conflow/internal/draft"
 	"github.com/ConteMan/conflow/internal/plan"
 	"github.com/ConteMan/conflow/internal/project"
+	"github.com/ConteMan/conflow/internal/release"
 )
+
+func TestResolveBaselineUsesEmptyStateForFirstPublish(t *testing.T) {
+	s, _ := planService(t)
+	baseline, baseLayer := s.resolveBaseline("development")
+	if len(baseline) != 0 || baseLayer != nil {
+		t.Fatalf("first publish baseline=%#v baseLayer=%#v", baseline, baseLayer)
+	}
+}
+
+func TestResolveBaselineUsesLatestSuccessfulConflowState(t *testing.T) {
+	s, _ := planService(t)
+	want := map[string]any{"feature_switches": []any{map[string]any{"id": "ads_enabled"}}}
+	raw, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	releasedAt := time.Date(2026, 9, 3, 10, 0, 0, 0, time.UTC)
+	const releaseID = "rel_plan_baseline"
+	if err := s.releases.Save(release.Release{ReleaseID: releaseID, EnvironmentID: "development", Kind: "publish", Outcome: "succeeded", CreatedAt: releasedAt, CompletedAt: releasedAt, OperationID: "op_plan_baseline"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.releases.SaveConflowState(releaseID, raw); err != nil {
+		t.Fatal(err)
+	}
+	baseline, baseLayer := s.resolveBaseline("development")
+	if !reflect.DeepEqual(baseline, want) || baseLayer != nil {
+		t.Fatalf("resolved baseline=%#v baseLayer=%#v", baseline, baseLayer)
+	}
+}
 
 func TestPlanInvalidationInputsAndTTL(t *testing.T) {
 	tests := []struct {
